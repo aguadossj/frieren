@@ -44,6 +44,13 @@ Cambia de stack solo con una razón concreta.
   con hora. Es material para el informe de setup que se publica al final.
 - Prioridad cuando hay conflicto: **funciona > se entiende > se siente bien > tiene más features.**
 
+## MCP del proyecto (`.mcp.json`)
+- **context7** — documentación al día. Úsalo SIEMPRE antes de escribir código con Vite 8, Tailwind v4,
+  React 19 o cualquier librería nueva que añadas (las APIs han cambiado respecto a lo que recuerdas).
+- **vercel** — logs de build/deploy cuando algo falle en producción (requiere login OAuth la primera vez).
+- **supabase** — solo si `SPEC.md` necesita estado compartido (leaderboard, salas). Si no, ignóralo.
+- **Simulador iOS** (`xcrun simctl` o la herramienta del simulador) — para probar en Safari iOS real.
+
 ## Agentes y comandos disponibles
 - `/kickoff <tema>` — ideación, puntuación y elección; genera `SPEC.md`.
 - `/checkpoint` — revisa la hora vs. el plan y decide qué recortar.

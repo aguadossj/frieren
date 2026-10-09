@@ -1,4 +1,35 @@
 {
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(vercel:*)",
+      "Bash(xcrun simctl:*)",
+      "Bash(open -a Simulator:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(date:*)",
+      "Bash(curl:*)",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "WebSearch",
+      "mcp__context7",
+      "mcp__vercel",
+      "mcp__Claude_Browser",
+      "mcp__Claude_Code_iOS_Simulator"
+    ],
+    "deny": [
+      "Bash(git push --force:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf /:*)"
+    ]
+  },
   "hooks": {
     "UserPromptSubmit": [
       {
