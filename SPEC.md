@@ -1,4 +1,5 @@
-URL: https://app-azure-sigma-64.vercel.app
+URL de la demo: **proyecto Vercel de Mario** (`app/.vercel` en su portátil; poner aquí la URL de producción en cuanto exista).
+La antigua `app-azure-sigma-64.vercel.app` (equipo `ferrer-labs`) queda **retirada**: no se despliega ahí ni se imprime en el QR.
 
 # Typing… — your friends fake your replies. Spot the real one.
 Track: **Game** · Party game para grupos, en el navegador del móvil.
@@ -17,7 +18,9 @@ La IA escribe un chat de tu grupo, a uno le toca contestar de verdad y los demá
 
 ## Pantallas
 Home (crear / unirse) · Lobby (QR, jugadores, pack) · Writing · Voting · Reveal · Leaderboard · Final.
-La fase de la sala decide la pantalla (`app/src/App.tsx`). Estilo: `design-refs/STYLE.md` (rojo `#EE2B2B`, blanco, negro).
+La fase de la sala decide la pantalla (`app/src/App.tsx`). Estilo: **`design-refs/mockup.png` manda**, detalles en
+`design-refs/STYLE.md` (rojo `#EE2B2B` en todas las pantallas, también la revelación; blanco; negro de acento).
+Votación en dos pasos: tocar burbuja → **Lock vote**. Final = Leaderboard con `final` + Share.
 
 ## Reglas (fuente de verdad: `app/src/game/types.ts` y `app/src/game/scoring.ts`)
 - 3–8 jugadores. Rondas = nº de jugadores (máx. 5); cada uno es el "writer" una vez.
@@ -65,24 +68,29 @@ idiomas que no sean inglés · historial de partidas · pantalla grande tipo TV 
 | **T2 — UI** | Pantallas, componentes, animaciones | `app/src/screens/**`, `app/src/components/**`, `app/src/App.tsx`, `app/src/index.css` |
 | **T3 — Contenido, IA, QA, deploy** | Packs, premios, IA, QR, sonidos, deploy, QA | `app/src/content/**`, `app/api/**`, `app/public/sfx/**`, QR en Lobby (avisar a T2), `AGENT_LOG.md`, `SETUP.md` |
 
-`app/src/game/scoring.ts` y `mockClient.ts`: T1 (la UI no los toca). Solo T3 despliega (`/ship`, cuenta Vercel `ferrer-labs`).
-Git: commits pequeños a `main`, `git pull --rebase` antes de cada push, `npm run build` antes de cada commit.
+`app/src/game/scoring.ts` y `mockClient.ts`: T1 (la UI no los toca).
+**Deploy: solo Mario** (`cd app && npx vercel --prod --yes` en su portátil, su cuenta de Vercel). Los demás piden deploy en el chat del equipo.
+Las env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `ANTHROPIC_API_KEY`) se añaden a **ese** proyecto (`npx vercel env add …` desde el portátil de Mario).
+Git: `git pull --rebase` **antes de empezar cada tarea** y antes de cada push (el viernes dos sesiones hicieron el Paso 0 a la vez y chocaron),
+commits pequeños a `main`, `npm run build` antes de cada commit. Node ≥ 20.19 (Vite 8): `nvm use 22`.
 
 ### Primeros 30 minutos de cada terminal (08:00)
 - **T1:** `claude /mcp` → autenticar `supabase` y comprobar que el proyecto se llama `frieren` → `.env.local` con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` →
   cargar skills `supabase` y `supabase-postgres-best-practices` → migración con tablas + RLS + `create_room`/`join_room`.
-- **T2:** `cd app && npm install && npm run dev`, jugar una partida con el mock, y pulir pantalla a pantalla siguiendo `STYLE.md`
-  (animaciones de burbujas, revelación con "typing" → pop, ranking que se reordena).
-- **T3:** QR real en Lobby (`npm i qrcode`), ampliar `packs.ts` a ≥ 30 chats (8+ por pack), conseguir clave de Anthropic
-  y `npx vercel env add ANTHROPIC_API_KEY`, deploy del estado actual.
+- **T2:** `cd app && npm install && npm run dev`, jugar una partida con el mock. Las pantallas **ya siguen el mockup** (`components/ui.tsx`):
+  comparar cada una con `design-refs/mockup.png` en 375×812 y pulir (revelación con "typing" → pop de la real, ranking que se reordena,
+  estados vacíos y errores, teclado de iOS tapando el input).
+- **T3:** ampliar `packs.ts` a ≥ 30 chats (8+ por pack), premios y sonidos, `api/generate-chats.ts`, conseguir clave de Anthropic
+  (Mario la añade al proyecto de Vercel). QR real **ya hecho** (`components/QR.tsx`).
 
 ## Hitos (sábado 10 oct)
-- **08:30** — Supabase creado y env vars puestas; deploy rojo con el mock funcionando en la URL.
+- **01:30 (vie→sáb) ✓** — Paso 0 (Andrés) + UI estilo mockup con QR (Mario) en `main`; primer deploy desde el proyecto de Mario.
+- **08:30** — Supabase creado y env vars puestas en el proyecto de Vercel de Mario; URL de la demo apuntada arriba.
 - **10:30** — T1: RPCs + Realtime probados en SQL · T2: todas las pantallas pulidas contra el mock · T3: packs + QR + sonidos.
 - **11:30** — UI conectada a Supabase: 3 móviles juegan una partida completa con packs.
 - **12:00 — FEATURE FREEZE.** IA conectada con fallback si hay clave; si no, packs y listo.
 - **12:00–15:00** — Pulido (`polish`), final compartible, 5 desconocidos lo prueban, arreglos.
-- **15:00** — Solo bugs. `/ship` final, QR impreso, `/setup-report`. **15:45** congelado. **16:00** code freeze.
+- **15:00** — Solo bugs. Deploy final (Mario), QR impreso con la URL de arriba, `/setup-report`. **15:45** congelado. **16:00** code freeze.
 
 ## Definition of done
 - [ ] 3 móviles reales (al menos un iPhone) juegan 3 rondas seguidas sin errores.
