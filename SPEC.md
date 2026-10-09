@@ -36,7 +36,7 @@ idiomas que no sean inglés · historial de partidas · pantalla grande tipo TV 
 ## Arquitectura
 - **Front:** Vite + React 19 + TS + Tailwind v4 en `app/`. La UI solo usa `useGame()` (`app/src/game/useGame.ts`),
   que expone un `GameClient` (contrato en `types.ts`). Hoy: `mockClient.ts` (memoria + 3 bots). Mañana: `supabaseClient.ts`.
-- **Tiempo real:** Supabase, **proyecto nuevo dedicado**.
+- **Tiempo real:** Supabase, **proyecto dedicado `frieren`** (ref `xociawfbjmccevhjcfiu`, ya en `.mcp.json`). Nunca usar otro proyecto.
   - Tablas `rooms`, `players`, `answers`, `votes`, `reactions`. RLS activado, **solo `select`** por sala; **ninguna escritura directa**.
   - Todas las escrituras por RPC `security definer`: `create_room`, `join_room`, `set_options`, `start_game`,
     `submit_answer`, `cast_vote`, `react`, `advance_phase`.
@@ -69,7 +69,7 @@ idiomas que no sean inglés · historial de partidas · pantalla grande tipo TV 
 Git: commits pequeños a `main`, `git pull --rebase` antes de cada push, `npm run build` antes de cada commit.
 
 ### Primeros 30 minutos de cada terminal (08:00)
-- **T1:** crear proyecto Supabase (región EU) → `.env.local` con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` →
+- **T1:** `claude /mcp` → autenticar `supabase` y comprobar que el proyecto se llama `frieren` → `.env.local` con `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` →
   cargar skills `supabase` y `supabase-postgres-best-practices` → migración con tablas + RLS + `create_room`/`join_room`.
 - **T2:** `cd app && npm install && npm run dev`, jugar una partida con el mock, y pulir pantalla a pantalla siguiendo `STYLE.md`
   (animaciones de burbujas, revelación con "typing" → pop, ranking que se reordena).
