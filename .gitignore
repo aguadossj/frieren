@@ -34,3 +34,6 @@ temp/
 .claude/worktrees/
 .hackathon/
 qr.png
+
+# Project instructions
+CLAUDE.md
