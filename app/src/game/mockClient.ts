@@ -1,0 +1,277 @@
+// GameClient local, sin backend: estado en memoria, temporizadores y 3 bots.
+// Sirve para construir y probar la UI (T2) mientras T1 hace Supabase.
+// - createRoom: eres host; entran 3 bots y tú pulsas Start.
+// - joinRoom: un bot es host y empieza solo a los 4 s.
+
+import { buildChat, pickTemplates } from '../content/packs'
+import { scoreRound } from './scoring'
+import {
+  MAX_ANSWER_LENGTH,
+  MAX_NAME_LENGTH,
+  MAX_ROUNDS,
+  MAX_VOTE_OPTIONS,
+  MIN_PLAYERS,
+  PHASE_SECONDS,
+  PLAYER_COLORS,
+} from './types'
+import type { Answer, Chat, GameClient, GameState, Pack, Phase, Player, Room, RoundResult } from './types'
+
+const BOT_NAMES = ['Marta', 'Laura', 'Pol']
+const BOT_REPLIES = [
+  'it was the cat bro',
+  "I'll buy you 2 tomorrow ok",
+  'skincare routine 💅',
+  "who's asking",
+  'no comment 🙃',
+  'ask my lawyer',
+  'lol',
+  'I was sleepwalking',
+]
+
+const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)]
+const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5)
+const randomCode = () => Array.from({ length: 4 }, () => pick('ABCDEFGHJKLMNPQRSTUVWXYZ'.split(''))).join('')
+
+interface Option {
+  id: string
+  text: string
+  authorId: string
+  isReal: boolean
+}
+
+export function createMockClient(): GameClient {
+  const listeners = new Set<(state: GameState) => void>()
+  let timers: ReturnType<typeof setTimeout>[] = []
+
+  let meId: string | null = null
+  let code = ''
+  let phase: Phase = 'lobby'
+  let pack: Pack = 'uni'
+  let groupType: Room['groupType'] = 'friends'
+  let players: Player[] = []
+  let roundIndex = 0
+  let totalRounds = 0
+  let phaseEndsAt: number | null = null
+  let writerOrder: string[] = []
+  let chats: Chat[] = []
+  let submissions: Record<string, string> = {}
+  let options: Option[] = []
+  let votes: Record<string, string> = {}
+  let laughs: Record<string, string[]> = {}
+  let result: RoundResult | null = null
+  let error: string | null = null
+
+  const later = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
+  const clearTimers = () => {
+    timers.forEach(clearTimeout)
+    timers = []
+  }
+
+  const writerId = () => writerOrder[roundIndex]
+  const bots = () => players.filter((p) => p.id !== meId)
+
+  function getState(): GameState {
+    if (!meId) return { room: null, meId: null, error }
+    const answers: Answer[] =
+      phase === 'voting' ? options.map((o) => ({ id: o.id, text: o.text, mine: o.authorId === meId })) : []
+    const room: Room = {
+      code,
+      phase,
+      roundIndex,
+      totalRounds,
+      phaseEndsAt,
+      pack,
+      groupType,
+      players,
+      chat: ['writing', 'voting', 'reveal'].includes(phase) ? chats[roundIndex] : null,
+      answers,
+      submittedIds: Object.keys(submissions),
+      votedIds: Object.keys(votes),
+      myVote: votes[meId] ?? null,
+      myLaughs: Object.keys(laughs).filter((id) => laughs[id].includes(meId!)),
+      result: phase === 'reveal' || phase === 'leaderboard' ? result : null,
+    }
+    return { room, meId, error }
+  }
+
+  const emit = () => {
+    const state = getState()
+    listeners.forEach((listener) => listener(state))
+  }
+
+  function addPlayer(name: string, isHost: boolean): Player {
+    const player: Player = {
+      id: crypto.randomUUID(),
+      name: name.trim().slice(0, MAX_NAME_LENGTH),
+      color: PLAYER_COLORS[players.length % PLAYER_COLORS.length],
+      score: 0,
+      isHost,
+    }
+    players = [...players, player]
+    return player
+  }
+
+  function setPhase(next: Phase, seconds: number | null, onEnd?: () => void) {
+    clearTimers()
+    phase = next
+    phaseEndsAt = seconds ? Date.now() + seconds * 1000 : null
+    if (seconds && onEnd) later(seconds * 1000, onEnd)
+  }
+
+  function startWriting() {
+    submissions = {}
+    votes = {}
+    laughs = {}
+    options = []
+    result = null
+    setPhase('writing', PHASE_SECONDS.writing, startVoting)
+    for (const bot of bots()) {
+      later(2000 + Math.random() * 6000, () => submit(bot.id, pick(BOT_REPLIES)))
+    }
+    emit()
+  }
+
+  function submit(playerId: string, text: string) {
+    if (phase !== 'writing' || submissions[playerId] !== undefined) return
+    submissions = { ...submissions, [playerId]: text.trim().slice(0, MAX_ANSWER_LENGTH) || '…' }
+    if (Object.keys(submissions).length === players.length) startVoting()
+    else emit()
+  }
+
+  function startVoting() {
+    const writer = writerId()
+    const textOf = (id: string) => submissions[id] ?? '…'
+    // Siempre incluimos la mía si soy impostor, para poder ver que no se puede votar.
+    const impostors = shuffle(players.filter((p) => p.id !== writer).map((p) => p.id))
+    const chosen = impostors.slice(0, MAX_VOTE_OPTIONS - 1)
+    options = shuffle([
+      { id: 'real', text: textOf(writer), authorId: writer, isReal: true },
+      ...chosen.map((id) => ({ id: `a-${id}`, text: textOf(id), authorId: id, isReal: false })),
+    ]).map((o, i) => ({ ...o, id: `opt-${i}` }))
+
+    setPhase('voting', PHASE_SECONDS.voting, startReveal)
+    for (const bot of bots().filter((b) => b.id !== writer)) {
+      later(1500 + Math.random() * 6000, () => {
+        const choices = options.filter((o) => o.authorId !== bot.id)
+        vote(bot.id, pick(choices).id)
+        if (Math.random() < 0.3) laugh(bot.id, pick(options).id)
+      })
+    }
+    emit()
+  }
+
+  function vote(voterId: string, answerId: string) {
+    const option = options.find((o) => o.id === answerId)
+    if (phase !== 'voting' || !option || option.authorId === voterId || voterId === writerId()) return
+    votes = { ...votes, [voterId]: answerId }
+    if (Object.keys(votes).length === players.length - 1) startReveal()
+    else emit()
+  }
+
+  function laugh(voterId: string, answerId: string) {
+    if (phase !== 'voting') return
+    const current = laughs[answerId] ?? []
+    if (current.includes(voterId)) return
+    laughs = { ...laughs, [answerId]: [...current, voterId] }
+    emit()
+  }
+
+  function startReveal() {
+    const writer = players.find((p) => p.id === writerId())!
+    result = scoreRound({ writer, players, options, votes, laughs })
+    players = players.map((p) => ({ ...p, score: p.score + (result!.points[p.id] ?? 0) }))
+    setPhase('reveal', PHASE_SECONDS.reveal, () => {
+      setPhase('leaderboard', PHASE_SECONDS.leaderboard, () => {
+        if (roundIndex + 1 < totalRounds) {
+          roundIndex += 1
+          startWriting()
+        } else {
+          setPhase('final', null)
+          emit()
+        }
+      })
+      emit()
+    })
+    emit()
+  }
+
+  function begin() {
+    if (players.length < MIN_PLAYERS) {
+      error = `You need at least ${MIN_PLAYERS} players.`
+      emit()
+      return
+    }
+    error = null
+    totalRounds = Math.min(players.length, MAX_ROUNDS)
+    writerOrder = shuffle(players.map((p) => p.id)).slice(0, totalRounds)
+    chats = pickTemplates(pack, totalRounds).map((template, i) => {
+      const writer = players.find((p) => p.id === writerOrder[i])!
+      return buildChat(template, writer, shuffle(players.filter((p) => p.id !== writer.id)))
+    })
+    roundIndex = 0
+    startWriting()
+  }
+
+  function reset() {
+    clearTimers()
+    meId = null
+    players = []
+    phase = 'lobby'
+    phaseEndsAt = null
+    roundIndex = 0
+    result = null
+    error = null
+  }
+
+  return {
+    async createRoom(name) {
+      reset()
+      code = randomCode()
+      meId = addPlayer(name, true).id
+      emit()
+      BOT_NAMES.forEach((botName, i) =>
+        later(600 * (i + 1), () => {
+          addPlayer(botName, false)
+          emit()
+        }),
+      )
+    },
+    async joinRoom(roomCode, name) {
+      reset()
+      code = roomCode.toUpperCase()
+      addPlayer(BOT_NAMES[0], true)
+      meId = addPlayer(name, false).id
+      addPlayer(BOT_NAMES[1], false)
+      addPlayer(BOT_NAMES[2], false)
+      emit()
+      later(4000, begin)
+    },
+    async setOptions(options) {
+      if (phase !== 'lobby') return
+      pack = options.pack ?? pack
+      groupType = options.groupType ?? groupType
+      emit()
+    },
+    async startGame() {
+      if (phase === 'lobby') begin()
+    },
+    async submitAnswer(text) {
+      if (meId) submit(meId, text)
+    },
+    async castVote(answerId) {
+      if (meId) vote(meId, answerId)
+    },
+    async react(answerId) {
+      if (meId) laugh(meId, answerId)
+    },
+    async leave() {
+      reset()
+      emit()
+    },
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    getState,
+  }
+}

@@ -1,14 +1,27 @@
+import { useGame } from './game/useGame'
+import Home from './screens/Home'
+import Lobby from './screens/Lobby'
+import Writing from './screens/Writing'
+import Voting from './screens/Voting'
+import { Leaderboard, Reveal } from './screens/Results'
+
+// Router por fase: la fase de la sala decide la pantalla. Sin rutas ni navegación manual.
 export default function App() {
-  return (
-    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6 text-center">
-      <h1 className="text-4xl font-bold tracking-tight">TODO_NAME</h1>
-      <p className="text-lg text-white/70">Walking skeleton. Replace me after /kickoff.</p>
-      <button
-        className="w-full max-w-xs rounded-2xl bg-white py-4 text-lg font-semibold text-black active:scale-95 transition"
-        onClick={() => navigator.vibrate?.(20)}
-      >
-        Start
-      </button>
-    </main>
-  )
+  const { room } = useGame()
+  if (!room) return <Home />
+
+  switch (room.phase) {
+    case 'lobby':
+      return <Lobby />
+    case 'writing':
+      return <Writing key={room.roundIndex} />
+    case 'voting':
+      return <Voting />
+    case 'reveal':
+      return <Reveal />
+    case 'leaderboard':
+      return <Leaderboard />
+    case 'final':
+      return <Leaderboard final />
+  }
 }
