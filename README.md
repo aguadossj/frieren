@@ -2,6 +2,8 @@
 
 Hackathon project by the team.
 
+Welcome to our hackathon project!
+
 ## Team
 
 - aguadossj
