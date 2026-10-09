@@ -1,7 +1,8 @@
-import { Avatar, Body, Button, Footer, Row, Screen, TopBar, TopNote } from '../components/ui'
+import { useState } from 'react'
+import { AppHeader, Avatar, Body, Button, Card, Eyebrow, Footer, Icon, Row, Screen } from '../components/ui'
 import QR, { joinUrl } from '../components/QR'
 import { useGame } from '../game/useGame'
-import { MIN_PLAYERS } from '../game/types'
+import { MAX_PLAYERS, MIN_PLAYERS } from '../game/types'
 import type { Pack } from '../game/types'
 
 const PACKS: { id: Pack; label: string }[] = [
@@ -13,60 +14,91 @@ const PACKS: { id: Pack; label: string }[] = [
 
 export default function Lobby() {
   const { room, me, game, error } = useGame()
+  const [copied, setCopied] = useState(false)
   if (!room || !me) return null
   const missing = MIN_PLAYERS - room.players.length
   const host = room.players.find((p) => p.isHost)
 
-  const share = () => {
+  const copy = () => {
     const url = joinUrl(room.code)
-    if (navigator.share) void navigator.share({ title: 'Typing…', url }).catch(() => {})
-    else void navigator.clipboard?.writeText(url)
+    if (navigator.clipboard) {
+      void navigator.clipboard.writeText(url).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      })
+    } else if (navigator.share) void navigator.share({ title: 'Typing…', url }).catch(() => {})
   }
 
   return (
     <Screen>
-      <TopBar
-        title={
-          <>
-            Room{' '}
-            <button onClick={share} className="ml-1 rounded-full bg-brand px-3 py-0.5 tracking-[0.18em] text-white active:scale-95">
-              {room.code}
-            </button>
-          </>
-        }
-        right={<TopNote>{room.players.length} joined</TopNote>}
-      />
+      <header className="shrink-0 bg-white text-ink">
+        <AppHeader />
+      </header>
 
-      <Body className="gap-3 pt-4">
-        <QR code={room.code} />
-
-        <ul className="mt-1 flex flex-col gap-3">
-          {room.players.map((p) => (
-            <li key={p.id} className="animate-rise">
-              <Row>
-                <Avatar player={p} />
-                <span className="flex-1 truncate text-[19px] font-semibold">
-                  {p.name}
-                  {p.id === me.id && <span className="text-neutral-400"> (you)</span>}
-                </span>
-                {p.isHost && <span className="text-[15px] text-neutral-400">host</span>}
-              </Row>
-            </li>
-          ))}
-        </ul>
-
-        <div className="flex flex-wrap gap-2 pt-1">
-          {PACKS.map((p) => (
+      <Body className="gap-5 pt-5">
+        <Card className="animate-pop">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Eyebrow className="text-neutral-500">Room code</Eyebrow>
+              <div className="text-[38px] leading-none font-black tracking-[0.16em]">{room.code}</div>
+            </div>
             <button
-              key={p.id}
-              disabled={!me.isHost}
-              onClick={() => void game.setOptions({ pack: p.id })}
-              className={`rounded-full px-4 py-2 text-[17px] font-semibold transition ${room.pack === p.id ? 'bg-ink text-white' : 'bg-brand-soft text-white/90'}`}
+              onClick={copy}
+              className="flex h-[44px] shrink-0 items-center gap-2 rounded-full bg-ink px-4 text-[15px] font-extrabold text-white active:scale-95"
             >
-              {p.label}
+              <Icon name={copied ? 'check' : 'copy'} size={16} />
+              {copied ? 'Copied' : 'Copy link'}
             </button>
-          ))}
-        </div>
+          </div>
+          <div className="-mx-5 -mb-2">
+            <QR code={room.code} size={144} />
+          </div>
+          <p className="text-center text-[15px] font-semibold text-neutral-500">Point a camera here to join</p>
+        </Card>
+
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between px-1">
+            <Eyebrow>Players ({room.players.length})</Eyebrow>
+            <span className="text-[14px] font-bold text-white/75">
+              {missing > 0 ? `Min ${MIN_PLAYERS}` : `Max ${MAX_PLAYERS}`}
+            </span>
+          </div>
+          <ul className="flex flex-col gap-2.5">
+            {room.players.map((p) => (
+              <li key={p.id} className="animate-rise">
+                <Row className="min-h-[60px]">
+                  <Avatar player={p} />
+                  <span className="flex-1 truncate text-[19px] font-semibold">
+                    {p.name}
+                    {p.id === me.id && <span className="text-neutral-400"> (you)</span>}
+                  </span>
+                  {p.isHost && (
+                    <span className="flex items-center gap-1 rounded-full bg-neutral-100 px-3 py-1 text-[14px] font-extrabold">
+                      <Icon name="crown" size={14} className="text-[#F5B700]" />
+                      Host
+                    </span>
+                  )}
+                </Row>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <Eyebrow className="px-1">Chat pack</Eyebrow>
+          <div className="flex flex-wrap gap-2">
+            {PACKS.map((p) => (
+              <button
+                key={p.id}
+                disabled={!me.isHost}
+                onClick={() => void game.setOptions({ pack: p.id })}
+                className={`min-h-[44px] rounded-full px-5 text-[17px] font-extrabold transition active:scale-95 ${room.pack === p.id ? 'bg-ink text-white' : 'bg-brand-soft text-white/90'}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </section>
       </Body>
 
       <Footer>
@@ -76,7 +108,10 @@ export default function Lobby() {
             {missing > 0 ? `Need ${missing} more` : 'Start game'}
           </Button>
         ) : (
-          <p className="py-5 text-center text-[18px] font-bold">Waiting for {host?.name ?? 'the host'} to start…</p>
+          <div className="flex h-[66px] items-center justify-center gap-3 rounded-full bg-white/15 text-[18px] font-bold">
+            <span className="size-2.5 animate-pulse rounded-full bg-white" />
+            Waiting for {host?.name ?? 'the host'} to start…
+          </div>
         )}
       </Footer>
     </Screen>

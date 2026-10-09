@@ -1,90 +1,165 @@
 import { useState } from 'react'
-import { Body, Button, Footer, Screen, TextInput, TypingDots } from '../components/ui'
+import { AppHeader, Body, Button, Eyebrow, Footer, Icon, Screen, TextInput, TypingDots } from '../components/ui'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
 
-// El QR de la sala apunta a ?room=CODE: entramos directamente al formulario de unirse.
+// El QR de la sala apunta a ?room=CODE: entramos directamente a la página de unirse.
 const codeFromUrl = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? ''
 
-type Mode = 'start' | 'create' | 'join'
+type Page = 'start' | 'create' | 'join'
+
+const STEPS = [
+  ['Get a message', 'The group chat asks you something.'],
+  ['Everyone fakes it', 'Friends copy how you text.'],
+  ['Spot the real one', 'Vote. Fool them. Score.'],
+] as const
 
 export default function Home() {
-  const { game, error } = useGame()
-  const [mode, setMode] = useState<Mode>(codeFromUrl ? 'join' : 'start')
-  const [name, setName] = useState('')
+  const [page, setPage] = useState<Page>(codeFromUrl ? 'join' : 'start')
   const [code, setCode] = useState(codeFromUrl)
-  const [hint, setHint] = useState<string | null>(null)
 
-  const submit = () => {
-    if (!name.trim()) return setHint('Pick a name first.')
-    if (mode === 'join' && code.trim().length !== 4) return setHint('Room codes have 4 letters.')
-    setHint(null)
-    void (mode === 'join' ? game.joinRoom(code, name) : game.createRoom(name))
-  }
+  if (page === 'create') return <NamePage mode="create" onBack={() => setPage('start')} />
+  if (page === 'join') return <NamePage mode="join" code={code} onBack={() => setPage('start')} />
+  return (
+    <Start
+      code={code}
+      setCode={setCode}
+      onCreate={() => setPage('create')}
+      onJoin={() => setPage('join')}
+    />
+  )
+}
+
+function Start({ code, setCode, onCreate, onJoin }: { code: string; setCode: (c: string) => void; onCreate: () => void; onJoin: () => void }) {
+  const [askCode, setAskCode] = useState(false)
 
   return (
     <Screen>
-      <Body className="items-center justify-center text-center">
-        <div className="mb-10 flex h-[56px] w-[74px] animate-pop items-center justify-center rounded-full bg-white">
-          <TypingDots />
+      <Body className="justify-center gap-7 pt-8">
+        <div className="text-center">
+          <div className="mx-auto mb-6 flex h-[52px] w-[70px] animate-pop items-center justify-center rounded-full bg-white">
+            <TypingDots />
+          </div>
+          <Eyebrow>Live bluffing party game</Eyebrow>
+          <h1 className="mt-2 text-[60px] leading-none font-black tracking-[-0.04em]">Typing…</h1>
+          <p className="mt-4 text-[19px] leading-snug font-semibold">
+            Your friends fake your replies.
+            <br />
+            Spot the real one.
+          </p>
         </div>
-        <h1 className="text-[64px] leading-none font-black tracking-[-0.04em]">Typing…</h1>
-        <p className="mt-6 text-[21px] leading-snug font-semibold">
-          Your friends fake your replies.
-          <br />
-          Spot the real one.
-        </p>
+
+        <ol className="flex animate-rise flex-col gap-3 rounded-[28px] bg-white/15 p-4" style={{ animationDelay: '0.15s' }}>
+          {STEPS.map(([title, line], i) => (
+            <li key={title} className="flex items-center gap-3">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[15px] font-black text-brand">{i + 1}</span>
+              <div className="leading-tight">
+                <div className="text-[17px] font-extrabold">{title}</div>
+                <div className="text-[15px] font-medium text-white/80">{line}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
       </Body>
 
-      {mode === 'start' ? (
-        <Footer>
-          <Button onClick={() => setMode('create')}>Create room</Button>
-          <Button variant="ink" onClick={() => setMode('join')}>
-            Join with code
-          </Button>
-          <p className="text-center text-[16px] font-semibold">No account. Just a name.</p>
-        </Footer>
-      ) : (
-        <form
-          className="flex shrink-0 animate-rise flex-col gap-3 px-5 pt-2 pb-6"
-          onSubmit={(e) => {
-            e.preventDefault()
-            submit()
-          }}
-        >
-          {mode === 'join' && (
+      <Footer>
+        <Button onClick={onCreate} className="flex items-center justify-between px-7">
+          <span className="flex items-center gap-3">
+            <Icon name="plus" size={22} />
+            Create room
+          </span>
+          <Icon name="arrowRight" size={22} />
+        </Button>
+
+        {askCode ? (
+          <form
+            className="flex animate-rise gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (code.length === 4) onJoin()
+            }}
+          >
             <TextInput
               placeholder="CODE"
               maxLength={4}
               autoCapitalize="characters"
+              autoFocus
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/[^a-z]/gi, '').toUpperCase())}
-              className="tracking-[0.3em] uppercase placeholder:tracking-[0.3em]"
-              autoFocus={!codeFromUrl}
+              className="min-w-0 flex-1 tracking-[0.3em] uppercase placeholder:tracking-[0.3em]"
             />
-          )}
-          <TextInput
-            placeholder="Your name"
-            maxLength={MAX_NAME_LENGTH}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoFocus={mode === 'create' || Boolean(codeFromUrl)}
-          />
-          <Button type="submit" variant={mode === 'join' ? 'ink' : 'white'}>
-            {mode === 'join' ? 'Join room' : 'Create room'}
+            <button
+              type="submit"
+              disabled={code.length !== 4}
+              className="h-[66px] shrink-0 rounded-full bg-ink px-7 text-[21px] font-extrabold text-white transition active:scale-[0.97] disabled:opacity-50"
+            >
+              Join
+            </button>
+          </form>
+        ) : (
+          <Button variant="ink" onClick={() => setAskCode(true)} className="flex items-center justify-between px-7">
+            <span>Join with code</span>
+            <span className="text-[16px] tracking-[0.2em] text-white/50">ABCD</span>
           </Button>
-          <button
-            type="button"
-            className="py-1 text-center text-[16px] font-semibold"
-            onClick={() => {
-              setHint(null)
-              setMode(mode === 'join' ? 'create' : 'join')
-            }}
-          >
-            {hint ?? error ?? (mode === 'join' ? 'Create a room instead' : 'Join with code instead')}
+        )}
+
+        <p className="text-center text-[16px] font-semibold">No account. Just a name.</p>
+      </Footer>
+    </Screen>
+  )
+}
+
+function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?: string; onBack: () => void }) {
+  const { game, error } = useGame()
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const join = mode === 'join'
+
+  const submit = () => {
+    if (!name.trim() || busy) return
+    setBusy(true)
+    void (join ? game.joinRoom(code, name) : game.createRoom(name)).finally(() => setBusy(false))
+  }
+
+  return (
+    <Screen>
+      <AppHeader
+        left={
+          <button onClick={onBack} className="-ml-2 flex h-[44px] items-center gap-2 px-2 text-[17px] font-extrabold active:scale-95">
+            <Icon name="arrowLeft" size={20} />
+            Back
           </button>
-        </form>
-      )}
+        }
+      />
+      <form
+        className="flex flex-1 flex-col"
+        onSubmit={(e) => {
+          e.preventDefault()
+          submit()
+        }}
+      >
+        <Body className="gap-6 pt-6">
+          <div className="animate-rise">
+            <Eyebrow>{join ? `Room · ${code}` : 'New room'}</Eyebrow>
+            <h1 className="mt-2 text-[40px] leading-[1.05] font-black tracking-[-0.03em]">{join ? 'Join the game' : 'Set up your game'}</h1>
+            <p className="mt-2 text-[18px] font-semibold text-white/85">
+              {join ? 'Pick a name. You’re in.' : 'Friends join by scanning your QR.'}
+            </p>
+          </div>
+
+          <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.1s' }}>
+            <Eyebrow>Your name</Eyebrow>
+            <TextInput placeholder="e.g. Pol" maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </label>
+        </Body>
+
+        <Footer>
+          {error && <p className="text-center text-[16px] font-bold">{error}</p>}
+          <Button type="submit" variant={join ? 'ink' : 'white'} disabled={!name.trim() || busy}>
+            {join ? 'Join room' : 'Create room'}
+          </Button>
+        </Footer>
+      </form>
     </Screen>
   )
 }

@@ -4,6 +4,7 @@ import Lobby from './screens/Lobby'
 import Writing from './screens/Writing'
 import Voting from './screens/Voting'
 import { Leaderboard, Reveal } from './screens/Results'
+import Final from './screens/Final'
 
 // Router por fase: la fase de la sala decide la pantalla. Sin rutas ni navegación manual.
 export default function App() {
@@ -22,6 +23,6 @@ export default function App() {
     case 'leaderboard':
       return <Leaderboard />
     case 'final':
-      return <Leaderboard final />
+      return <Final />
   }
 }

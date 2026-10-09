@@ -1,10 +1,122 @@
 // Componentes base (T2 es dueño). Estilo: design-refs/STYLE.md + design-refs/mockup.png (rojo, blanco, negro).
 // Escala del mockup: pills grandes, tipografía muy gruesa, cabecera blanca y cuerpo rojo.
 
+import { useState } from 'react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
+import { PHASE_SECONDS } from '../game/types'
 import type { Player } from '../game/types'
+import { joinUrl } from './QR'
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
+
+/** Iconos de línea (estilo lucide), heredan el color del texto. */
+const ICONS = {
+  copy: 'M9 9h10v10H9zM5 15V5h10',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
+  arrowRight: 'M5 12h14M13 6l6 6-6 6',
+  arrowLeft: 'M19 12H5M11 6l-6 6 6 6',
+  plus: 'M12 5v14M5 12h14',
+  crown: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z',
+  share: 'M12 3v12M7 8l5-5 5 5M5 14v6h14v-6',
+  replay: 'M4 4v6h6M4.6 15a8 8 0 1 0 1.8-8.3L4 10',
+} as const
+
+export function Icon({ name, size = 20, className = '' }: { name: keyof typeof ICONS; size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d={ICONS[name]} />
+    </svg>
+  )
+}
+
+/** Cabecera de la app: marca a la izquierda y, dentro de una sala, el código (tocar = copiar el enlace). */
+export function AppHeader({ code, left }: { code?: string; left?: ReactNode }) {
+  const [copied, setCopied] = useState(false)
+  const copy = () => {
+    if (!code) return
+    const url = joinUrl(code)
+    if (navigator.clipboard) {
+      void navigator.clipboard.writeText(url).then(() => {
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      })
+    } else if (navigator.share) void navigator.share({ title: 'Typing…', url }).catch(() => {})
+  }
+  return (
+    <div className="flex h-[56px] shrink-0 items-center justify-between gap-3 px-5">
+      {left ?? <span className="text-[22px] font-black tracking-[-0.03em] text-brand">Typing…</span>}
+      {code && (
+        <button onClick={copy} aria-label="Copy invite link" className="flex h-[38px] items-center gap-2 rounded-full bg-neutral-100 px-4 text-ink active:scale-95">
+          <span className="text-[16px] font-extrabold tracking-[0.18em]">{code}</span>
+          <Icon name={copied ? 'check' : 'copy'} size={15} className={copied ? 'text-good' : 'text-neutral-400'} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+export type RoundStep = 'writing' | 'voting' | 'reveal'
+const STEPS: { id: RoundStep; label: string }[] = [
+  { id: 'writing', label: 'Write' },
+  { id: 'voting', label: 'Vote' },
+  { id: 'reveal', label: 'Reveal' },
+]
+
+/** Bloque blanco superior de una ronda: cabecera + ronda, pasos (Write · Vote · Reveal), reloj y barra de tiempo. */
+export function RoundHeader({ code, step, round, total, seconds }: { code: string; step: RoundStep; round: number; total: number; seconds: number }) {
+  const current = STEPS.findIndex((s) => s.id === step)
+  const progress = Math.min(100, (seconds / PHASE_SECONDS[step]) * 100)
+  return (
+    <header className="shrink-0 bg-white text-ink">
+      <AppHeader code={code} />
+      <div className="flex items-center justify-between gap-2 px-5 pb-3">
+        <span className="shrink-0 leading-none font-extrabold tabular-nums">
+          <span className="block text-[11px] tracking-[0.14em] text-neutral-400">ROUND</span>
+          <span className="text-[17px]">
+            {round}/{total}
+          </span>
+        </span>
+        <ol className="flex items-center gap-1 rounded-full bg-neutral-100 p-1">
+          {STEPS.map((s, i) => (
+            <li
+              key={s.id}
+              className={cx(
+                'flex items-center gap-0.5 rounded-full px-2.5 py-1 text-[13px] font-extrabold transition',
+                i === current ? 'bg-ink text-white' : i < current ? 'text-ink' : 'text-neutral-400',
+              )}
+            >
+              {i < current && <Icon name="check" size={11} className="-ml-0.5" />}
+              {s.label}
+            </li>
+          ))}
+        </ol>
+        <span className={cx('w-[40px] shrink-0 text-right text-[16px] font-extrabold tabular-nums', seconds <= 5 && 'animate-pulse text-brand')}>
+          0:{String(seconds).padStart(2, '0')}
+        </span>
+      </div>
+      <div className="h-[5px] bg-neutral-100">
+        <div
+          className={cx('h-full transition-[width] duration-1000 ease-linear', seconds <= 5 ? 'bg-brand' : 'bg-ink')}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </header>
+  )
+}
+
+/** Etiqueta pequeña en mayúsculas sobre un título ("NEW ROOM", "ROOM CODE"). */
+export const Eyebrow = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
+  <div className={cx('text-[13px] font-extrabold tracking-[0.16em] uppercase opacity-80', className)}>{children}</div>
+)
+
+/** Tarjeta blanca de contenido. */
+export function Card({ children, className = '', style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
+  return (
+    <div style={style} className={cx('rounded-[28px] bg-white p-5 text-ink', className)}>
+      {children}
+    </div>
+  )
+}
 
 /** Marco de pantalla. En escritorio se ve como un móvil centrado (como el mockup). */
 export function Screen({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
@@ -73,11 +185,12 @@ export function Avatar({ player, size = 36, ring = false }: { player: Pick<Playe
   )
 }
 
-export function Bubble({ children, className = '', selected = false }: { children: ReactNode; className?: string; selected?: boolean }) {
+export function Bubble({ children, className = '', selected = false, dark = false }: { children: ReactNode; className?: string; selected?: boolean; dark?: boolean }) {
   return (
     <div
       className={cx(
-        'w-fit max-w-[82%] rounded-[24px] bg-white px-5 py-3 text-[18px] leading-snug text-ink',
+        'w-fit max-w-[82%] rounded-[24px] px-5 py-3 text-[18px] leading-snug',
+        dark ? 'bg-ink text-white' : 'bg-white text-ink',
         selected && 'outline-[4px] outline-ink outline-solid',
         className,
       )}
