@@ -1,11 +1,12 @@
-import { Avatar, Button, Screen, TopBar } from '../components/ui'
+import { Avatar, Body, Button, Footer, Row, Screen, TopBar, TopNote } from '../components/ui'
+import QR, { joinUrl } from '../components/QR'
 import { useGame } from '../game/useGame'
 import { MIN_PLAYERS } from '../game/types'
 import type { Pack } from '../game/types'
 
 const PACKS: { id: Pack; label: string }[] = [
   { id: 'uni', label: 'Uni' },
-  { id: 'spicy', label: 'Spicy 🌶️' },
+  { id: 'spicy', label: 'Spicy' },
   { id: 'dating', label: 'Dating' },
   { id: 'moral', label: 'Moral' },
 ]
@@ -13,61 +14,71 @@ const PACKS: { id: Pack; label: string }[] = [
 export default function Lobby() {
   const { room, me, game, error } = useGame()
   if (!room || !me) return null
-  const joinUrl = `${location.origin}/?room=${room.code}`
+  const missing = MIN_PLAYERS - room.players.length
+  const host = room.players.find((p) => p.isHost)
+
+  const share = () => {
+    const url = joinUrl(room.code)
+    if (navigator.share) void navigator.share({ title: 'Typing…', url }).catch(() => {})
+    else void navigator.clipboard?.writeText(url)
+  }
 
   return (
     <Screen>
       <TopBar
         title={
           <>
-            Room <span className="ml-1 rounded-lg bg-brand px-2 py-0.5 tracking-[0.2em] text-white">{room.code}</span>
+            Room{' '}
+            <button onClick={share} className="ml-1 rounded-full bg-brand px-3 py-0.5 tracking-[0.18em] text-white active:scale-95">
+              {room.code}
+            </button>
           </>
         }
-        right={<span className="text-sm font-bold text-brand">{room.players.length} joined</span>}
+        right={<TopNote>{room.players.length} joined</TopNote>}
       />
 
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        {/* T3: sustituir por el QR real de joinUrl (librería `qrcode`). */}
-        <div className="self-center rounded-[18px] bg-white px-4 py-3 text-center text-ink">
-          <div className="text-xs text-neutral-500">Scan or go to</div>
-          <div className="text-sm font-bold break-all">{joinUrl}</div>
-        </div>
+      <Body className="gap-3 pt-4">
+        <QR code={room.code} />
 
-        <ul className="flex flex-col gap-2">
+        <ul className="mt-1 flex flex-col gap-3">
           {room.players.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 rounded-[14px] bg-white px-3 py-2 text-ink">
-              <Avatar player={p} size={28} />
-              <span className="font-semibold">{p.name}</span>
-              {p.id === me.id && <span className="text-xs text-neutral-400">you</span>}
-              {p.isHost && <span className="ml-auto text-xs text-neutral-400">host</span>}
+            <li key={p.id} className="animate-rise">
+              <Row>
+                <Avatar player={p} />
+                <span className="flex-1 truncate text-[19px] font-semibold">
+                  {p.name}
+                  {p.id === me.id && <span className="text-neutral-400"> (you)</span>}
+                </span>
+                {p.isHost && <span className="text-[15px] text-neutral-400">host</span>}
+              </Row>
             </li>
           ))}
         </ul>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 pt-1">
           {PACKS.map((p) => (
             <button
               key={p.id}
               disabled={!me.isHost}
               onClick={() => void game.setOptions({ pack: p.id })}
-              className={`rounded-xl px-3 py-1.5 text-sm font-bold ${room.pack === p.id ? 'bg-ink text-white' : 'bg-white/20'}`}
+              className={`rounded-full px-4 py-2 text-[17px] font-semibold transition ${room.pack === p.id ? 'bg-ink text-white' : 'bg-brand-soft text-white/90'}`}
             >
               {p.label}
             </button>
           ))}
         </div>
-      </div>
+      </Body>
 
-      <div className="flex flex-col gap-2 p-4">
-        {error && <p className="text-center text-sm font-bold">{error}</p>}
+      <Footer>
+        {error && <p className="text-center text-[15px] font-bold">{error}</p>}
         {me.isHost ? (
-          <Button onClick={() => void game.startGame()}>
-            {room.players.length < MIN_PLAYERS ? `Waiting for ${MIN_PLAYERS - room.players.length} more…` : 'Start game'}
+          <Button disabled={missing > 0} onClick={() => void game.startGame()}>
+            {missing > 0 ? `Need ${missing} more` : 'Start game'}
           </Button>
         ) : (
-          <p className="py-4 text-center font-bold">Waiting for the host to start…</p>
+          <p className="py-5 text-center text-[18px] font-bold">Waiting for {host?.name ?? 'the host'} to start…</p>
         )}
-      </div>
+      </Footer>
     </Screen>
   )
 }

@@ -1,71 +1,90 @@
 import { useState } from 'react'
-import { Bubble, Button, Screen, TypingDots } from '../components/ui'
+import { Body, Button, Footer, Screen, TextInput, TypingDots } from '../components/ui'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
 
 // El QR de la sala apunta a ?room=CODE: entramos directamente al formulario de unirse.
 const codeFromUrl = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? ''
 
+type Mode = 'start' | 'create' | 'join'
+
 export default function Home() {
   const { game, error } = useGame()
+  const [mode, setMode] = useState<Mode>(codeFromUrl ? 'join' : 'start')
   const [name, setName] = useState('')
   const [code, setCode] = useState(codeFromUrl)
-  const [joining, setJoining] = useState(Boolean(codeFromUrl))
   const [hint, setHint] = useState<string | null>(null)
 
-  const go = (action: () => Promise<void>) => {
+  const submit = () => {
     if (!name.trim()) return setHint('Pick a name first.')
-    if (joining && code.trim().length !== 4) return setHint('Room codes have 4 letters.')
+    if (mode === 'join' && code.trim().length !== 4) return setHint('Room codes have 4 letters.')
     setHint(null)
-    void action()
+    void (mode === 'join' ? game.joinRoom(code, name) : game.createRoom(name))
   }
 
   return (
     <Screen>
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-        <Bubble className="px-3">
+      <Body className="items-center justify-center text-center">
+        <div className="mb-10 flex h-[56px] w-[74px] animate-pop items-center justify-center rounded-full bg-white">
           <TypingDots />
-        </Bubble>
-        <h1 className="text-5xl font-black tracking-tighter">Typing…</h1>
-        <p className="font-medium">
+        </div>
+        <h1 className="text-[64px] leading-none font-black tracking-[-0.04em]">Typing…</h1>
+        <p className="mt-6 text-[21px] leading-snug font-semibold">
           Your friends fake your replies.
           <br />
           Spot the real one.
         </p>
-      </div>
+      </Body>
 
-      <form
-        className="flex flex-col gap-3 p-4"
-        onSubmit={(e) => {
-          e.preventDefault()
-          go(() => (joining ? game.joinRoom(code, name) : game.createRoom(name)))
-        }}
-      >
-        <input
-          className="rounded-[18px] bg-white px-4 py-3.5 text-ink outline-none placeholder:text-neutral-400"
-          placeholder="Your name"
-          maxLength={MAX_NAME_LENGTH}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          autoComplete="off"
-        />
-        {joining && (
-          <input
-            className="rounded-[18px] bg-white px-4 py-3.5 text-center font-bold tracking-[0.3em] text-ink uppercase outline-none placeholder:tracking-normal placeholder:text-neutral-400"
-            placeholder="Room code"
-            maxLength={4}
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            autoComplete="off"
+      {mode === 'start' ? (
+        <Footer>
+          <Button onClick={() => setMode('create')}>Create room</Button>
+          <Button variant="ink" onClick={() => setMode('join')}>
+            Join with code
+          </Button>
+          <p className="text-center text-[16px] font-semibold">No account. Just a name.</p>
+        </Footer>
+      ) : (
+        <form
+          className="flex shrink-0 animate-rise flex-col gap-3 px-5 pt-2 pb-6"
+          onSubmit={(e) => {
+            e.preventDefault()
+            submit()
+          }}
+        >
+          {mode === 'join' && (
+            <TextInput
+              placeholder="CODE"
+              maxLength={4}
+              autoCapitalize="characters"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/[^a-z]/gi, '').toUpperCase())}
+              className="tracking-[0.3em] uppercase placeholder:tracking-[0.3em]"
+              autoFocus={!codeFromUrl}
+            />
+          )}
+          <TextInput
+            placeholder="Your name"
+            maxLength={MAX_NAME_LENGTH}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoFocus={mode === 'create' || Boolean(codeFromUrl)}
           />
-        )}
-        {(hint || error) && <p className="text-center text-sm font-bold">{hint ?? error}</p>}
-        <Button type="submit">{joining ? 'Join room' : 'Create room'}</Button>
-        <Button type="button" variant="ink" onClick={() => setJoining(!joining)}>
-          {joining ? 'Create a room instead' : 'Join with code'}
-        </Button>
-        <p className="text-center text-xs font-medium">No account. Just a name.</p>
-      </form>
+          <Button type="submit" variant={mode === 'join' ? 'ink' : 'white'}>
+            {mode === 'join' ? 'Join room' : 'Create room'}
+          </Button>
+          <button
+            type="button"
+            className="py-1 text-center text-[16px] font-semibold"
+            onClick={() => {
+              setHint(null)
+              setMode(mode === 'join' ? 'create' : 'join')
+            }}
+          >
+            {hint ?? error ?? (mode === 'join' ? 'Create a room instead' : 'Join with code instead')}
+          </button>
+        </form>
+      )}
     </Screen>
   )
 }

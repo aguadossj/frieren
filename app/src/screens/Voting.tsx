@@ -1,40 +1,50 @@
-import { Avatar, Bubble, RolePill, Screen, TimerPill, TopBar } from '../components/ui'
+import { useState } from 'react'
+import { Avatar, Body, Bubble, Button, Footer, Screen, TimerPill, TopBar } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
 
 export default function Voting() {
   const { room, me, game } = useGame()
   const seconds = useCountdown(room?.phaseEndsAt ?? null)
+  const [picked, setPicked] = useState<string | null>(null)
   if (!room?.chat || !me) return null
 
   const writer = room.players.find((p) => p.id === room.chat!.writerId)!
   const isWriter = writer.id === me.id
-  const lastMessage = room.chat.messages.at(-1)
+  const last = room.chat.messages.at(-1)
+  const lastAuthor = last && room.players.find((p) => p.id === last.playerId)
+  const locked = room.myVote !== null
+  const choice = room.myVote ?? picked
+  const voters = room.players.length - 1
 
   return (
     <Screen>
       <TopBar title={`Which one is the real ${writer.name}?`} right={<TimerPill seconds={seconds} />} />
 
-      <div className="flex flex-1 flex-col gap-2.5 p-3">
-        {lastMessage && <p className="text-center text-xs font-medium">"{lastMessage.text}"</p>}
-        {room.answers.map((answer) => {
-          const chosen = room.myVote === answer.id
+      <Body className="gap-3">
+        {last && (
+          <p className="pt-4 pb-1 text-center text-[16px] font-semibold">
+            "{last.text}"{lastAuthor && ` — ${lastAuthor.name}`}
+          </p>
+        )}
+        {room.answers.map((answer, i) => {
           const laughed = room.myLaughs.includes(answer.id)
           return (
-            <div key={answer.id} className="flex items-center gap-2">
-              <Avatar player={writer} size={28} />
+            <div key={answer.id} className="flex animate-rise items-center gap-3" style={{ animationDelay: `${i * 0.08}s` }}>
+              <Avatar player={writer} size={40} ring />
               <button
-                className="flex-1 text-left disabled:opacity-60"
-                disabled={isWriter || answer.mine || room.myVote !== null}
-                onClick={() => void game.castVote(answer.id)}
+                className="min-w-0 flex-1 text-left transition active:scale-[0.98] disabled:active:scale-100"
+                disabled={isWriter || answer.mine || locked}
+                onClick={() => setPicked(answer.id)}
               >
-                <Bubble className={`max-w-none ${chosen ? 'outline-[3px] outline-ink outline-solid' : ''}`}>
+                <Bubble selected={choice === answer.id} className={`max-w-full ${answer.mine ? 'opacity-70' : ''}`}>
                   {answer.text}
-                  {answer.mine && <span className="ml-2 text-xs text-neutral-400">yours</span>}
+                  {answer.mine && <span className="ml-2 text-[13px] text-neutral-400">yours</span>}
                 </Bubble>
               </button>
               <button
                 aria-label="Funniest"
-                className={`size-10 shrink-0 rounded-full text-lg ${laughed ? 'bg-white' : 'bg-white/20'}`}
+                disabled={answer.mine}
+                className={`shrink-0 text-[26px] transition active:scale-125 disabled:opacity-30 ${laughed ? 'scale-125' : 'opacity-90'}`}
                 onClick={() => void game.react(answer.id)}
               >
                 😂
@@ -42,15 +52,20 @@ export default function Voting() {
             </div>
           )
         })}
-        <div className="flex-1" />
-        <RolePill>
-          {isWriter
-            ? "They're trying to find you…"
-            : room.myVote
-              ? `Voted. Waiting (${room.votedIds.length}/${room.players.length - 1})`
-              : 'Tap the real one · 😂 the funniest'}
-        </RolePill>
-      </div>
+      </Body>
+
+      <Footer>
+        <p className="text-center text-[16px] font-semibold">
+          {isWriter ? "They're trying to find you… 😏" : 'Tap the real one · 😂 the funniest'}
+        </p>
+        <Button
+          variant="ink"
+          disabled={isWriter || locked || !picked}
+          onClick={() => picked && void game.castVote(picked)}
+        >
+          {isWriter || locked ? `${room.votedIds.length}/${voters} voted` : 'Lock vote'}
+        </Button>
+      </Footer>
     </Screen>
   )
 }

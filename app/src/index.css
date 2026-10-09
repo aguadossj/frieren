@@ -1,11 +1,28 @@
 @import "tailwindcss";
 
-/* Paleta: design-refs/STYLE.md. Color fijo rojo, blanco y negro. */
+/* Paleta: design-refs/STYLE.md + design-refs/mockup.png. Color fijo rojo, blanco y negro. */
 @theme {
   --color-brand: #EE2B2B;
+  --color-brand-soft: #F46262; /* chips no seleccionados */
   --color-ink: #111111;
   --color-good: #00A055;
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+
+  --animate-pop: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  --animate-rise: rise 0.4s ease-out both;
+}
+
+@keyframes pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes rise {
+  from { transform: translateY(14px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
 }
 
 /* Base mobile-first: sin rebote, sin zoom por doble tap, respeta el notch */
@@ -22,10 +39,15 @@ body {
 }
 #root {
   min-height: 100dvh;
-  max-width: 480px;
+  max-width: 440px;
   margin: 0 auto;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
+/* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
+@media (min-width: 640px) {
+  body { background: #161616; }
+}
 button { touch-action: manipulation; user-select: none; -webkit-user-select: none; cursor: pointer; }
+button:disabled { cursor: default; }
 /* iOS hace zoom en inputs con letra < 16px */
 input { font-size: 16px; }

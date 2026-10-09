@@ -1,7 +1,7 @@
 # Typing… — Guía de estilo "Chat rojo"
 
 Decisión del equipo (sáb 10 oct, ~01:30): **un chat normal y corriente, con fondo rojo intenso fijo `#EE2B2B` en todas las pantallas**
-(sin pasteles). La revelación usa fondo negro `#111` para que el momento clave destaque.
+(sin pasteles). La revelación también es roja (como en `design-refs/mockup.png`); el momento clave lo marcan el titular grande y las filas de puntos.
 Esta guía es la fuente de verdad visual. Cualquier pantalla nueva sale de aquí.
 
 ## Idea
@@ -9,7 +9,7 @@ Parece una app de mensajería de verdad (cabecera, burbujas, "escribiendo…", b
 así que se entiende al instante. El color viene del **fondo rojo**; todo lo demás es blanco y limpio, con negro como segundo acento.
 
 ## Reglas
-1. **Nada de pasteles** (se ve infantil). Fondo **rojo `#EE2B2B`** en todas las pantallas; **negro `#111`** solo en la revelación.
+1. **Nada de pasteles** (se ve infantil). Fondo **rojo `#EE2B2B`** en todas las pantallas, también la revelación.
 2. **Sobre el fondo de color, el texto va en blanco** (nombres, titulares, instrucciones).
 3. **Burbujas, cabecera, barra de entrada y filas en blanco** con texto casi negro `#111`.
 4. **El negro `#111` es el segundo acento:** píldora del temporizador, indicación de rol, botón secundario, opción votada (`outline` 3px).
@@ -23,7 +23,7 @@ así que se entiende al instante. El color viene del **fondo rojo**; todo lo dem
 | Token | Hex | Uso |
 |---|---|---|
 | `brand` | `#EE2B2B` | Fondo de todas las pantallas; texto de estado y del botón principal sobre blanco |
-| `ink` | `#111111` | Fondo de la revelación; temporizador, indicación de rol, botón secundario, opción votada |
+| `ink` | `#111111` | Temporizador, indicación de rol, botón secundario, opción votada |
 | `good` | `#00A055` | Puntos positivos (+400) sobre filas blancas |
 | blanco | `#FFFFFF` | Cabeceras, burbujas, barra de entrada, filas, botón principal |
 
@@ -70,3 +70,14 @@ Botones con mayúscula inicial: "Create room", "Join with code", "Start game", "
 }
 ```
 Clases: `bg-brand`, `text-brand`, `bg-ink`, `text-good`. Componentes base en `app/src/components/ui.tsx`.
+
+## Referencia visual (sáb 10 oct, 01:10)
+**`design-refs/mockup.png` manda** (Inicio, Sala, Ronda, Votación, Revelación, Ranking). Escala de `components/ui.tsx`:
+- Botones pill de 66 px, texto 21 px extrabold (primario blanco + texto rojo; secundario negro).
+- Cabecera blanca 72 px: título 20 px extrabold; derecha = nota roja (`TopNote`) o timer pill negro `0:18`.
+- Burbujas blancas radio 24 px, 18 px; seleccionada = borde negro 4 px. Nombre del autor encima, blanco extrabold 15 px.
+- Filas blancas (`Row`) de 64 px con avatar de 36 px (lobby, puntos de la revelación, ranking con barras y ▲/▼).
+- Votación en dos pasos: tocar burbuja → **Lock vote** (botón negro). 😂 al lado de cada burbuja.
+- Premio en caja negra con 🏆 (`AwardCard`). Chips de pack: negro seleccionado, `#F46262` el resto.
+- QR real en el lobby (`components/QR.tsx`, librería `qrcode`) → `?room=CODE`.
+- En escritorio el juego se ve como un móvil centrado sobre `#161616`.
