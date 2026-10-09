@@ -1,71 +1,70 @@
-# Typing… — Guía de estilo "Jelly Party"
+# Typing… — Guía de estilo "Chat de colores"
 
-Inspiración: Fall Guys (gominolas y jelly beans, colores saturados, todo "blandito" y que rebota).
+Decisión del equipo (sáb 10 oct, ~01:00): **un chat normal y corriente, con fondo de color por ronda.**
 Esta guía es la fuente de verdad visual. Cualquier pantalla nueva sale de aquí.
 
-## Sensación
-Divertido, saturado, gomoso. Cada botón parece una gominola que se hunde al tocarla.
-Nada plano y gris, nada corporativo, nada de degradados ni glassmorphism.
+## Idea
+Parece una app de mensajería de verdad (cabecera, burbujas, "escribiendo…", barra de mensaje),
+así que se entiende al instante. El color viene del **fondo, que cambia en cada ronda**; todo lo demás es blanco y limpio.
 
-## Colores (tokens)
-| Token | Hex | Borde inferior ("jelly edge") | Uso |
+## Reglas
+1. **Un color protagonista por pantalla:** el de la ronda actual. Fondo = su tono claro; acentos (botón, temporizador, enviar) = su tono fuerte.
+2. **Burbujas blancas** sobre el fondo de color. El color de cada jugador va en su **nombre** y su **avatar**, no en la burbuja.
+3. **Cabecera, barra de entrada y botones inferiores en blanco.**
+4. Sin contornos, sin sombras, sin degradados, sin texturas, sin pegatinas inclinadas. Limpio.
+5. Esquinas: burbujas 18px, botones 18px, filas/tarjetas 14–16px, píldoras 12px.
+6. Mucho aire, letra grande. Mensajes ≥ 15px en el producto real. Botón principal abajo, a ancho completo.
+
+## Colores de ronda (fondo claro / acento fuerte)
+| Ronda | Fondo | Acento | Texto suave sobre fondo |
 |---|---|---|---|
-| `sky` | `#4FB8FF` | — | Fondo principal |
-| `grape` | `#B07CFF` | `#7E4FD6` | Fondo de la revelación / momentos especiales |
-| `orange` | `#FF8A1F` | `#C55F00` | CTA principal (Send, Create room) |
-| `lime` | `#7BE07B` | `#45A845` | Éxito, Start, "FOOLED!" (texto `#1F5A1F`) |
-| `banana` | `#FFD12E` | `#D49A00` | Temporizador, destacados (texto `#7A4A00`) |
-| `bubblegum` | `#FF5FA2` | `#C9367A` | Picante, jugador rosa |
-| `cloud` | `#FFFFFF` | `#B9DDF7` | Inputs, botones secundarios (texto `#2A7FD4`) |
-| `glass` | `rgba(255,255,255,.2)` | — | Filas de listas sobre fondo de color |
+| 1 · Pink | `#FFE3EF` | `#FF4F8B` | `#B0577C` |
+| 2 · Mint | `#DDF7EA` | `#16A34A` | `#3E8A62` |
+| 3 · Lilac | `#ECE6FF` | `#7C5CFF` | `#6B5BB0` |
+| 4 · Butter | `#FFF3C9` | `#F5A300` (texto `#B57700`) | `#8A6A1F` |
+| 5 · Sky | `#DDF0FF` | `#2F8CFF` | `#3D6E9E` |
+Inicio = Pink. Sala = Sky. Las rondas rotan en este orden; el ranking entre rondas usa el color de la ronda que acaba de terminar.
 
-**Colores de los jugadores** (fijos por orden de entrada, en avatar, burbujas y ranking):
-bubblegum `#FF5FA2` · lime `#7BE07B` · banana `#FFD12E` · grape `#B07CFF` · orange `#FF8A1F` ·
-mint `#4FE3C1` · coral `#FF6B6B` · cloud `#FFFFFF`.
-Sobre colores claros (banana, lime, cloud, mint) el texto va en el tono oscuro de su familia, nunca negro puro.
+## Colores de jugador (fijos por orden de entrada; avatar + nombre)
+`#FF4F8B` pink · `#16A34A` green · `#F5A300` amber · `#7C5CFF` violet · `#2F8CFF` blue ·
+`#14B8A6` teal · `#F97316` orange · `#E11D48` red.
+Avatar = círculo con la inicial en blanco. En la votación **todas** las burbujas llevan el avatar de Pol para que sean indistinguibles.
 
 ## Tipografía
-- **Títulos, botones, números:** `Lilita One` (Google Fonts), en MAYÚSCULAS para botones y estados.
-- **Mensajes y texto:** `Fredoka` 400/600. Los mensajes del chat ≥ 14px en el producto real.
+Fuente del sistema (`system-ui, -apple-system, "Segoe UI", Roboto`). Se siente nativo y carga al instante.
+Logo y titulares grandes: peso 800 con `letter-spacing: -1px`. Botones: 700. Nombres en burbujas: 600, 10–11px.
 
-## La regla "jelly"
-Todo elemento tocable o destacado lleva:
-- `border-radius` grande (16–24px; círculos para el temporizador).
-- **Borde inferior grueso** del tono oscuro de su color: 4px en burbujas y chips, 6px en botones.
-- Al tocar: `translateY(3px)` y el borde inferior baja a 2px (se "hunde"). Transición de 80–120ms.
+## Componentes clave
+- **Cabecera de chat:** avatar del grupo + nombre ("Piso 3B") + estado en el color de acento ("Pol is typing…") + temporizador en píldora de acento.
+- **Burbuja:** blanca, nombre encima en el color del jugador. "Escribiendo…" = burbuja blanca con tres puntos que saltan.
+- **Indicación de rol:** píldora blanca centrada encima de la barra de entrada, texto en acento:
+  "You're Pol. Say it for real." / "Write what Pol would say. Fool them."
+- **Barra de entrada:** fondo blanco; campo en tono muy claro del color de ronda; botón de enviar circular en acento. Máx. 80 caracteres.
+- **Votación:** filas con el avatar de Pol + burbuja + 😂 a la derecha. La elegida lleva un `outline` de 3px en acento. Botón "Lock vote".
+- **Revelación:** el mensaje real grande y centrado, titular "Fooled 2! 🎭", filas blancas con +puntos en verde, tarjeta del premio con 🏆.
+- **Ranking:** filas blancas con posición, avatar, nombre, barra del color del jugador, puntos y ▲▼. Pasa solo a los 3s.
 
-## Jugadores = jelly beans
-Cápsula del color del jugador (unos 22×30px en listas, 40×56px en el podio), visera blanca y dos ojos.
-Hecha solo con CSS, sin imágenes. Expresiones en la revelación: ojos felices si engañó, ojos de sorpresa si lo pillaron.
-
-## Movimiento
-- Entradas con rebote (`cubic-bezier(.34,1.56,.64,1)`, 250–400ms).
-- Pegatinas y estados ligeramente girados (-5° a 3°): "POL IS TYPING…", "FOOLED 2!".
-- "Escribiendo…": tres puntos que saltan.
-- La revelación: zoom del mensaje real, sello "FOOLED X!" o "CAUGHT!", confeti.
-- Ranking: los beans suben o bajan y las barras crecen. Pasa solo a los 3s.
-- Respetar `prefers-reduced-motion`.
-
-## Sonido (en iPhone no hay vibración, el sonido da el feedback)
-Pop corto al enviar, "boing" al votar, fanfarria corta en la revelación. Volumen bajo; botón de silenciar.
+## Movimiento y sonido
+- El fondo cambia de color con una transición de 400ms al empezar cada ronda (el momento "nueva ronda").
+- Las burbujas entran como mensajes nuevos (subir 8px + fade, 200ms, de una en una).
+- Revelación: tres puntos ~1,2s y luego aparece el mensaje real con un pequeño "pop" (scale 0.9→1) + confeti.
+- Ranking: las barras crecen y las filas se reordenan con animación.
+- Sonidos cortos: "mensaje enviado", "voto", "revelación". En iPhone no hay vibración. Respetar `prefers-reduced-motion`.
 
 ## Copy
-Inglés, corto, gamberro, en MAYÚSCULAS en botones: `CREATE ROOM`, `SEND!`, `START!`, `FOOLED 2!`, `CAUGHT!`.
-Microcopy en minúsculas y con humor: "that's you, bean! be real".
+Inglés, corto y natural, en minúsculas como un chat real ("who ate my yogurt 😤").
+Botones con mayúscula inicial: "Create room", "Join with code", "Start game", "Lock vote".
 
 ## Tailwind v4 (`app/src/index.css`)
 ```css
 @theme {
-  --color-sky: #4FB8FF;
-  --color-grape: #B07CFF;   --color-grape-edge: #7E4FD6;
-  --color-orange: #FF8A1F;  --color-orange-edge: #C55F00;
-  --color-lime: #7BE07B;    --color-lime-edge: #45A845;   --color-lime-ink: #1F5A1F;
-  --color-banana: #FFD12E;  --color-banana-edge: #D49A00; --color-banana-ink: #7A4A00;
-  --color-bubblegum: #FF5FA2; --color-bubblegum-edge: #C9367A;
-  --color-cloud-edge: #B9DDF7; --color-cloud-ink: #2A7FD4;
-  --font-display: "Lilita One", system-ui, sans-serif;
-  --font-body: "Fredoka", system-ui, sans-serif;
-  --ease-jelly: cubic-bezier(.34,1.56,.64,1);
+  --color-r1-bg: #FFE3EF; --color-r1: #FF4F8B;
+  --color-r2-bg: #DDF7EA; --color-r2: #16A34A;
+  --color-r3-bg: #ECE6FF; --color-r3: #7C5CFF;
+  --color-r4-bg: #FFF3C9; --color-r4: #F5A300;
+  --color-r5-bg: #DDF0FF; --color-r5: #2F8CFF;
 }
 ```
-Botón tipo: `rounded-[20px] bg-orange border-b-[6px] border-orange-edge font-display text-white active:translate-y-[3px] active:border-b-2 transition`.
+En la práctica: el color de la ronda vive en dos variables CSS en la raíz de la pantalla
+(`--round-bg`, `--round-accent`) y los componentes usan `bg-[var(--round-bg)]`, `bg-[var(--round-accent)]`.
+Cambiar de ronda = cambiar esas dos variables.
