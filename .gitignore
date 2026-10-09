@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+venv/
+.venv/
+env/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Build and coverage output
+dist/
+build/
+out/
+coverage/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
