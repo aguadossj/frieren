@@ -21,6 +21,7 @@
       "WebSearch",
       "mcp__context7",
       "mcp__vercel",
+      "mcp__supabase",
       "mcp__Claude_Browser",
       "mcp__Claude_Code_iOS_Simulator"
     ],
