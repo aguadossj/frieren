@@ -1,0 +1,70 @@
+Voy a una hackathon, powered by https://ai.lytvynfoundation.org/ y con esta info:
+
+Three tracks. €10,000 to the team that ships the best build.
+Friday evening you get the theme. Saturday afternoon you demo. Everything in between is yours.
+The challenge
+Coding agents have changed what four people can build in a day. This is where we find out how much.
+You get the theme at kickoff. You get thirteen hours of build time across two days. You ship something that runs in a mobile browser and that a stranger can pick up and use in 60 seconds.
+Any stack. Any model, any agent, any tool you want.
+No pitch decks. No business models. No slides. You hand someone a phone and they use it, or they don't.
+Pick your track
+Ship a game. Something playable in 60 seconds. Any genre, any mechanic.
+Ship a tool. Productivity. Pick a task a real person does by hand every week and build the thing that does it for them.
+Ship a habit. Something for health, fitness, sleep, food — anything that makes a person do the right thing tomorrow.
+Choose your track when you apply, or decide on the Friday once you've seen the theme. Each track gets its own winner.
+€10,000
+To the winning team. Cash.
+How it's judged
+Saturday afternoon, every build goes live and everyone in the room tries everything.
+The €10,000 is decided by the jury — the Lytvyn.AI.Foundation , our mentors, and the organising team. Four things they're looking for:
+Is it good. Is it actually finished. Is it original. And how hard did you push your agents to get there.
+Every team publishes their setup afterwards: models, tools, prompting approach, total tokens burned. By Saturday night we'll know exactly what fifteen teams shipped in thirteen hours and what it cost them.
+Schedule
+Friday 9 October
+18:00 — Doors, food, check-in
+18:30 — Kickoff. Clock starts.
+23:00 — Venue closes. Go home, sleep on it.
+Saturday 10 October
+08:00 — Doors, breakfast, back to work
+16:00 — Code freeze
+16:15 — Demos. Everyone tries everything.
+17:45 — Winners announced
+18:15 — Afterparty
+
+Mentors on the floor, food and coffee throughout
+Teams
+Up to 4 people. Bring your own team, or come solo and we'll match you on the Friday.
+Who this is for
+Working engineers, technical founders, and anyone already building seriously with coding agents.
+You don't need to have built anything like this before — most people here won't have. You need to be able to ship.
+Bring
+Your own laptop. Your own AI subscriptions and API keys — Claude, ChatGPT, Cursor, whatever you already run on. Come with your setup working and your environment ready, so the clock goes on building instead of installing.
+Included
+Free entry. Food and drinks across both days. Mentors. Afterparty. A room full of people who ship.
+70 places
+That's the whole room, and we're keeping it that way on purpose.
+Applications are reviewed — this is not a ticket. Apply below and we'll come back to you within a few days.
+Venue announced shortly — central Barcelona. Powered by the Lytvyn.AI.Foundation.
+Comunicados
+Dan Neciu
+1 oct, 14:16
+Pre-hackathon Meetup
+Hi guys, currently we have 60 confirmed people and still a lot on the waitlist. We prioritized teams and people who confirmed their participation on Linkedin.
+
+Before the hackaton we have an AI meetup, you can see the details and sign up here:
+https://www.meetup.com/barcelonajs/events/316793592/
+You guys have priority, so join now, at the meetup you can find people and create teams and hopefully we can fill the remaining 25 open positions for the hackathon.
+
+I will announce the meetup tomorrow to the communities in Barcelona as well, so try to sign up today.
+
+Have a great day,
+Dan
+Ubicación
+Itnig Spaces
+Carrer de Pujades, 94, Sant Martí, 08005 Barcelona, España
+
+
+
+
+
+Entonces, como si fueras un senior manager, preparame un promot/agente o lo que necesite para la hackathon
