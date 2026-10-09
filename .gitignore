@@ -28,3 +28,9 @@ temp/
 .idea/
 .vscode/
 *.swp
+
+# Hackathon
+.vercel/
+.claude/worktrees/
+.hackathon/
+qr.png
