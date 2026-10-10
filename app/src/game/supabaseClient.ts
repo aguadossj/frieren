@@ -279,8 +279,8 @@ export function createSupabaseClient(): GameClient {
     },
     async checkRoom(code) {
       try {
-        const r = await rpc<{ ok: boolean; reason: string | null; color?: string | null }>('check_room', { p_code: code })
-        return r.ok ? { ok: true, color: r.color ?? undefined } : { ok: false, message: friendly(r.reason ?? 'room_not_found') }
+        const r = await rpc<{ ok: boolean; reason: string | null }>('check_room', { p_code: code })
+        return r.ok ? { ok: true } : { ok: false, message: friendly(r.reason ?? 'room_not_found') }
       } catch {
         // Si la función aún no está desplegada o falla la red, no bloqueamos: join_room vuelve a comprobarlo
         return { ok: true }

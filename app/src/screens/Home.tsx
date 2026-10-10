@@ -4,8 +4,7 @@ import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import HowToPlay, { seenHowTo } from '../components/HowToPlay'
 import MimicInfo from '../components/MimicInfo'
 import type { SwipeCard } from '../components/SwipeDeck'
-import { AppHeader, Avatar, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
-import { PandaFace } from '../components/Panda'
+import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
 import { getLang, useLang, useT } from '../i18n'
 import { LEGAL, LEGAL_PAGES, LEGAL_PATHS } from '../content/legal'
 import { describePlace, knownPosition } from '../lib/place'
@@ -320,18 +319,13 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
   // Comprobación del código ANTES de pedir el nombre (check_room): existe, no ha empezado, no está llena
   const [checking, setChecking] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
-  // Color (→ panda) que te tocará al entrar, según check_room
-  const [myColor, setMyColor] = useState<string | null>(null)
 
   const checkCode = async (v: string) => {
     setChecking(true)
     setCodeError(null)
     const res = await game.checkRoom(v)
     setChecking(false)
-    if (res.ok) {
-      setMyColor(res.color ?? null)
-      return setStep('name')
-    }
+    if (res.ok) return setStep('name')
     setStep('code')
     setCodeError(res.message ?? null)
     setShake(true)
@@ -409,34 +403,22 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
           void join()
         }}
       >
-        <Body className="pt-4">
-          {/* Solo tu panda (el que tendrás en la sala) y tu nombre */}
-          <div className="my-auto flex flex-col items-center gap-8 py-4">
-            <div className={`animate-pop ${shake ? 'animate-nudge' : ''}`}>
-              {myColor ? (
-                <Avatar player={{ name: name.trim() || '?', color: myColor }} roomCode={code} size={176} ring />
-              ) : checking ? (
-                <span className="flex size-[176px] items-center justify-center rounded-full bg-white/20 ring-[3px] ring-white">
-                  <TypingDots />
-                </span>
-              ) : (
-                // Sin dato de color (servidor sin actualizar): un panda genérico
-                <span className="flex size-[176px] items-center justify-center overflow-hidden rounded-full bg-white ring-[3px] ring-white">
-                  <PandaFace size={150} />
-                </span>
-              )}
-            </div>
-            <TextInput
-              className="animate-rise"
-              style={{ animationDelay: '0.15s' }}
-              placeholder={t.namePlaceholderGuest}
-              aria-label={t.yourName}
-              maxLength={MAX_NAME_LENGTH}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              enterKeyHint="go"
-            />
+        <Body className="gap-8 pt-6">
+          {/* Solo el nombre. El panda se asigna al entrar en la sala y se ve en el lobby. */}
+          <div className="animate-rise">
+            <Eyebrow>{t.joinARoom}</Eyebrow>
+            <h1 className="mt-2 text-[44px] leading-[1.02] font-black tracking-[-0.035em]">{t.askName}</h1>
           </div>
+          <TextInput
+            className={`animate-rise ${shake ? 'animate-nudge' : ''}`}
+            style={{ animationDelay: '0.1s' }}
+            placeholder={t.namePlaceholderGuest}
+            aria-label={t.yourName}
+            maxLength={MAX_NAME_LENGTH}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            enterKeyHint="go"
+          />
         </Body>
 
         <Footer>

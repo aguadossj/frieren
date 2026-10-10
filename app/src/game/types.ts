@@ -145,8 +145,7 @@ export interface GameClient {
   createRoom(name: string, emoji?: string): Promise<void>
   joinRoom(code: string, name: string, emoji?: string): Promise<void>
   /** Antes de pedir el nombre: ¿se puede entrar con este código? `message` ya traducido si no. */
-  /** `color`: el que te tocará al entrar (o el tuyo si ya estás dentro) → para enseñar tu panda antes de unirte. */
-  checkRoom(code: string): Promise<{ ok: boolean; message?: string; color?: string }>
+  checkRoom(code: string): Promise<{ ok: boolean; message?: string }>
   setOptions(options: { pack?: Pack; groupType?: GroupType }): Promise<void> // atajo: guarda en `setup` (who/vibes)
   // Host
   saveSetup(answers: Setup): Promise<void> // contexto para la IA; en lobby y en partida (aplica a la siguiente ronda)
