@@ -38,12 +38,21 @@ body {
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
 }
+/* #root ocupa exactamente el área visible (ver src/lib/viewport.ts): con el teclado abierto
+   encoge en vez de desplazarse, y la cabecera del chat no se sale de la pantalla. */
 #root {
-  min-height: 100dvh;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--vv-top, 0px);
+  height: var(--vv-h, 100dvh);
   max-width: 440px;
   margin: 0 auto;
+  box-sizing: border-box;
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
+html[data-keyboard='open'] #root { padding-bottom: 0; }
+
 /* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
 @media (min-width: 640px) {
   body { background: #161616; }

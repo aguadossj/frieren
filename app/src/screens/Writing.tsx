@@ -8,10 +8,27 @@ export default function Writing() {
   const seconds = useCountdown(room?.phaseEndsAt ?? null)
   const [text, setText] = useState('')
   const [mine, setMine] = useState<string | null>(null)
-  const end = useRef<HTMLDivElement>(null)
+  const [typing, setTyping] = useState(false) // input con foco ⇒ teclado abierto
+  const list = useRef<HTMLDivElement>(null)
+
+  // Bajar al último mensaje dentro de la lista (no scrollIntoView: en iOS desplaza toda la página)
+  const toBottom = (smooth = true) => {
+    const el = list.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+  }
+  useEffect(() => toBottom(), [mine])
   useEffect(() => {
-    end.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [mine])
+    if (!typing) return
+    // el teclado tarda ~250 ms en subir y encoger la lista
+    const vv = window.visualViewport
+    const onResize = () => toBottom(false)
+    vv?.addEventListener('resize', onResize)
+    const t = setTimeout(() => toBottom(false), 300)
+    return () => {
+      vv?.removeEventListener('resize', onResize)
+      clearTimeout(t)
+    }
+  }, [typing])
   if (!room?.chat || !me) return null
 
   const writer = room.players.find((p) => p.id === room.chat!.writerId)!
@@ -33,7 +50,7 @@ export default function Writing() {
         right={<TimerPill seconds={seconds} />}
       />
 
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-5 pb-4">
+      <div ref={list} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-5 pb-4">
         <SectionLabel>
           ROUND {room.roundIndex + 1} OF {room.totalRounds}
         </SectionLabel>
@@ -63,10 +80,9 @@ export default function Writing() {
             </>
           )}
         </div>
-        <div ref={end} />
       </div>
 
-      <div className="shrink-0 bg-white px-5 pt-3 pb-6 text-ink">
+      <div className={`shrink-0 bg-white px-5 pt-3 text-ink ${typing ? 'pb-3' : 'pb-6'}`}>
         {sent ? (
           <div className="flex h-[54px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[17px] font-extrabold">
             <Icon name="check" size={18} className="text-good" />
@@ -74,9 +90,16 @@ export default function Writing() {
           </div>
         ) : (
           <>
-            <RolePill className="mb-3 text-center text-[16px]">
-              {isWriter ? `You're ${writer.name}. Say it for real.` : `Write what ${writer.name} would say. Fool them.`}
-            </RolePill>
+            {/* Con el teclado abierto, el hint pasa a ser una línea fina para no comerse el chat */}
+            {typing ? (
+              <p className="mb-2 truncate text-center text-[14px] font-extrabold text-neutral-500">
+                {isWriter ? `You're ${writer.name} · say it for real` : `Fool them · write like ${writer.name}`}
+              </p>
+            ) : (
+              <RolePill className="mb-3 text-center text-[16px]">
+                {isWriter ? `You're ${writer.name}. Say it for real.` : `Write what ${writer.name} would say. Fool them.`}
+              </RolePill>
+            )}
             <form
               className="flex items-center gap-3"
               onSubmit={(e) => {
@@ -84,6 +107,7 @@ export default function Writing() {
                 const t = text.trim()
                 if (!t) return
                 setMine(t)
+                setTyping(false)
                 void game.submitAnswer(t)
                 setText('')
               }}
@@ -95,11 +119,14 @@ export default function Writing() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 autoComplete="off"
-                autoFocus
+                enterKeyHint="send"
+                onFocus={() => setTyping(true)}
+                onBlur={() => setTyping(false)}
               />
               <button
                 type="submit"
                 aria-label="Send"
+                onMouseDown={(e) => e.preventDefault() /* no cerrar el teclado al tocar enviar */}
                 disabled={!text.trim()}
                 className="flex size-[54px] shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50"
               >

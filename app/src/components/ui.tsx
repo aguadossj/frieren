@@ -64,7 +64,7 @@ export function Screen({ children, dark = false }: { children: ReactNode; dark?:
   return (
     <main
       className={cx(
-        'flex h-dvh flex-col overflow-hidden text-white sm:my-6 sm:h-[calc(100dvh-3rem)] sm:max-h-[900px] sm:rounded-[44px] sm:shadow-2xl',
+        'flex h-full flex-col overflow-hidden text-white sm:my-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] sm:shadow-2xl',
         dark ? 'bg-ink' : 'bg-brand',
       )}
     >
