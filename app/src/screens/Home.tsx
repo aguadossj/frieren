@@ -180,7 +180,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
 
           <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.1s' }}>
             <Eyebrow>{t.yourName}</Eyebrow>
-            <TextInput placeholder={t.namePlaceholderHost} maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            <TextInput placeholder={t.namePlaceholderHost} maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} />
           </label>
 
           <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.2s' }}>
@@ -329,7 +329,6 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
               maxLength={MAX_NAME_LENGTH}
               value={name}
               onChange={(e) => setName(e.target.value)}
-              autoFocus
               enterKeyHint="go"
             />
           </label>
@@ -395,7 +394,6 @@ function CodeTiles({ label, value, onChange }: { label: string; value: string; o
         onChange={(e) => onChange(e.target.value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, CODE_LENGTH))}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        autoFocus
         autoCapitalize="characters"
         autoComplete="one-time-code"
         autoCorrect="off"
