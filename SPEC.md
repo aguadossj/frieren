@@ -67,6 +67,11 @@ idiomas que no sean inglés · historial de partidas · pantalla grande tipo TV 
     Rondas por defecto = una por jugador.
   - **Métricas:** `game.events` (room_created, player_joined, player_kicked, setup_saved, host_transferred…) escritas por
     las RPC; duración de partida con `rooms.started_at/ended_at`.
+- **Cliente:** `app/src/game/supabaseClient.ts` cumple `GameClient` (sesión anónima al crear/unirse, canal privado
+  `room:<id>`, refresco cada 5 s y al volver a la pestaña, `advance_phase` al vencer el reloj, reloj corregido con
+  `serverNow`). `useGame.ts` usa Supabase si hay env vars; si no, o con **`?mock=1`** en la URL, el mock con bots (plan B).
+  **Env vars (también en Vercel):** `VITE_SUPABASE_URL=https://xociawfbjmccevhjcfiu.supabase.co` y
+  `VITE_SUPABASE_PUBLISHABLE_KEY=<clave publicable sb_publishable_…>` (pública por diseño; nunca la service_role).
 - **IA (ronda a ronda):** Supabase **Edge Function** `generate-round` con adaptador **compatible con OpenAI**
   (proveedor probable: **Grok/xAI**; URL base, modelo y clave por secretos). Ronda 1 al pulsar Start; ronda N+1 se genera
   en segundo plano al empezar la votación de la N (lanzada desde la base con `pg_net`). Recibe contexto actual, rondas

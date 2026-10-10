@@ -1,12 +1,18 @@
 // Punto único de acceso al juego desde la UI (T1 es dueño).
-// Hoy siempre usa el mock. T1: cuando exista `supabaseClient.ts`, elegir por
-// `import.meta.env.VITE_GAME_BACKEND === 'supabase'` y dejar el mock como respaldo en local.
+// Backend real (Supabase) si está configurado; mock con bots si no, o si la URL lleva `?mock=1`
+// (plan B para la demo) o `VITE_GAME_BACKEND=mock`.
 
 import { useEffect, useState, useSyncExternalStore } from 'react'
+import { supabaseConfigured } from '../lib/supabase'
 import { createMockClient } from './mockClient'
+import { createSupabaseClient } from './supabaseClient'
 import type { GameClient } from './types'
 
-export const game: GameClient = createMockClient()
+const forceMock =
+  import.meta.env.VITE_GAME_BACKEND === 'mock' || new URLSearchParams(location.search).has('mock')
+
+export const backend: 'supabase' | 'mock' = supabaseConfigured && !forceMock ? 'supabase' : 'mock'
+export const game: GameClient = backend === 'supabase' ? createSupabaseClient() : createMockClient()
 
 let snapshot = game.getState()
 game.subscribe((state) => {

@@ -1,7 +1,8 @@
 // Contrato compartido entre UI (T2), backend (T1) y contenido (T3).
 // Solo T1 lo cambia, avisando al equipo. La UI solo habla con `GameClient`.
 
-export type Phase = 'lobby' | 'writing' | 'voting' | 'reveal' | 'leaderboard' | 'final'
+// 'generating' = la IA prepara la ronda (solo con IA activada; si tarda, entra una conversación de respaldo).
+export type Phase = 'lobby' | 'generating' | 'writing' | 'voting' | 'reveal' | 'leaderboard' | 'final'
 export type Pack = 'uni' | 'spicy' | 'dating' | 'moral'
 export type GroupType = 'students' | 'friends' | 'coworkers' | 'family'
 
@@ -26,6 +27,7 @@ export interface Player {
   color: string // color de avatar, asignado por orden de entrada (ver PLAYER_COLORS)
   score: number
   isHost: boolean
+  emoji?: string
 }
 
 export interface ChatMessage {
@@ -78,6 +80,30 @@ export interface Room {
   myVote: string | null
   myLaughs: string[] // answerIds a los que he dado 😂
   result: RoundResult | null // reveal/leaderboard
+  setup?: Setup // contexto para la IA (preguntas iniciales); lo edita el host
+  settings?: RoomSettings
+}
+
+/** Respuestas a las preguntas iniciales: { who: 'students', age: '18_24', vibes: ['spicy'], topic: '...' }. */
+export type Setup = Record<string, string | string[] | number | null>
+
+export interface RoomSettings {
+  rounds: number | null // null = una por jugador
+  writing_seconds: number
+  voting_seconds: number
+  reveal_seconds: number
+  leaderboard_seconds: number
+  max_players: number
+}
+
+/** Pregunta inicial del catálogo (tabla game.setup_questions). */
+export interface SetupQuestion {
+  id: string
+  label: string
+  kind: 'single' | 'multi' | 'text' | 'scale'
+  options: { value: string; label: string; emoji?: string }[]
+  required: boolean
+  rules: Record<string, unknown>
 }
 
 export interface GameState {
@@ -87,9 +113,16 @@ export interface GameState {
 }
 
 export interface GameClient {
-  createRoom(name: string): Promise<void>
-  joinRoom(code: string, name: string): Promise<void>
-  setOptions(options: { pack?: Pack; groupType?: GroupType }): Promise<void> // solo host, en lobby
+  createRoom(name: string, emoji?: string): Promise<void>
+  joinRoom(code: string, name: string, emoji?: string): Promise<void>
+  setOptions(options: { pack?: Pack; groupType?: GroupType }): Promise<void> // atajo: guarda en `setup` (who/vibes)
+  // Host
+  saveSetup(answers: Setup): Promise<void> // contexto para la IA; en lobby y en partida (aplica a la siguiente ronda)
+  updateSettings(settings: Partial<RoomSettings>): Promise<void>
+  getSetupQuestions(): Promise<SetupQuestion[]>
+  kick(playerId: string): Promise<void>
+  skipPhase(): Promise<void>
+  endGame(): Promise<void>
   startGame(): Promise<void> // solo host, ≥ MIN_PLAYERS
   submitAnswer(text: string): Promise<void>
   castVote(answerId: string): Promise<void>

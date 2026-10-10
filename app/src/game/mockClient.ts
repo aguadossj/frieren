@@ -14,7 +14,7 @@ import {
   PHASE_SECONDS,
   PLAYER_COLORS,
 } from './types'
-import type { Answer, Chat, GameClient, GameState, Pack, Phase, Player, Room, RoundResult } from './types'
+import type { Answer, Chat, GameClient, GameState, Pack, Phase, Player, Room, RoundResult, Setup, SetupQuestion } from './types'
 
 const BOT_NAMES = ['Marta', 'Laura', 'Pol']
 const BOT_REPLIES = [
@@ -31,6 +31,22 @@ const BOT_REPLIES = [
 const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)]
 const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5)
 const randomCode = () => Array.from({ length: 4 }, () => pick('ABCDEFGHJKLMNPQRSTUVWXYZ'.split(''))).join('')
+
+// Copia local del catálogo de game.setup_questions (el real viene de Supabase).
+const MOCK_QUESTIONS: SetupQuestion[] = [
+  { id: 'who', label: "Who's playing?", kind: 'single', required: false, rules: {}, options: [
+    { value: 'students', label: 'Students', emoji: '🎓' }, { value: 'friends', label: 'Friends', emoji: '👯' },
+    { value: 'coworkers', label: 'Coworkers', emoji: '💼' }, { value: 'family', label: 'Family', emoji: '🏠' },
+    { value: 'couples', label: 'Couples', emoji: '💘' } ] },
+  { id: 'age', label: 'Age range', kind: 'single', required: false, rules: {}, options: [
+    { value: 'under_18', label: 'Under 18' }, { value: '18_24', label: '18–24' }, { value: '25_34', label: '25–34' },
+    { value: '35_plus', label: '35+' }, { value: 'mixed', label: 'Mixed' } ] },
+  { id: 'vibes', label: 'What should the chats be about?', kind: 'multi', required: false, rules: {}, options: [
+    { value: 'spicy', label: 'Spicy', emoji: '🌶️' }, { value: 'exes', label: 'Exes & dating', emoji: '💔' },
+    { value: 'ethics', label: 'Moral dilemmas', emoji: '⚖️' }, { value: 'uni', label: 'Uni life', emoji: '📚' },
+    { value: 'work', label: 'Work drama', emoji: '🏢' }, { value: 'chaos', label: 'Pure chaos', emoji: '🌀' } ] },
+  { id: 'topic', label: 'Or write your own topic', kind: 'text', required: false, rules: { max_length: 120 }, options: [] },
+]
 
 interface Option {
   id: string
@@ -60,6 +76,7 @@ export function createMockClient(): GameClient {
   let laughs: Record<string, string[]> = {}
   let result: RoundResult | null = null
   let error: string | null = null
+  let setup: Setup = {}
 
   const later = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms))
   const clearTimers = () => {
@@ -90,6 +107,7 @@ export function createMockClient(): GameClient {
       myVote: votes[meId] ?? null,
       myLaughs: Object.keys(laughs).filter((id) => laughs[id].includes(meId!)),
       result: phase === 'reveal' || phase === 'leaderboard' ? result : null,
+      setup,
     }
     return { room, meId, error }
   }
@@ -254,6 +272,29 @@ export function createMockClient(): GameClient {
     },
     async startGame() {
       if (phase === 'lobby') begin()
+    },
+    async saveSetup(answers) {
+      setup = { ...setup, ...answers }
+      emit()
+    },
+    async updateSettings() {},
+    async getSetupQuestions() {
+      return MOCK_QUESTIONS
+    },
+    async kick(playerId) {
+      if (phase !== 'lobby' || playerId === meId) return
+      players = players.filter((p) => p.id !== playerId)
+      emit()
+    },
+    async skipPhase() {
+      const timer = timers.at(-1)
+      if (timer) clearTimeout(timer)
+      if (phase === 'writing') startVoting()
+      else if (phase === 'voting') startReveal()
+    },
+    async endGame() {
+      setPhase('final', null)
+      emit()
     },
     async submitAnswer(text) {
       if (meId) submit(meId, text)
