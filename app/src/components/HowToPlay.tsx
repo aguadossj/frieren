@@ -5,11 +5,14 @@
  * Sale solo la primera vez que alguien abre la web (se recuerda en localStorage) y desde el botón "Cómo jugar" de la portada.
  */
 import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { useLang, useT } from '../i18n'
 import { Icon } from './ui'
 
 const SEEN_KEY = 'typing.howto.seen'
 const SHOTS = ['chat', 'vote', 'reveal', 'standings'] as const
+const SWIPE = 70 // px para que la carta salga volando
+const FLY_MS = 300
 
 export function seenHowTo(): boolean {
   try {
@@ -35,7 +38,26 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
   const [dir, setDir] = useState<1 | -1>(1)
   const [leaving, setLeaving] = useState(false)
   const startX = useRef<number | null>(null)
+  const [dx, setDx] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [flying, setFlying] = useState<0 | 1 | -1>(0)
   const last = page === pages.length - 1
+  const offset = flying ? flying * 640 : dx
+
+  /** La carta sale volando hacia ese lado y entra la siguiente (en la última, se cierra y a jugar). */
+  const fly = (side: 1 | -1) => {
+    setFlying(side)
+    navigator.vibrate?.(12)
+    setTimeout(() => {
+      setFlying(0)
+      setDx(0)
+      if (last) close()
+      else {
+        setDir(1)
+        setPage((p) => p + 1)
+      }
+    }, FLY_MS)
+  }
 
   // Precargar las 4 capturas para que el paso de página sea instantáneo
   useEffect(() => {
@@ -56,7 +78,9 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
     setDir(to > page ? 1 : -1)
     setPage(to)
   }
-  const next = () => (last ? close() : go(page + 1))
+  const next = () => {
+    if (!flying) fly(-1) // el botón y → también tiran la carta
+  }
 
   // Teclado: ← → para pasar, Esc para cerrar
   const keys = useRef({ next, prev: () => go(page - 1), close })
@@ -97,34 +121,57 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      {/* Captura real dentro de un móvil; se puede deslizar para pasar de página */}
-      <div
-        className="flex min-h-0 flex-1 touch-pan-y items-center justify-center px-6 py-3 select-none"
-        onPointerDown={(e) => (startX.current = e.clientX)}
-        onPointerUp={(e) => {
-          if (startX.current === null) return
-          const dx = e.clientX - startX.current
-          startX.current = null
-          if (dx < -50) next()
-          else if (dx > 50) go(page - 1)
-        }}
-        onPointerCancel={() => (startX.current = null)}
-      >
+      {/* Capturas como cartas de Tinder: la de arriba sigue al dedo y, si la sueltas lejos, sale volando y entra la siguiente,
+          que ya asoma detrás. La primera hace un amago para enseñar el gesto. */}
+      <div className="relative min-h-0 flex-1 px-6 py-3 select-none">
+        {page + 1 < pages.length && (
+          <div className="absolute inset-0 flex items-center justify-center px-6 py-3" aria-hidden="true">
+            <Phone src={`/howto/${lang}-${SHOTS[page + 1]}.webp`} className="scale-[0.9] opacity-50" style={{ rotate: page % 2 ? '-3deg' : '3deg' }} />
+          </div>
+        )}
         <div
-          key={page}
-          className="relative h-full max-h-[480px] overflow-hidden rounded-[34px] border-[7px] border-[#2B2B2B] bg-brand shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
-          style={{
-            aspectRatio: '450 / 975',
-            animation: `${dir === 1 ? 'howto-in-right' : 'howto-in-left'} 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both`,
-            rotate: page % 2 ? '2deg' : '-2deg',
+          className="absolute inset-0 flex touch-none items-center justify-center px-6 py-3"
+          onPointerDown={(e) => {
+            if (flying) return
+            startX.current = e.clientX
+            setDragging(true)
+            e.currentTarget.setPointerCapture(e.pointerId)
+          }}
+          onPointerMove={(e) => {
+            if (startX.current !== null) setDx(e.clientX - startX.current)
+          }}
+          onPointerUp={() => {
+            if (startX.current === null) return
+            startX.current = null
+            setDragging(false)
+            if (Math.abs(dx) > SWIPE) fly(dx > 0 ? 1 : -1)
+            else setDx(0)
+          }}
+          onPointerCancel={() => {
+            startX.current = null
+            setDragging(false)
+            setDx(0)
           }}
         >
-          <img
-            src={`/howto/${lang}-${SHOTS[page]}.webp`}
-            alt=""
-            draggable={false}
-            className="size-full object-cover object-top"
-          />
+          <div
+            key={page}
+            className="h-full max-h-[480px]"
+            style={{
+              transform: `translateX(${offset}px) rotate(${offset / 18}deg)`,
+              transition: dragging ? 'none' : `transform ${FLY_MS}ms cubic-bezier(0.3, 0.8, 0.4, 1)`,
+            }}
+          >
+            <div
+              className="h-full"
+              style={{
+                animation: `${dir === 1 ? 'howto-in-right' : 'howto-in-left'} 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both${
+                  page === 0 && !dragging && !dx ? ', swipe-hint 1.4s ease-in-out 1.6s 2' : ''
+                }`,
+              }}
+            >
+              <Phone src={`/howto/${lang}-${SHOTS[page]}.webp`} style={{ rotate: page % 2 ? '2deg' : '-2deg' }} />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -152,6 +199,18 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
           <Icon name="arrowRight" size={22} />
         </button>
       </div>
+    </div>
+  )
+}
+
+/** Captura del juego dentro de un marco de móvil. */
+function Phone({ src, className = '', style }: { src: string; className?: string; style?: CSSProperties }) {
+  return (
+    <div
+      className={`relative h-full max-h-[480px] overflow-hidden rounded-[34px] border-[7px] border-[#2B2B2B] bg-brand shadow-[0_24px_60px_rgba(0,0,0,0.55)] ${className}`}
+      style={{ aspectRatio: '450 / 975', ...style }}
+    >
+      <img src={src} alt="" draggable={false} className="pointer-events-none size-full object-cover object-top" />
     </div>
   )
 }
