@@ -49,7 +49,7 @@ export default function Home() {
 function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void }) {
   const t = useT()
   return (
-    <Screen className="relative">
+    <Screen drift className="relative">
       {/* EN · ES flotando sobre el fondo, sin barra ni hueco propio */}
       <LangToggle className="absolute top-2 right-3 z-10" />
       {/* Centrado "seguro": my-auto centra si sobra sitio y, si no cabe, se desplaza normal sin cortar la parte de arriba.

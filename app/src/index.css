@@ -119,6 +119,15 @@ input { font-size: 16px; }
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
 }
+/* Dibujitos de fondo que se desplazan hacia la derecha (pantalla principal). 400 = ancho del patrón (ChatDoodles) */
+@keyframes doodle-drift {
+  from { transform: translateX(0); }
+  to { transform: translateX(400px); }
+}
+.doodle-drift { animation: doodle-drift 70s linear infinite; will-change: transform; }
+@media (prefers-reduced-motion: reduce) {
+  .doodle-drift { animation: none; }
+}
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

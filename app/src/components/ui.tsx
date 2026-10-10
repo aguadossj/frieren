@@ -72,11 +72,14 @@ export function Screen({
   children,
   dark = false,
   plain = false,
+  drift = false,
   className = '',
 }: {
   children: ReactNode
   dark?: boolean
   plain?: boolean
+  /** Los dibujitos de fondo se desplazan hacia la derecha (pantalla principal). */
+  drift?: boolean
   className?: string
 }) {
   const [seed] = useState(() => Math.floor(Math.random() * 1e6))
@@ -88,7 +91,7 @@ export function Screen({
         className,
       )}
     >
-      {!plain && !dark && <ChatDoodles seed={seed} className="-z-10" />}
+      {!plain && !dark && <ChatDoodles seed={seed} drift={drift} className="-z-10" />}
       {children}
     </main>
   )

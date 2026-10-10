@@ -54,26 +54,57 @@ function rng(seed: number) {
 
 const W = 400
 const H = 900
-const CELL = 54 // rejilla (más pequeña = más dibujos) con desplazamiento aleatorio: reparto uniforme pero sin parecer una cuadrícula
+const TARGET = 150 // cuántos dibujos intentamos meter
+const GAP = 6 // separación mínima entre dibujos (en unidades del viewBox)
 
-export default function ChatDoodles({ seed, opacity = 0.13, className = '' }: { seed: number; opacity?: number; className?: string }) {
-  const items = useMemo(() => {
-    const rand = rng(seed * 7919 + 17)
-    const out: { d: string; x: number; y: number; r: number; s: number }[] = []
-    for (let row = 0; row * CELL < H; row++) {
-      for (let col = 0; col * CELL < W + CELL; col++) {
-        if (rand() < 0.06) continue // algún hueco suelto
-        out.push({
-          d: ICONS[Math.floor(rand() * ICONS.length)],
-          x: col * CELL + 4 + rand() * (CELL - 36) + (row % 2 ? CELL / 2 : 0) - CELL / 2,
-          y: row * CELL + 4 + rand() * (CELL - 36),
-          r: Math.round(rand() * 60 - 30),
-          s: 1.05 + rand() * 0.45,
-        })
-      }
-    }
-    return out
-  }, [seed])
+type Doodle = { d: string; x: number; y: number; r: number; s: number }
+
+/**
+ * Posiciones aleatorias de verdad (no en rejilla): se lanzan puntos al azar y se aceptan si no se
+ * solapan con los ya puestos. La distancia se mide "dando la vuelta" en horizontal, así el dibujo
+ * encaja consigo mismo al repetirlo de lado a lado (necesario para que se pueda desplazar sin cortes).
+ */
+function scatter(seed: number): Doodle[] {
+  const rand = rng(seed * 7919 + 17)
+  const out: (Doodle & { rad: number })[] = []
+  for (let tries = 0; tries < 6000 && out.length < TARGET; tries++) {
+    const sc = 0.8 + rand() ** 1.6 * 0.95 // casi todos pequeños/medianos, algunos grandes
+    const rad = 12 * sc + GAP
+    const x = rand() * W
+    const y = -10 + rand() * (H + 10)
+    const free = out.every((o) => {
+      let dx = Math.abs(o.x - x)
+      dx = Math.min(dx, W - dx) // vuelta horizontal
+      return dx * dx + (o.y - y) ** 2 >= (o.rad + rad) ** 2
+    })
+    if (!free) continue
+    out.push({ d: ICONS[Math.floor(rand() * ICONS.length)], x, y, r: Math.round(rand() * 90 - 45), s: sc, rad })
+  }
+  return out
+}
+
+export default function ChatDoodles({
+  seed,
+  opacity = 0.13,
+  className = '',
+  drift = false,
+}: {
+  seed: number
+  opacity?: number
+  className?: string
+  /** Desplazamiento lento y continuo hacia la derecha (pantalla principal). */
+  drift?: boolean
+}) {
+  const items = useMemo(() => scatter(seed), [seed])
+  // Cada dibujo se centra en (x, y): la caja del icono es 24×24
+  const paths = (dx: number) =>
+    items.map((it, i) => (
+      <path
+        key={`${dx}-${i}`}
+        d={it.d}
+        transform={`translate(${it.x + dx} ${it.y}) rotate(${it.r}) scale(${it.s}) translate(-12 -12)`}
+      />
+    ))
 
   return (
     <svg
@@ -83,10 +114,19 @@ export default function ChatDoodles({ seed, opacity = 0.13, className = '' }: { 
       preserveAspectRatio="xMidYMin slice"
       style={{ opacity }}
     >
-      <g fill="none" stroke="#fff" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-        {items.map((it, i) => (
-          <path key={i} d={it.d} transform={`translate(${it.x} ${it.y}) rotate(${it.r} 12 12) scale(${it.s})`} />
-        ))}
+      <g
+        className={drift ? 'doodle-drift' : undefined}
+        fill="none"
+        stroke="#fff"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {/* Tres copias (izquierda, centro, derecha): el patrón encaja consigo mismo, así que al moverse
+            hacia la derecha una anchura entera y volver a empezar no se nota el salto */}
+        {paths(-W)}
+        {paths(0)}
+        {drift ? null : paths(W)}
       </g>
     </svg>
   )
