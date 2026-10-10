@@ -3,6 +3,7 @@
 // - createRoom: eres host; entran 3 bots y tú pulsas Start.
 // - joinRoom: un bot es host y empieza solo a los 4 s.
 
+import { generateRound, setupFromLobby, toAiPlayers, type AiPastRound } from '../content/ai'
 import { buildChat, pickTemplates } from '../content/packs'
 import { scoreRound } from './scoring'
 import {
@@ -176,6 +177,7 @@ export function createMockClient(): GameClient {
       { id: 'real', text: textOf(writer), authorId: writer, isReal: true },
       ...chosen.map((id) => ({ id: `a-${id}`, text: textOf(id), authorId: id, isReal: false })),
     ]).map((o, i) => ({ ...o, id: `opt-${i}` }))
+    recordRoundForAi()
 
     setPhase('voting', PHASE_SECONDS.voting, startReveal)
     for (const bot of bots().filter((b) => b.id !== writer)) {
@@ -206,6 +208,7 @@ export function createMockClient(): GameClient {
   function startReveal() {
     const writer = players.find((p) => p.id === writerId())!
     result = scoreRound({ writer, players, options, votes, laughs })
+    recordVotesForAi(result)
     players = players.map((p) => ({ ...p, score: p.score + (result!.points[p.id] ?? 0) }))
     setPhase('reveal', PHASE_SECONDS.reveal, () => {
       setPhase('leaderboard', PHASE_SECONDS.leaderboard, () => {
@@ -222,24 +225,89 @@ export function createMockClient(): GameClient {
     emit()
   }
 
-  function begin() {
+  // ── IA ronda a ronda (mismo flujo que SPEC › IA): ronda 1 al pulsar Start, ronda N+1 al empezar la
+  // votación de la N, con el historial y la memoria. Si no llega a tiempo, se queda el chat de packs.ts.
+  let starting = false
+  let gameId = 0
+  let aiMemory: unknown = null
+  let history: AiPastRound[] = []
+
+  async function requestRound(index: number, timeoutMs: number): Promise<Chat | null> {
+    const game = gameId
+    const ai = await generateRound(
+      {
+        round: index + 1,
+        total_rounds: totalRounds,
+        setup: { ...setupFromLobby(pack, groupType), ...setup }, // lo que eligió el host manda
+        players: toAiPlayers(players),
+        writer_id: writerOrder[index],
+        history: structuredClone(history),
+        memory: aiMemory,
+      },
+      timeoutMs,
+    )
+    if (!ai || game !== gameId) return null
+    aiMemory = ai.memory
+    return ai.chat
+  }
+
+  /** Lo que aprende la IA de esta ronda: respuestas reales y falsas (los votos llegan en startReveal). */
+  function recordRoundForAi() {
+    const writer = writerId()
+    history.push({
+      round: roundIndex + 1,
+      writer_id: writer,
+      title: chats[roundIndex].title,
+      messages: chats[roundIndex].messages.map((m) => ({ player_id: m.playerId, text: m.text })),
+      real_answer: submissions[writer] ?? '…',
+      fakes: players.filter((p) => p.id !== writer).map((p) => ({ player_id: p.id, text: submissions[p.id] ?? '…' })),
+    })
+    const next = roundIndex + 1
+    if (next >= totalRounds) return
+    const game = gameId
+    void requestRound(next, 15000).then((chat) => {
+      if (chat && game === gameId && roundIndex < next) chats[next] = chat
+    })
+  }
+
+  function recordVotesForAi(round: RoundResult) {
+    const entry = history[history.length - 1]
+    if (!entry) return
+    const byAuthor = new Map(round.answers.map((a) => [a.authorId, a]))
+    entry.found_by = round.answers.find((a) => a.isReal)?.voterIds.length ?? 0
+    entry.fakes = entry.fakes.map((f) => ({ ...f, fooled: byAuthor.get(f.player_id)?.voterIds.length ?? 0 }))
+    entry.laughs = Object.fromEntries(round.answers.map((a) => [a.authorId, a.laughs]))
+  }
+
+  async function begin() {
     if (players.length < MIN_PLAYERS) {
       error = `You need at least ${MIN_PLAYERS} players.`
       emit()
       return
     }
+    if (starting) return
+    starting = true
     error = null
+    gameId += 1
+    history = []
+    aiMemory = null
     totalRounds = Math.min(players.length, MAX_ROUNDS)
     writerOrder = shuffle(players.map((p) => p.id)).slice(0, totalRounds)
+    // Respaldo para todas las rondas; la IA los va sustituyendo si llega a tiempo.
     chats = pickTemplates(pack, totalRounds).map((template, i) => {
       const writer = players.find((p) => p.id === writerOrder[i])!
       return buildChat(template, writer, shuffle(players.filter((p) => p.id !== writer.id)))
     })
+    const first = await requestRound(0, 6000)
+    starting = false
+    if (players.length === 0 || phase !== 'lobby') return // salió de la sala mientras se generaba
+    if (first) chats[0] = first
     roundIndex = 0
     startWriting()
   }
 
   function reset() {
+    gameId += 1
     clearTimers()
     meId = null
     players = []
@@ -298,7 +366,7 @@ export function createMockClient(): GameClient {
       if (!players.find((p) => p.id === meId)?.isHost) later(4000, begin)
     },
     async startGame() {
-      if (phase === 'lobby') begin()
+      if (phase === 'lobby') await begin()
     },
     async updateSettings() {},
     async getSetupQuestions() {
