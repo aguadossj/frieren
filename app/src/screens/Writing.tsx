@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bubble, Icon, RolePill, Screen, SectionLabel, TimerPill, TopBar, TypingDots, groupInitials } from '../components/ui'
+import { Bubble, Icon, Screen, TimerPill, TypingDots, groupInitials } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH } from '../game/types'
 import { focusWithoutScroll } from '../lib/viewport'
@@ -48,103 +48,113 @@ export default function Writing() {
   const writer = room.players.find((p) => p.id === room.chat!.writerId)!
   const isWriter = writer.id === me.id
   const sent = room.submittedIds.includes(me.id) || mine !== null
-  const nameOf = (id: string) => room.players.find((p) => p.id === id)?.name ?? '?'
+  const playerOf = (id: string) => room.players.find((p) => p.id === id)
   const step = 0.35 // s entre mensajes al entrar
+  const hint = isWriter ? `You're ${writer.name} · say it for real` : `Fool them · write like ${writer.name}`
 
+  // Layout tipo WhatsApp para aprovechar la pantalla del móvil:
+  // cabecera compacta (ronda en el subtítulo) · chat rojo con el nombre DENTRO de la burbuja ·
+  // pista como nota pequeña al final del chat · abajo solo la barra de escribir.
+  // La pantalla es blanca y solo el chat es rojo: así Safari tiñe de blanco sus barras de arriba y abajo.
   return (
-    <Screen>
-      <TopBar
-        avatar={
-          <span className="flex size-[50px] shrink-0 items-center justify-center rounded-full bg-brand text-[18px] font-extrabold text-white">
-            {groupInitials(room.chat.title)}
-          </span>
-        }
-        title={room.chat.title}
-        subtitle={mine ? `${room.players.length} members` : `${writer.name} is typing…`}
-        right={<TimerPill seconds={seconds} />}
-      />
-
-      <div ref={list} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-5 pb-4">
-        <SectionLabel>
-          ROUND {room.roundIndex + 1} OF {room.totalRounds}
-        </SectionLabel>
-        {room.chat.messages.map((m, i) => (
-          <div key={i} className="animate-rise" style={{ animationDelay: `${i * step}s` }}>
-            <div className="mb-1 pl-1 text-[15px] font-extrabold">{nameOf(m.playerId)}</div>
-            <Bubble>{m.text}</Bubble>
+    <Screen className="bg-white!">
+      <header className="flex shrink-0 items-center gap-3 bg-white px-4 py-2.5 text-ink">
+        <span className="flex size-[42px] shrink-0 items-center justify-center rounded-full bg-brand text-[16px] font-extrabold text-white">
+          {groupInitials(room.chat.title)}
+        </span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <div className="truncate text-[18px] font-extrabold">{room.chat.title}</div>
+          <div className="truncate text-[14px] font-semibold text-brand">
+            Round {room.roundIndex + 1}/{room.totalRounds} · {mine ? 'sent ✓' : `${writer.name} is typing…`}
           </div>
-        ))}
+        </div>
+        <TimerPill seconds={seconds} />
+      </header>
 
-        {/* Lo que escribe el writer va a la derecha: primero "typing…", luego tu respuesta */}
-        <div className="flex animate-rise flex-col items-end pt-2" style={{ animationDelay: `${room.chat.messages.length * step}s` }}>
+      <div ref={list} className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-brand px-3 pt-3 pb-3">
+        {room.chat.messages.map((m, i) => {
+          const author = playerOf(m.playerId)
+          const firstOfRun = i === 0 || room.chat!.messages[i - 1].playerId !== m.playerId
+          return (
+            <div key={i} className={`animate-rise ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`} style={{ animationDelay: `${i * step}s` }}>
+              <Bubble className="max-w-[85%] rounded-[20px] px-4 py-2 text-[17px]">
+                {firstOfRun && (
+                  <div className="text-[13px] leading-tight font-extrabold" style={{ color: author?.color }}>
+                    {author?.name ?? '?'}
+                  </div>
+                )}
+                {m.text}
+              </Bubble>
+            </div>
+          )
+        })}
+
+        {/* Lo que escribe el writer va a la derecha: "typing…" y luego tu respuesta */}
+        <div className="mt-2.5 flex animate-rise flex-col items-end" style={{ animationDelay: `${room.chat.messages.length * step}s` }}>
           {mine ? (
             <>
-              <div className="mb-1 flex items-center gap-1 pr-1 text-[15px] font-extrabold">
-                <Icon name="check" size={14} />
+              <Bubble dark className="max-w-[85%] animate-pop rounded-[20px] px-4 py-2 text-[17px]">{mine}</Bubble>
+              <div className="mt-1 flex items-center gap-1 pr-1 text-[13px] font-extrabold">
+                <Icon name="check" size={12} />
                 Sent as {writer.name}
               </div>
-              <Bubble dark className="animate-pop">{mine}</Bubble>
             </>
           ) : (
-            <>
-              <div className="mb-1 pr-1 text-[15px] font-extrabold">{writer.name} is typing…</div>
-              <Bubble>
-                <TypingDots />
-              </Bubble>
-            </>
+            <Bubble className="rounded-[20px] px-4 py-1.5">
+              <TypingDots />
+            </Bubble>
           )}
         </div>
+
+        {/* Pista como nota del sistema (antes era una caja negra grande abajo) */}
+        {!sent && (
+          <div className="mt-3 self-center rounded-full bg-black/25 px-3.5 py-1.5 text-center text-[14px] font-extrabold text-white">
+            {hint}
+          </div>
+        )}
       </div>
 
-      <div className={`shrink-0 bg-white px-4 text-ink ${typing ? 'pt-2 pb-2' : 'pt-3 pb-6'}`}>
+      <div className={`shrink-0 bg-white px-3 ${typing ? 'pt-2 pb-2' : 'pt-2.5 pb-4'}`}>
         {sent ? (
-          <div className="flex h-[54px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[17px] font-extrabold">
+          <div className="flex h-[48px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[16px] font-extrabold text-ink">
             <Icon name="check" size={18} className="text-good" />
-            Sent · waiting for others {room.submittedIds.length}/{room.players.length}
+            Waiting for others {room.submittedIds.length}/{room.players.length}
           </div>
         ) : (
-          <>
-            {/* Con el teclado abierto desaparece el hint (pasa al placeholder) para dejar el máximo de chat */}
-            {!typing && (
-              <RolePill className="mb-3 text-center text-[16px]">
-                {isWriter ? `You're ${writer.name}. Say it for real.` : `Write what ${writer.name} would say. Fool them.`}
-              </RolePill>
-            )}
-            <form
-              className="flex items-center gap-3"
-              onSubmit={(e) => {
-                e.preventDefault()
-                const t = text.trim()
-                if (!t) return
-                setMine(t)
-                setTyping(false)
-                void game.submitAnswer(t)
-                setText('')
-              }}
+          <form
+            className="flex items-center gap-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const t = text.trim()
+              if (!t) return
+              setMine(t)
+              setTyping(false)
+              void game.submitAnswer(t)
+              setText('')
+            }}
+          >
+            <input
+              className="h-[46px] min-w-0 flex-1 rounded-full bg-neutral-100 px-5 text-[17px] text-ink outline-none placeholder:text-neutral-400"
+              placeholder={`Message as ${writer.name}`}
+              maxLength={MAX_ANSWER_LENGTH}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              autoComplete="off"
+              enterKeyHint="send"
+              onTouchEnd={focusWithoutScroll}
+              onFocus={() => setTyping(true)}
+              onBlur={() => setTyping(false)}
+            />
+            <button
+              type="submit"
+              aria-label="Send"
+              onMouseDown={(e) => e.preventDefault() /* no cerrar el teclado al tocar enviar */}
+              disabled={!text.trim()}
+              className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50"
             >
-              <input
-                className={`min-w-0 flex-1 rounded-full bg-neutral-100 px-5 text-[17px] text-ink outline-none transition-[height] placeholder:text-neutral-400 ${typing ? 'h-[44px]' : 'h-[54px]'}`}
-                placeholder={typing ? (isWriter ? `Say it for real, ${writer.name}` : `Fool them · write like ${writer.name}`) : `Message as ${writer.name}`}
-                maxLength={MAX_ANSWER_LENGTH}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                autoComplete="off"
-                enterKeyHint="send"
-                onTouchEnd={focusWithoutScroll}
-                onFocus={() => setTyping(true)}
-                onBlur={() => setTyping(false)}
-              />
-              <button
-                type="submit"
-                aria-label="Send"
-                onMouseDown={(e) => e.preventDefault() /* no cerrar el teclado al tocar enviar */}
-                disabled={!text.trim()}
-                className={`flex shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50 ${typing ? 'size-[44px]' : 'size-[54px]'}`}
-              >
-                <Icon name="arrowRight" size={24} className="-rotate-90" />
-              </button>
-            </form>
-          </>
+              <Icon name="arrowRight" size={22} className="-rotate-90" />
+            </button>
+          </form>
         )}
       </div>
     </Screen>

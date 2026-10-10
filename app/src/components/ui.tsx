@@ -60,12 +60,13 @@ export const Eyebrow = ({ children, className = '' }: { children: ReactNode; cla
 )
 
 /** Marco de pantalla. En escritorio se ve como un móvil centrado (como el mockup). */
-export function Screen({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
+export function Screen({ children, dark = false, className = '' }: { children: ReactNode; dark?: boolean; className?: string }) {
   return (
     <main
       className={cx(
         'flex h-full flex-col overflow-hidden text-white sm:my-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] sm:shadow-2xl',
         dark ? 'bg-ink' : 'bg-brand',
+        className,
       )}
     >
       {children}
