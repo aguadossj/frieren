@@ -1,7 +1,7 @@
 // Núcleo de la IA de Typing…: genera el chat de UNA ronda y actualiza la memoria de la sala ("aprendizaje").
 // TS puro: sin Deno.*, sin process.env, sin paquetes. Lo usan la Edge Function (index.ts) y el mock en local
-// (plugin de Vite en app/vite.config.ts). Proveedor: cualquier API compatible con OpenAI (por defecto Hermes 3 70B
-// en OpenRouter para rondas y Mimic, Groq para los borradores; ver index.ts).
+// (plugin de Vite en app/vite.config.ts). Proveedor: cualquier API compatible con OpenAI (Hermes 3 70B en OpenRouter
+// por defecto, ver index.ts).
 //
 // Flujo (SPEC.md › IA): ronda 1 al pulsar Start; ronda N+1 en segundo plano al empezar la votación de la N.
 // Por eso la última ronda del historial puede venir sin votos (`fooled`, `found_by`, `laughs` opcionales).
@@ -856,7 +856,6 @@ export function parseJsonReply(content: unknown): unknown {
 
 async function send(config: AiConfig, system: string, user: string, schemaName: string, schema: unknown, timeoutMs: number) {
   const mode = config.jsonMode ?? 'json_schema'
-  const reasoning = config.model.includes('gpt-oss')
   const instructions =
     mode === 'json_schema'
       ? system
@@ -868,20 +867,16 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
       signal: AbortSignal.timeout(timeoutMs),
       body: JSON.stringify({
         model: config.model,
-        ...(reasoning ? { reasoning_effort: 'low' } : {}),
+        ...(config.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
         // Los modelos pequeños (p. ej. Hermes 3 8B) se desordenan con temperatura 1.
-        temperature: reasoning ? 1 : 0.8,
-        // gpt-oss gasta tokens razonando; el resto (Hermes…) con max_tokens, que entiende cualquier servidor compatible.
-        // 2500: la memoria de 8 jugadores + el chat no caben en 1500 y el JSON cortado no se puede leer.
-        ...(reasoning ? { max_completion_tokens: 4000 } : { max_tokens: 2500 }),
+        temperature: config.model.includes('gpt-oss') ? 1 : 0.8,
+        // max_tokens lo entiende cualquier servidor compatible (vLLM, OpenRouter…); Groq acepta ambos.
+        ...(mode === 'json_schema' ? { max_completion_tokens: 4000 } : { max_tokens: 1500 }),
         ...(mode === 'json_schema'
           ? { response_format: { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } } }
           : mode === 'json_object'
             ? { response_format: { type: 'json_object' } }
             : {}),
-        // OpenRouter descarta en silencio los parámetros que el proveedor no admite. Con json_schema el esquema NO va
-        // en el prompt, así que si se descarta el modelo no lo ve: mejor un error (reintento / respaldo) que basura.
-        ...(mode === 'json_schema' && config.baseUrl.includes('openrouter.ai') ? { provider: { require_parameters: true } } : {}),
         messages: [
           { role: 'system', content: instructions },
           { role: 'user', content: user },
@@ -912,9 +907,8 @@ export async function generateRound(input: GenerateRoundInput, config: AiConfig)
     const retryable =
       error instanceof AiError &&
       (error.code === 'invalid_output' || (error.code === 'provider_status' && error.message.startsWith('400')))
-    // Solo si queda al menos lo que tardó el primer intento: con Hermes (~10 s) un reintento con 5 s nunca llega.
     const left = deadline - Date.now()
-    if (!retryable || left < Math.max(2500, Date.now() - started)) throw error
+    if (!retryable || left < 2500) throw error
     return done(await generateOnce(input, { ...config, timeoutMs: left }, theme), 2)
   }
 }
@@ -953,10 +947,6 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
     languageProblem([output.chat.title, ...texts], lang) ??
     copiedFrom(texts, [...(input.style_examples ?? []), ...(input.house_examples ?? []).map((ex) => ex.lines)])
   if (problem) throw new AiError('invalid_output', problem)
-  // Sin esquema estricto (json_object) el modelo puede saltarse la memoria: la ronda vale, pero que se vea en los logs.
-  if (!output.memory_update || !Array.isArray(output.memory_update.players)) {
-    console.warn('generate-round', `round ${input.round}: no memory_update from ${config.model}, memory not refreshed`)
-  }
 
   return {
     chat: {

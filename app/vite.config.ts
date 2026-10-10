@@ -33,7 +33,7 @@ function devAi(env: Record<string, string>): Plugin {
               apiKey: env.AI_API_KEY,
               baseUrl: env.AI_BASE_URL || 'https://openrouter.ai/api/v1',
               model: env.AI_MODEL || 'nousresearch/hermes-3-llama-3.1-70b',
-              jsonMode: env.AI_JSON_MODE || 'json_schema',
+              jsonMode: env.AI_JSON_MODE || 'json_object',
               timeoutMs: 20000,
             }),
           )
