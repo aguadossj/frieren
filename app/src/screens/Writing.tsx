@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bubble, Icon, RolePill, Screen, SectionLabel, TimerPill, TopBar, TypingDots, groupInitials } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH } from '../game/types'
+import { focusWithoutScroll } from '../lib/viewport'
 
 export default function Writing() {
   const { room, me, game } = useGame()
@@ -10,6 +11,14 @@ export default function Writing() {
   const [mine, setMine] = useState<string | null>(null)
   const [typing, setTyping] = useState(false) // input con foco ⇒ teclado abierto
   const list = useRef<HTMLDivElement>(null)
+
+  // La barra de escribir es blanca: lo que asoma bajo ella con el teclado abierto también (ver index.css)
+  useEffect(() => {
+    document.documentElement.dataset.kbBg = 'white'
+    return () => {
+      delete document.documentElement.dataset.kbBg
+    }
+  }, [])
 
   // Bajar al último mensaje dentro de la lista (no scrollIntoView: en iOS desplaza toda la página)
   const toBottom = (smooth = true) => {
@@ -120,6 +129,7 @@ export default function Writing() {
                 onChange={(e) => setText(e.target.value)}
                 autoComplete="off"
                 enterKeyHint="send"
+                onTouchEnd={focusWithoutScroll}
                 onFocus={() => setTyping(true)}
                 onBlur={() => setTyping(false)}
               />
