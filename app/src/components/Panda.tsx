@@ -1,3 +1,5 @@
+import { useT } from '../i18n'
+
 // Panda presentador (estilo dibujo animado: pelo crema, contorno negro, boca abierta):
 // asoma desde abajo saludando con la pata, parpadea y comenta la partida en un bocadillo.
 
@@ -74,6 +76,7 @@ export function PandaFace({ size = 150 }: { size?: number }) {
 
 /** Panda con bocadillo, pegado al borde inferior de su zona. */
 export default function PandaHost({ text }: { text: string }) {
+  const t = useT()
   return (
     <div className="pointer-events-none flex shrink-0 items-end gap-0 overflow-hidden pr-4" aria-live="polite">
       <div className="-mb-2 shrink-0 animate-panda" style={{ animationDelay: '0.5s' }}>
@@ -83,7 +86,7 @@ export default function PandaHost({ text }: { text: string }) {
       </div>
       <div className="mb-16 min-w-0 animate-pop" style={{ animationDelay: '0.9s' }}>
         <div className="relative rounded-[22px] bg-white px-4 py-3 text-ink">
-          <div className="text-[12px] font-extrabold tracking-[0.14em] text-brand">PANDA SAYS</div>
+          <div className="text-[12px] font-extrabold tracking-[0.14em] text-brand">{t.pandaSays}</div>
           <p className="text-[16px] leading-snug font-extrabold">{text}</p>
           {/* Colita del bocadillo hacia el panda */}
           <svg className="absolute bottom-3 -left-2.5" width="14" height="16" viewBox="0 0 14 16" aria-hidden="true">

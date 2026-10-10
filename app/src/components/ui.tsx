@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import type { Player } from '../game/types'
 import { joinUrl } from './QR'
+import { setLang, useLang } from '../i18n'
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
 
@@ -254,4 +255,26 @@ export const SectionLabel = ({ children }: { children: ReactNode }) => (
 export function groupInitials(title: string) {
   const words = title.replace(/[^\p{L}\p{N}\s]/gu, '').trim().split(/\s+/)
   return (words[words.length - 1] ?? '?').slice(0, 2).toUpperCase()
+}
+
+/** Selector de idioma EN/ES (se recuerda en el móvil). `dark` = sobre fondo blanco. */
+export function LangToggle({ className = '' }: { className?: string }) {
+  const lang = useLang()
+  return (
+    <div role="group" aria-label="Language" className={cx('flex h-[44px] shrink-0 items-center gap-0.5 rounded-full bg-white/18 p-1', className)}>
+      {(['en', 'es'] as const).map((l) => (
+        <button
+          key={l}
+          onClick={() => setLang(l)}
+          aria-pressed={lang === l}
+          className={cx(
+            'h-full min-w-[44px] rounded-full px-3 text-[15px] font-black uppercase transition',
+            lang === l ? 'bg-white text-brand' : 'text-white/80',
+          )}
+        >
+          {l}
+        </button>
+      ))}
+    </div>
+  )
 }

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Avatar, Button, Footer, Icon, Screen, TimerPill, TopBar } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
+import { useT } from '../i18n'
 
 const LETTERS = 'ABCDEF'
 
 export default function Voting() {
   const { room, me, game } = useGame()
+  const t = useT()
   const seconds = useCountdown(room?.phaseEndsAt ?? null)
   const [picked, setPicked] = useState<string | null>(null)
   if (!room?.chat || !me) return null
@@ -20,7 +22,7 @@ export default function Voting() {
 
   return (
     <Screen>
-      <TopBar title={`Which one is the real ${writer.name}?`} right={<TimerPill seconds={seconds} />} />
+      <TopBar title={t.whichIsReal(writer.name)} right={<TimerPill seconds={seconds} />} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-3">
         {/* Lo que se pregunta, como en el chat */}
@@ -34,7 +36,7 @@ export default function Voting() {
           </div>
         )}
         {room.mimic && (
-          <p className="shrink-0 self-center rounded-full bg-ink px-4 py-1 text-[13px] font-bold">One of these is an AI. Avoid it.</p>
+          <p className="shrink-0 self-center rounded-full bg-ink px-4 py-1 text-[13px] font-bold">{t.aiAmongThese}</p>
         )}
 
         {/* Opciones: todas del mismo tamaño, repartiendo el alto disponible */}
@@ -59,7 +61,7 @@ export default function Voting() {
                   {selected ? <Icon name="check" size={18} /> : LETTERS[i]}
                 </span>
                 <span className="line-clamp-2 min-w-0 flex-1 text-[17px] leading-snug font-semibold">{answer.text}</span>
-                {answer.mine && <span className="shrink-0 text-[13px] font-extrabold text-neutral-400">YOURS</span>}
+                {answer.mine && <span className="shrink-0 text-[13px] font-extrabold text-neutral-400">{t.yours}</span>}
               </button>
               </div>
             )
@@ -69,7 +71,7 @@ export default function Voting() {
 
       <Footer className="pt-1">
         <Button variant="ink" disabled={isWriter || locked || !picked} onClick={() => picked && void game.castVote(picked)}>
-          {isWriter ? `They’re hunting you · ${room.votedIds.length}/${voters}` : locked ? `Locked · ${room.votedIds.length}/${voters} voted` : picked ? 'Lock vote' : 'Tap the real one'}
+          {isWriter ? t.huntingYou(room.votedIds.length, voters) : locked ? t.locked(room.votedIds.length, voters) : picked ? t.lockVote : t.tapTheReal}
         </Button>
       </Footer>
     </Screen>

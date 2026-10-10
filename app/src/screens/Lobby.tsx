@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Avatar, Button, Footer, Icon, Row, Screen, TopBar, TopNote } from '../components/ui'
+import { Avatar, Button, Eyebrow, Footer, Icon, LangToggle, Row, Screen } from '../components/ui'
 import PandaHost from '../components/Panda'
 import QR, { joinUrl } from '../components/QR'
 import { useGame } from '../game/useGame'
 import { MIN_PLAYERS } from '../game/types'
+import { useT } from '../i18n'
 
 export default function Lobby() {
   const { room, me, game, error } = useGame()
+  const t = useT()
   const [copied, setCopied] = useState(false)
   if (!room || !me) return null
   const missing = MIN_PLAYERS - room.players.length
@@ -23,93 +25,100 @@ export default function Lobby() {
     } else if (navigator.share) void navigator.share({ title: 'Typing…', url }).catch(() => {})
   }
 
+  /** Código en fichas grandes: tocarlo copia el enlace de invitación. */
+  const codeButton = (
+    <button onClick={copy} aria-label={t.copyLink} className="flex items-center gap-2 active:scale-95">
+      {room.code.split('').map((l, i) => (
+        <span key={i} className="flex h-[52px] w-[44px] items-center justify-center rounded-[14px] bg-white text-[28px] font-black text-ink">
+          {l}
+        </span>
+      ))}
+      <span className={`flex size-[44px] items-center justify-center rounded-full transition-colors ${copied ? 'bg-good' : 'bg-white/18'}`}>
+        <Icon name={copied ? 'check' : 'copy'} size={20} />
+      </span>
+    </button>
+  )
+
   return (
     <Screen>
-      <TopBar
-        avatar={
-          <button
-            onClick={() => void game.leave()}
-            aria-label="Leave room"
-            className="-ml-2 flex size-[44px] shrink-0 items-center justify-center rounded-full text-ink active:scale-90 active:bg-neutral-100"
-          >
-            <Icon name="arrowLeft" size={24} />
-          </button>
-        }
-        title={
-          <span className="flex items-center gap-2">
-            Room
-            <button onClick={copy} aria-label="Copy invite link" className="flex items-center gap-1.5 rounded-full bg-brand px-3 py-0.5 tracking-[0.18em] text-white active:scale-95">
-              {room.code}
-              <Icon name={copied ? 'check' : 'copy'} size={14} className="opacity-80" />
-            </button>
-          </span>
-        }
-        right={<TopNote>{copied ? 'Link copied' : `${room.players.length} joined`}</TopNote>}
-      />
+      {/* Sin cabecera: atrás e idioma flotando arriba */}
+      <div className="flex shrink-0 items-center justify-between px-4 pt-3">
+        <button
+          onClick={() => void game.leave()}
+          aria-label={t.leaveRoom}
+          className="flex size-[44px] items-center justify-center rounded-full bg-white/18 active:scale-90"
+        >
+          <Icon name="arrowLeft" size={22} />
+        </button>
+        <LangToggle />
+      </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pt-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pt-2">
         {me.isHost ? (
-          <div className="flex shrink-0 flex-col items-center gap-2">
+          <div className="flex shrink-0 flex-col items-center gap-3">
             <QR code={room.code} size={150} />
-            <p className="text-[15px] font-semibold text-white/85">Scan to join · tap the code to copy</p>
+            {codeButton}
+            {copied && <p className="-mt-1 animate-pop text-[14px] font-bold">{t.linkCopied}</p>}
             {situation && (
               <p className="line-clamp-2 max-w-full rounded-[18px] bg-white/15 px-4 py-1.5 text-center text-[14px] font-bold">“{situation}”</p>
             )}
-            {room.mimic && <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">An AI is hiding among the answers</p>}
+            {room.mimic && <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">{t.aiHiding}</p>}
           </div>
         ) : (
           /* Invitado: bienvenida en grande en vez del QR */
-          <div className="flex shrink-0 flex-col items-center gap-3 pt-2 text-center">
+          <div className="flex shrink-0 flex-col items-center gap-3 text-center">
             <div className="relative animate-pop">
               <Avatar player={me} size={84} ring />
               <span className="absolute -right-1 -bottom-1 flex size-8 items-center justify-center rounded-full bg-good text-white ring-[3px] ring-brand">
                 <Icon name="check" size={18} />
               </span>
             </div>
-            <h1 className="animate-pop text-[40px] leading-none font-black tracking-[-0.03em]" style={{ animationDelay: '0.15s' }}>
-              You’re in, {me.name}!
+            <h1 className="animate-pop text-[38px] leading-none font-black tracking-[-0.03em]" style={{ animationDelay: '0.15s' }}>
+              {t.youreIn(me.name)}
             </h1>
-            <p className="text-[17px] font-semibold text-white/85">
-              {host ? `${host.name}’s room` : 'The room'} · {room.players.length} {room.players.length === 1 ? 'player' : 'players'}
-            </p>
+            <p className="text-[17px] font-semibold text-white/85">{host ? t.hostsRoom(host.name) : ''}</p>
             {situation && (
               <p className="line-clamp-2 max-w-full rounded-[18px] bg-white/15 px-4 py-1.5 text-[14px] font-bold">“{situation}”</p>
             )}
-            {room.mimic && <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">An AI is hiding among the answers</p>}
+            {room.mimic && <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">{t.aiHiding}</p>}
           </div>
         )}
 
-        <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pb-2">
-          {room.players.map((p) => (
-            <li key={p.id} className="animate-rise">
-              <Row className={`min-h-[60px] ${p.id === me.id && !me.isHost ? 'outline-[3px] outline-ink outline-solid' : ''}`}>
-                <Avatar player={p} />
-                <span className="flex-1 truncate text-[19px] font-semibold">
-                  {p.name}
-                  {p.id === me.id && <span className="text-neutral-400"> (you)</span>}
-                </span>
-                {p.isHost && <span className="text-[15px] text-neutral-400">host</span>}
-              </Row>
-            </li>
-          ))}
-        </ul>
+        <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+          <div className="flex shrink-0 items-center justify-between px-1">
+            <Eyebrow>{t.players(room.players.length)}</Eyebrow>
+            <div className="flex -space-x-2">
+              {room.players.slice(0, 6).map((p) => (
+                <Avatar key={p.id} player={p} size={24} ring />
+              ))}
+            </div>
+          </div>
+          <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pb-2">
+            {room.players.map((p) => (
+              <li key={p.id} className="animate-rise">
+                <Row className={`min-h-[60px] ${p.id === me.id && !me.isHost ? 'outline-[3px] outline-ink outline-solid' : ''}`}>
+                  <Avatar player={p} />
+                  <span className="flex-1 truncate text-[19px] font-semibold">
+                    {p.name}
+                    {p.id === me.id && <span className="text-neutral-400"> ({t.youLower})</span>}
+                  </span>
+                  {p.isHost && <span className="text-[15px] text-neutral-400">{t.hostTag}</span>}
+                </Row>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
       {me.isHost ? (
         <Footer>
           {error && <p className="text-center text-[15px] font-bold">{error}</p>}
           <Button disabled={missing > 0} onClick={() => void game.startGame()}>
-            {missing > 0 ? `Need ${missing} more` : 'Start game'}
+            {missing > 0 ? t.needMore(missing) : t.startGame}
           </Button>
         </Footer>
       ) : (
-        <PandaHost
-          text={
-            missing > 0
-              ? `Need ${missing} more ${missing === 1 ? 'player' : 'players'}. Send them the code!`
-              : `Waiting for ${host?.name ?? 'the host'} to start. Warm up those thumbs.`
-          }
-        />
+        <PandaHost text={missing > 0 ? t.needMorePanda(missing) : t.waitingPanda(host?.name ?? t.theHost)} />
       )}
     </Screen>
   )

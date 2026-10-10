@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import type { SwipeCard } from '../components/SwipeDeck'
-import { AppHeader, Body, Button, Eyebrow, Footer, Icon, Screen, TextInput, TypingDots } from '../components/ui'
+import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
+import { getLang, useT } from '../i18n'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
 
@@ -9,12 +10,6 @@ import { MAX_NAME_LENGTH } from '../game/types'
 const codeFromUrl = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? ''
 
 type Page = 'start' | 'create' | 'join'
-
-const STEPS = [
-  ['Get a message', 'The group chat asks you something.'],
-  ['Everyone fakes it', 'Friends copy how you text.'],
-  ['Spot the real one', 'Vote. Fool them. Score.'],
-] as const
 
 export default function Home() {
   const [page, setPage] = useState<Page>(codeFromUrl ? 'join' : 'start')
@@ -25,24 +20,28 @@ export default function Home() {
 }
 
 function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void }) {
+  const t = useT()
   return (
     <Screen>
-      <Body className="justify-center gap-7 pt-8">
+      <div className="flex shrink-0 justify-end px-5 pt-3">
+        <LangToggle />
+      </div>
+      <Body className="justify-center gap-7 pt-2">
         <div className="text-center">
           <div className="mx-auto mb-6 flex h-[52px] w-[70px] animate-pop items-center justify-center rounded-full bg-white">
             <TypingDots />
           </div>
-          <Eyebrow>Live bluffing party game</Eyebrow>
+          <Eyebrow>{t.tagline}</Eyebrow>
           <h1 className="mt-2 text-[60px] leading-none font-black tracking-[-0.04em]">Typing…</h1>
           <p className="mt-4 text-[19px] leading-snug font-semibold">
-            Your friends fake your replies.
+            {t.pitch1}
             <br />
-            Spot the real one.
+            {t.pitch2}
           </p>
         </div>
 
         <ol className="flex animate-rise flex-col gap-3 rounded-[28px] bg-white/15 p-4" style={{ animationDelay: '0.15s' }}>
-          {STEPS.map(([title, line], i) => (
+          {t.steps.map(([title, line], i) => (
             <li key={title} className="flex items-center gap-3">
               <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[15px] font-black text-brand">{i + 1}</span>
               <div className="leading-tight">
@@ -58,14 +57,15 @@ function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void 
         <Button onClick={onCreate} className="flex items-center justify-between px-7">
           <span className="flex items-center gap-3">
             <Icon name="plus" size={22} />
-            Create room
+            {t.createRoom}
           </span>
           <Icon name="arrowRight" size={22} />
         </Button>
 
-        <Button variant="ink" onClick={onJoin} className="flex items-center justify-between px-7">
-          <span>Join with code</span>
-          <span className="flex gap-1" aria-hidden="true">
+        <Button variant="ink" onClick={onJoin} className={`flex items-center px-7 ${t.joinWithCode.length <= 14 ? 'justify-between' : 'justify-center'}`}>
+          <span className="whitespace-nowrap">{t.joinWithCode}</span>
+          {/* Fichas decorativas solo si el texto es corto (en castellano no caben) */}
+          <span className={`gap-1 ${t.joinWithCode.length <= 14 ? 'flex' : 'hidden'}`} aria-hidden="true">
             {'ABCD'.split('').map((l) => (
               <span key={l} className="flex size-6 items-center justify-center rounded-[7px] bg-white/12 text-[13px] text-white/60">
                 {l}
@@ -81,17 +81,15 @@ function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void 
 
 // Preguntas sí/no del setup (mazo tipo Tinder). Van a `setup` como contexto libre para la IA;
 // `mimic` activa el bot impostor en `settings`.
-const CARDS: SwipeCard[] = [
-  { id: 'know', question: 'Do you all know each other well?', no: 'Not really', yes: 'Besties', icon: GLYPHS.people },
-  { id: 'adults', question: 'Is everyone over 18?', no: 'No', yes: 'Yes', icon: GLYPHS.age },
-  { id: 'spicy', question: 'Can the chats get spicy?', no: 'Keep it clean', yes: 'Spicy', icon: GLYPHS.flame },
-  { id: 'mimic', question: 'Let an AI hide among your answers?', hint: 'Vote for it and you lose points.', no: 'No AI', yes: 'Bring it', icon: GLYPHS.robot },
-]
+const CARD_ICONS = { know: GLYPHS.people, adults: GLYPHS.age, spicy: GLYPHS.flame, mimic: GLYPHS.robot }
+const CARD_IDS = ['know', 'adults', 'spicy', 'mimic'] as const
 
 const MAX_SITUATION = 120
 
 function NamePage({ onBack }: { onBack: () => void }) {
   const { game, error } = useGame()
+  const t = useT()
+  const cards: SwipeCard[] = CARD_IDS.map((id) => ({ id, icon: CARD_ICONS[id], ...t.cards[id] }))
   const [name, setName] = useState('')
   const [situation, setSituation] = useState('')
   const [step, setStep] = useState<'name' | 'swipe'>('name')
@@ -105,6 +103,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
       await game.createRoom(name)
       await game.saveSetup({
         ...(situation.trim() && { situation: situation.trim() }),
+        lang: getLang(), // idioma de la partida, para que la IA escriba los chats en él
         know: a.know ? 'yes' : 'no',
         adults: a.adults ? 'yes' : 'no',
         spicy: a.spicy ? 'yes' : 'no',
@@ -130,7 +129,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
       className="-ml-2 flex h-[44px] items-center gap-2 px-2 text-[17px] font-extrabold active:scale-95"
     >
       <Icon name="arrowLeft" size={20} />
-      Back
+      {t.back}
     </button>
   )
 
@@ -144,14 +143,15 @@ function NamePage({ onBack }: { onBack: () => void }) {
               <div className="flex h-[52px] w-[70px] items-center justify-center rounded-full bg-white">
                 <TypingDots />
               </div>
-              <p className="text-[19px] font-extrabold">Opening your room…</p>
+              <p className="text-[19px] font-extrabold">{t.openingRoom}</p>
             </div>
           ) : (
             <SwipeDeck
-              cards={CARDS}
+              cards={cards}
+              intro={t.quickOnes}
               onAnswer={(id, yes) => {
                 answers.current[id] = yes
-                if (id === CARDS[CARDS.length - 1].id) void create()
+                if (id === cards[cards.length - 1].id) void create()
               }}
             />
           )}
@@ -173,19 +173,19 @@ function NamePage({ onBack }: { onBack: () => void }) {
       >
         <Body className="gap-5 pt-4">
           <div className="animate-rise">
-            <Eyebrow>New room · 1/2</Eyebrow>
-            <h1 className="mt-2 text-[40px] leading-[1.05] font-black tracking-[-0.03em]">Set up your game</h1>
-            <p className="mt-2 text-[18px] font-semibold text-white/85">The AI writes your group chats from this.</p>
+            <Eyebrow>{t.newRoom1}</Eyebrow>
+            <h1 className="mt-2 text-[40px] leading-[1.05] font-black tracking-[-0.03em]">{t.setUpGame}</h1>
+            <p className="mt-2 text-[18px] font-semibold text-white/85">{t.setUpSub}</p>
           </div>
 
           <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.1s' }}>
-            <Eyebrow>Your name</Eyebrow>
-            <TextInput placeholder="e.g. Pol" maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            <Eyebrow>{t.yourName}</Eyebrow>
+            <TextInput placeholder={t.namePlaceholderHost} maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           </label>
 
           <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.2s' }}>
               <span className="flex items-baseline justify-between">
-                <Eyebrow>What’s going on right now?</Eyebrow>
+                <Eyebrow>{t.situationLabel}</Eyebrow>
                 <span className="text-[13px] font-bold text-white/60 tabular-nums">
                   {situation.length}/{MAX_SITUATION}
                 </span>
@@ -195,17 +195,17 @@ function NamePage({ onBack }: { onBack: () => void }) {
                 maxLength={MAX_SITUATION}
                 value={situation}
                 onChange={(e) => setSituation(e.target.value)}
-                placeholder="Friday drinks at Pol’s flat. Someone just spilled wine on the sofa…"
+                placeholder={t.situationPlaceholder}
                 className="w-full resize-none rounded-[28px] bg-white px-6 py-4 text-[17px] leading-snug font-semibold text-ink outline-none placeholder:font-medium placeholder:text-neutral-400"
               />
-              <span className="text-[14px] font-semibold text-white/70">Where you are, who’s there, what just happened.</span>
+              <span className="text-[14px] font-semibold text-white/70">{t.situationHint}</span>
           </label>
         </Body>
 
         <Footer>
           {error && <p className="text-center text-[16px] font-bold">{error}</p>}
           <Button type="submit" disabled={!name.trim()} className="flex items-center justify-center gap-3">
-            Next
+            {t.next}
             <Icon name="arrowRight" size={22} />
           </Button>
         </Footer>
@@ -219,6 +219,7 @@ const CODE_LENGTH = 4
 /** Unirse: 1) código en 4 casillas (se salta si vienes del QR) → 2) invitación con tu nombre y vista previa. */
 function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => void }) {
   const { game, error } = useGame()
+  const t = useT()
   const fromQr = initialCode.length === CODE_LENGTH
   const [code, setCode] = useState(initialCode)
   const [step, setStep] = useState<'code' | 'name'>(fromQr ? 'name' : 'code')
@@ -233,7 +234,7 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
       className="-ml-2 flex h-[44px] items-center gap-2 px-2 text-[17px] font-extrabold active:scale-95"
     >
       <Icon name="arrowLeft" size={20} />
-      Back
+      {t.back}
     </button>
   )
 
@@ -257,11 +258,12 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
         <AppHeader left={back} />
         <Body className="gap-8 pt-6">
           <div className="animate-rise">
-            <Eyebrow>Join a room</Eyebrow>
-            <h1 className="mt-2 text-[44px] leading-[1.02] font-black tracking-[-0.035em]">Got a code?</h1>
-            <p className="mt-2 text-[18px] font-semibold text-white/85">It’s on the host’s screen. Or just scan their QR.</p>
+            <Eyebrow>{t.joinARoom}</Eyebrow>
+            <h1 className="mt-2 text-[44px] leading-[1.02] font-black tracking-[-0.035em]">{t.gotACode}</h1>
+            <p className="mt-2 text-[18px] font-semibold text-white/85">{t.gotACodeSub}</p>
           </div>
           <CodeTiles
+            label={t.roomCode}
             value={code}
             onChange={(v) => {
               setCode(v)
@@ -288,7 +290,7 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
           {/* Invitación tipo entrada, con muescas y línea perforada */}
           <div className={`relative animate-pop rounded-[30px] bg-white text-ink ${shake ? 'animate-nudge' : ''}`}>
             <div className="px-6 pt-6 pb-5 text-center">
-              <Eyebrow className="text-neutral-400">You’re invited to</Eyebrow>
+              <Eyebrow className="text-neutral-400">{t.invitedTo}</Eyebrow>
               <div className="mt-3 flex justify-center gap-2">
                 {code.split('').map((l, i) => (
                   <span
@@ -314,16 +316,16 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
                 {initial || <TypingDots />}
               </span>
               <div className="min-w-0">
-                <div className="truncate text-[19px] leading-tight font-extrabold">{name.trim() || 'You'}</div>
-                <div className="text-[15px] font-semibold text-neutral-400">{name.trim() ? 'is joining the chat…' : 'type your name below'}</div>
+                <div className="truncate text-[19px] leading-tight font-extrabold">{name.trim() || t.you}</div>
+                <div className="text-[15px] font-semibold text-neutral-400">{name.trim() ? t.joiningChat : t.typeYourName}</div>
               </div>
             </div>
           </div>
 
           <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.15s' }}>
-            <Eyebrow>Your name</Eyebrow>
+            <Eyebrow>{t.yourName}</Eyebrow>
             <TextInput
-              placeholder="e.g. Laura"
+              placeholder={t.namePlaceholderGuest}
               maxLength={MAX_NAME_LENGTH}
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -339,7 +341,7 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
               <span>{error}</span>
               {!fromQr && (
                 <button type="button" onClick={() => setStep('code')} className="min-h-[44px] underline underline-offset-4">
-                  Change code
+                  {t.changeCode}
                 </button>
               )}
             </div>
@@ -347,11 +349,11 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
           <Button type="submit" variant="ink" disabled={!name.trim() || busy} className="flex items-center justify-center gap-3">
             {busy ? (
               <>
-                Joining <TypingDots />
+                {t.joining} <TypingDots />
               </>
             ) : (
               <>
-                Join room
+                {t.joinRoom}
                 <Icon name="arrowRight" size={22} />
               </>
             )}
@@ -363,7 +365,7 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
 }
 
 /** 4 casillas para el código. Un input invisible encima recoge lo que escribes (y lo pegado). */
-function CodeTiles({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function CodeTiles({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const [focused, setFocused] = useState(true)
   return (
     <div className="relative flex animate-rise justify-center gap-3" style={{ animationDelay: '0.1s' }}>
@@ -388,7 +390,7 @@ function CodeTiles({ value, onChange }: { value: string; onChange: (v: string) =
         )
       })}
       <input
-        aria-label="Room code"
+        aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/[^a-z]/gi, '').toUpperCase().slice(0, CODE_LENGTH))}
         onFocus={() => setFocused(true)}
