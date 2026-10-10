@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { retintSafariBars } from '../lib/viewport'
 import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
+import HowToPlay, { seenHowTo } from '../components/HowToPlay'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
 import { getLang, useT } from '../i18n'
@@ -28,6 +29,8 @@ type Page = 'start' | 'create' | 'join'
 export default function Home() {
   const [codeFromUrl] = useState(() => pendingCode)
   const [page, setPage] = useState<Page>(codeFromUrl ? 'join' : 'start')
+  // "Cómo se juega": solo la primera vez que se abre la web (luego, desde el botón de la portada)
+  const [howTo, setHowTo] = useState(() => !seenHowTo())
 
   // Home siempre "limpia", también al volver de una partida: sin restos del chat (fondo blanco, teclado),
   // sin foco en ningún campo, página arriba del todo y barras de Safari recalculadas.
@@ -41,17 +44,33 @@ export default function Home() {
     retintSafariBars()
   }, [])
 
-  if (page === 'create') return <NamePage onBack={() => setPage('start')} />
-  if (page === 'join') return <JoinPage initialCode={codeFromUrl} onBack={() => setPage('start')} />
-  return <Start onCreate={() => setPage('create')} onJoin={() => setPage('join')} />
+  const current =
+    page === 'create' ? (
+      <NamePage onBack={() => setPage('start')} />
+    ) : page === 'join' ? (
+      <JoinPage initialCode={codeFromUrl} onBack={() => setPage('start')} />
+    ) : (
+      <Start onCreate={() => setPage('create')} onJoin={() => setPage('join')} onHowTo={() => setHowTo(true)} />
+    )
+  return (
+    <>
+      {current}
+      {howTo && <HowToPlay onClose={() => setHowTo(false)} />}
+    </>
+  )
 }
 
-function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void }) {
+function Start({ onCreate, onJoin, onHowTo }: { onCreate: () => void; onJoin: () => void; onHowTo: () => void }) {
   const t = useT()
   return (
     <Screen drift className="relative">
       {/* EN · ES flotando sobre el fondo, sin barra ni hueco propio */}
       <LangToggle className="absolute top-2 right-3 z-10" />
+      {/* Cómo jugar: reabre el pop-up de los 3 pasos */}
+      <button onClick={onHowTo} className="absolute top-2 left-3 z-10 flex h-[44px] items-center gap-2 px-2 text-[15px] font-black active:scale-95">
+        <span className="flex size-[26px] items-center justify-center rounded-full bg-white text-[15px] font-black text-brand">?</span>
+        {t.howToPlay}
+      </button>
       {/* Centrado "seguro": my-auto centra si sobra sitio y, si no cabe, se desplaza normal sin cortar la parte de arriba.
           En móviles bajos se compacta (y se ocultan los pasos) para que no haga falta scroll. */}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5">
