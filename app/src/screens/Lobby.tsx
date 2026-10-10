@@ -63,7 +63,9 @@ export default function Lobby() {
         <LangToggle />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pt-2">
+      {/* Zona central con UN solo scroll (QR/bienvenida + jugadores). Antes la lista tenía su propio scroll y en
+          móviles bajos se quedaba con altura ~0 entre el QR y el botón: no se veía nadie ni se podía deslizar. */}
+      <div className="flex min-h-0 flex-1 touch-pan-y flex-col gap-4 overflow-y-auto overscroll-contain px-5 pt-2 pb-3 [-webkit-overflow-scrolling:touch]">
         {me.isHost ? (
           <div className="flex shrink-0 flex-col items-center gap-3">
             <QR code={room.code} size={150} />
@@ -96,7 +98,7 @@ export default function Lobby() {
           </div>
         )}
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+        <div className="flex shrink-0 flex-col gap-2.5">
           <div className="flex shrink-0 items-center justify-between px-1">
             <Eyebrow>{t.players(room.players.length)}</Eyebrow>
             <div className="flex -space-x-2">
@@ -105,7 +107,7 @@ export default function Lobby() {
               ))}
             </div>
           </div>
-          <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain pb-2">
+          <ul className="flex flex-col gap-2.5">
             {room.players.map((p) => (
               <li key={p.id} className="animate-rise">
                 <Row className={`min-h-[60px] ${p.id === me.id && !me.isHost ? 'outline-[3px] outline-ink outline-solid' : ''}`}>
