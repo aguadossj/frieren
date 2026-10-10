@@ -98,8 +98,8 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 html[data-keyboard='open'] #root { padding-bottom: 0; }
-/* Teclado abierto (solo pasa al escribir): fondo blanco para que no asome una franja roja sobre el teclado. */
-html[data-keyboard='open'], html[data-keyboard='open'] body, html[data-keyboard='open'] #root { background-color: #fff; }
+/* Solo el chat es blanco (también con el teclado abierto): Writing pone html[data-page='chat'] al entrar. */
+html[data-page='chat'], html[data-page='chat'] body, html[data-page='chat'] #root { background-color: #fff; }
 
 /* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
 @media (min-width: 640px) {

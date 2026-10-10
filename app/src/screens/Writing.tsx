@@ -14,11 +14,18 @@ export default function Writing() {
   const list = useRef<HTMLDivElement>(null)
 
   // Que Safari repinte sus barras con los colores del chat al entrar (y con los de la siguiente pantalla al salir)
+  // Solo el chat es blanco: página y barras de Safari en blanco mientras esté abierto, rojo al salir
   useEffect(() => {
+    const root = document.documentElement
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    root.dataset.page = 'chat'
+    meta?.setAttribute('content', '#ffffff')
     retintSafariBars()
     const t = setTimeout(retintSafariBars, 400) // por si la primera llega antes de pintar
     return () => {
       clearTimeout(t)
+      delete root.dataset.page
+      meta?.setAttribute('content', '#EE2B2B')
       setTimeout(retintSafariBars, 50)
     }
   }, [])
@@ -53,10 +60,14 @@ export default function Writing() {
   // Layout tipo WhatsApp para aprovechar la pantalla del móvil:
   // cabecera mínima (solo nombre del grupo + tiempo) · chat rojo con el nombre DENTRO de la burbuja ·
   // pista como nota pequeña al final del chat · abajo solo la barra de escribir.
-  // Fondo rojo como el resto de pantallas; cabecera y barra de escribir en blanco.
+  // Pantalla blanca; solo el chat es una tarjeta roja. Bordes blancos ⇒ Safari pinta sus barras en blanco.
   return (
     <>
-    <Screen>
+      {/* Franjas blancas fijas en los bordes SOLO en el chat: Safari (iOS 26) recalcula el color de sus barras
+          cuando aparece un elemento fijo en el borde. Se montan al entrar y se desmontan al salir. */}
+      <div aria-hidden className="fixed inset-x-0 top-0 z-[60] h-[4px] bg-white sm:hidden" />
+      <div aria-hidden className="fixed inset-x-0 bottom-0 z-[60] h-[6px] bg-white sm:hidden" />
+    <Screen className="bg-white!">
       <header className="flex min-h-[40px] shrink-0 items-center gap-2.5 bg-white px-3 pt-2.5 pb-1 text-ink">
         <span className="flex size-[32px] shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-extrabold text-white">
           {groupInitials(room.chat.title)}
