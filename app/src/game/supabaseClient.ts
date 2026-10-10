@@ -9,6 +9,8 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { GameClient, GameState, GroupType, Pack, Room, RoomSettings, Setup, SetupQuestion } from './types'
+import { getLang } from '../i18n'
+import type { Lang } from '../i18n'
 
 const ROOM_KEY = 'typing.roomId'
 const POLL_MS = 5000
@@ -16,26 +18,47 @@ const POLL_MS = 5000
 const PACK_TO_VIBE: Record<Pack, string> = { uni: 'uni', spicy: 'spicy', dating: 'exes', moral: 'ethics' }
 const VIBE_TO_PACK: Record<string, Pack> = { uni: 'uni', spicy: 'spicy', exes: 'dating', ethics: 'moral' }
 
-const ERRORS: Record<string, string> = {
-  room_not_found: "That room doesn't exist. Check the code.",
-  game_in_progress: 'That game already started. Wait for the next one.',
-  room_full: 'That room is full.',
-  kicked: 'You were removed from this room.',
-  not_enough_players: 'You need at least 3 players.',
-  invalid_name: 'Pick a name (1–16 characters).',
-  host_only: 'Only the host can do that.',
-  not_in_room: "You're not in this room anymore.",
-  already_answered: 'You already sent your answer.',
-  already_voted: 'You already voted.',
-  cannot_vote_own: "You can't vote for your own answer.",
-  writer_cannot_vote: "It's your round. Just watch them guess.",
-  not_writing_phase: 'Too late, time is up.',
-  not_voting_phase: 'Voting is closed.',
+const ERRORS: Record<Lang, Record<string, string>> = {
+  en: {
+    room_not_found: "That room doesn't exist. Check the code.",
+    game_in_progress: 'That game already started. Wait for the next one.',
+    room_full: 'That room is full.',
+    kicked: 'You were removed from this room.',
+    not_enough_players: 'You need at least 3 players.',
+    invalid_name: 'Pick a name (1–16 characters).',
+    host_only: 'Only the host can do that.',
+    not_in_room: "You're not in this room anymore.",
+    already_answered: 'You already sent your answer.',
+    already_voted: 'You already voted.',
+    cannot_vote_own: "You can't vote for your own answer.",
+    writer_cannot_vote: "It's your round. Just watch them guess.",
+    not_writing_phase: 'Too late, time is up.',
+    not_voting_phase: 'Voting is closed.',
+    unknown: 'Something went wrong. Try again.',
+  },
+  es: {
+    room_not_found: 'Esa sala no existe. Revisa el código.',
+    game_in_progress: 'Esa partida ya ha empezado. Espera a la siguiente.',
+    room_full: 'La sala está llena.',
+    kicked: 'Te han sacado de esta sala.',
+    not_enough_players: 'Hacen falta al menos 3 jugadores.',
+    invalid_name: 'Elige un nombre (1–16 caracteres).',
+    host_only: 'Solo el anfitrión puede hacer eso.',
+    not_in_room: 'Ya no estás en esta sala.',
+    already_answered: 'Ya has enviado tu respuesta.',
+    already_voted: 'Ya has votado.',
+    cannot_vote_own: 'No puedes votar tu propia respuesta.',
+    writer_cannot_vote: 'Es tu ronda. Mira cómo intentan adivinar.',
+    not_writing_phase: 'Tarde, se acabó el tiempo.',
+    not_voting_phase: 'La votación está cerrada.',
+    unknown: 'Algo ha fallado. Vuelve a intentarlo.',
+  },
 }
 
 function friendly(message: string | undefined): string {
   const key = (message ?? '').split(':')[0]
-  return ERRORS[key] ?? 'Something went wrong. Try again.'
+  const errors = ERRORS[getLang()]
+  return errors[key] ?? errors.unknown
 }
 
 function readRoomId(): string | null {
@@ -150,14 +173,14 @@ export function createSupabaseClient(): GameClient {
     try {
       const s = await rpc<ServerRoom>('get_room_state', { p_room_id: roomId })
       if (seq !== requestSeq) return // llegó una respuesta más nueva
-      if (s.kicked) return leaveLocally(ERRORS.kicked)
+      if (s.kicked) return leaveLocally(ERRORS[getLang()].kicked)
       if (s.left) return leaveLocally()
       lastVersion = s.version
       state = { ...state, room: toRoom(s), meId: s.meId }
       emit()
       schedulePhaseTimer()
     } catch (e) {
-      if (friendly((e as Error).message) === ERRORS.not_in_room) leaveLocally()
+      if (friendly((e as Error).message) === ERRORS[getLang()].not_in_room) leaveLocally()
     }
   }
 
@@ -234,6 +257,8 @@ export function createSupabaseClient(): GameClient {
       try {
         await ensureSession()
         const r = await rpc<{ room_id: string }>('create_room', { p_name: name, p_emoji: emoji ?? null })
+        // Idioma del host como contexto de la sala: la IA escribe los chats y el bot en ese idioma.
+        await rpc('save_setup', { p_room_id: r.room_id, p_answers: { lang: getLang() } }).catch(() => {})
         setState({ error: null })
         await startSync(r.room_id)
       } catch (e) {
@@ -257,7 +282,7 @@ export function createSupabaseClient(): GameClient {
         if (options.groupType) answers.who = options.groupType
         return rpc('save_setup', { ...roomArgs(), p_answers: answers })
       }),
-    saveSetup: (answers) => act(() => rpc('save_setup', { ...roomArgs(), p_answers: answers })),
+    saveSetup: (answers) => act(() => rpc('save_setup', { ...roomArgs(), p_answers: { lang: getLang(), ...answers } })),
     updateSettings: (settings) => act(() => rpc('update_settings', { ...roomArgs(), p_settings: settings })),
     getSetupQuestions: () => rpc<SetupQuestion[]>('get_setup_questions').catch(() => []),
     kick: (playerId) => act(() => rpc('kick_player', { ...roomArgs(), p_player_id: playerId })),

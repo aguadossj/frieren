@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import type { Player } from '../game/types'
 import { joinUrl } from './QR'
+import { setLang, useLang } from '../i18n'
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
 
@@ -254,4 +255,28 @@ export const SectionLabel = ({ children }: { children: ReactNode }) => (
 export function groupInitials(title: string) {
   const words = title.replace(/[^\p{L}\p{N}\s]/gu, '').trim().split(/\s+/)
   return (words[words.length - 1] ?? '?').slice(0, 2).toUpperCase()
+}
+
+/** Selector de idioma EN/ES directamente sobre el fondo (sin caja): el elegido en blanco y subrayado. */
+export function LangToggle({ className = '' }: { className?: string }) {
+  const lang = useLang()
+  return (
+    <div role="group" aria-label="Language" className={cx('flex shrink-0 items-center text-[15px] font-black', className)}>
+      {(['en', 'es'] as const).map((l, i) => (
+        <span key={l} className="flex items-center">
+          {i > 0 && <span className="text-white/35">·</span>}
+          <button
+            onClick={() => setLang(l)}
+            aria-pressed={lang === l}
+            className={cx(
+              'h-[44px] min-w-[40px] px-2 uppercase transition',
+              lang === l ? 'text-white underline decoration-[3px] underline-offset-[6px]' : 'text-white/55',
+            )}
+          >
+            {l}
+          </button>
+        </span>
+      ))}
+    </div>
+  )
 }

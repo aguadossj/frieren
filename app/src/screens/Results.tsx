@@ -3,12 +3,17 @@ import PandaHost from '../components/Panda'
 import { Avatar, AwardCard, Button, Footer, Icon, Screen, TopBar, TopNote } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
 import { MIMIC_AUTHOR_ID } from '../game/types'
-import type { Player, Room } from '../game/types'
+import type { Player, RoundResult, Room } from '../game/types'
+import { useLang, useT } from '../i18n'
+
+type Strings = ReturnType<typeof useT>
 
 const LETTERS = 'ABCDEF'
 
 export function Reveal() {
   const { room, me } = useGame()
+  const t = useT()
+  const lang = useLang()
   if (!room?.result || !room.chat || !me) return null
 
   const result = room.result
@@ -16,20 +21,20 @@ export function Reveal() {
   const real = result.answers.find((a) => a.isReal)!
   const fooled = result.answers.filter((a) => !a.isReal).reduce((n, a) => n + a.voterIds.length, 0)
   const playerOf = (id: string) => room.players.find((p) => p.id === id)
-  const nameOf = (id: string) => (id === me.id ? 'You' : (playerOf(id)?.name ?? '?'))
+  const nameOf = (id: string) => (id === me.id ? t.you : (playerOf(id)?.name ?? '?'))
   const myPoints = result.points[me.id] ?? 0
 
   return (
     <Screen>
-      <TopBar title={`The real ${writer.name} said…`} right={<TopNote>Round {room.roundIndex + 1}</TopNote>} />
+      <TopBar title={t.theRealSaid(writer.name)} right={<TopNote>{t.round(room.roundIndex + 1)}</TopNote>} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-3">
         <div className="flex shrink-0 animate-pop items-center justify-between gap-3">
           <div className="min-w-0 text-[32px] leading-none font-black tracking-[-0.03em] whitespace-nowrap">
-            {real.voterIds.length === 0 ? 'Nobody got it' : fooled === 0 ? 'Too easy' : `${fooled} fooled`}
+            {real.voterIds.length === 0 ? t.nobodyGotIt : fooled === 0 ? t.tooEasy : t.fooled(fooled)}
           </div>
           <div className={`shrink-0 rounded-full px-4 py-2 text-[18px] font-black tabular-nums ${myPoints ? 'bg-white text-good' : 'bg-white/15 text-white'}`}>
-            You +{myPoints}
+            {t.youPoints(myPoints)}
           </div>
         </div>
 
@@ -52,12 +57,12 @@ export function Reveal() {
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-1 text-[17px] leading-snug font-semibold">{a.text}</p>
                     <p className={`text-[13px] font-extrabold ${a.isReal || bot ? 'text-white/80' : 'text-neutral-400'}`}>
-                      {a.isReal ? `REAL · ${writer.name}` : bot ? 'MIMIC · the AI' : `by ${nameOf(a.authorId)}`}
+                      {a.isReal ? t.realBy(writer.name) : bot ? t.mimicTag : t.by(nameOf(a.authorId))}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center">
                     {voters.length === 0 ? (
-                      <span className={`text-[13px] font-bold ${a.isReal || bot ? 'text-white/60' : 'text-neutral-300'}`}>no votes</span>
+                      <span className={`text-[13px] font-bold ${a.isReal || bot ? 'text-white/60' : 'text-neutral-300'}`}>{t.noVotes}</span>
                     ) : (
                       <div className="flex -space-x-2">
                         {voters.slice(0, 4).map((v) => (
@@ -79,16 +84,24 @@ export function Reveal() {
       </div>
 
       <Footer className="pt-1">
-        <AwardCard>{result.award}</AwardCard>
+        <AwardCard>{lang === 'en' ? result.award : localAward(t, result, room.players, writer)}</AwardCard>
       </Footer>
     </Screen>
   )
 }
 
+/** Premio en el idioma de la interfaz: el impostor que más engañó, o el writer si nadie lo consiguió. */
+function localAward(t: Strings, result: RoundResult, players: Player[], writer: Player) {
+  const best = result.answers.filter((a) => !a.isReal && a.voterIds.length).sort((a, b) => b.voterIds.length - a.voterIds.length)[0]
+  const who = best && (best.isBot ? 'Mimic' : players.find((p) => p.id === best.authorId)?.name)
+  return who ? t.awardImpostor(writer.name, who) : t.awardWriter(writer.name)
+}
+
 /** Frase del panda según cómo va la partida. */
-function pandaLine(room: Room, meId: string | undefined, leadChanged: boolean, now: Player[]): string {
-  const name = (p: Player) => (p.id === meId ? 'You' : p.name)
-  const obj = (p: Player) => (p.id === meId ? 'you' : p.name)
+function pandaLine(t: Strings, room: Room, meId: string | undefined, leadChanged: boolean, now: Player[]): string {
+  const P = t.panda
+  const name = (p: Player) => (p.id === meId ? t.you : p.name)
+  const obj = (p: Player) => (p.id === meId ? t.youLower : p.name)
   const result = room.result
   const writer = room.players.find((p) => p.id === room.chat?.writerId)
   const real = result?.answers.find((a) => a.isReal)
@@ -96,25 +109,26 @@ function pandaLine(room: Room, meId: string | undefined, leadChanged: boolean, n
   const lastNext = room.roundIndex + 2 === room.totalRounds
   const finished = room.roundIndex + 1 >= room.totalRounds
 
-  if (leadChanged) return `${name(now[0])} just stole first place!`
-  if (writer && real && real.voterIds.length === 0) return `Nobody recognised ${writer.name}. Do you even know each other?`
-  if (writer && real && voters > 1 && real.voterIds.length === voters) return `Too easy. ${writer.name}, be less predictable.`
+  if (leadChanged) return P.stole(name(now[0]))
+  if (writer && real && real.voterIds.length === 0) return P.nobody(writer.name)
+  if (writer && real && voters > 1 && real.voterIds.length === voters) return P.everyone(writer.name)
   const bot = result?.answers.find((a) => a.isBot)
-  if (bot && bot.voterIds.length > 0) return `The AI fooled ${bot.voterIds.length} of you. Embarrassing.`
+  if (bot && bot.voterIds.length > 0) return P.ai(bot.voterIds.length)
   const liar = result?.answers.filter((a) => !a.isReal && !a.isBot).sort((a, b) => b.voterIds.length - a.voterIds.length)[0]
   const liarPlayer = liar && room.players.find((p) => p.id === liar.authorId)
-  if (liar && liarPlayer && liar.voterIds.length >= 2) return `${name(liarPlayer)} fooled ${liar.voterIds.length} people. Should we be worried?`
-  if (finished) return `That’s it. ${name(now[0])} takes the crown.`
-  if (lastNext) return 'Last round. Everything can still change.'
-  if (now[1] && now[0].score === now[1].score) return `${name(now[0])} and ${obj(now[1])} are tied at the top. Tense.`
-  if (now[1] && now[0].score - now[1].score <= 200) return `Only ${now[0].score - now[1].score} points between ${name(now[0])} and ${obj(now[1])}.`
-  return `${name(now[0])} is running away with it.`
+  if (liar && liarPlayer && liar.voterIds.length >= 2) return P.liar(name(liarPlayer), liar.voterIds.length)
+  if (finished) return P.crown(name(now[0]))
+  if (lastNext) return P.last
+  if (now[1] && now[0].score === now[1].score) return P.tied(name(now[0]), obj(now[1]))
+  if (now[1] && now[0].score - now[1].score <= 200) return P.close(now[0].score - now[1].score, name(now[0]), obj(now[1]))
+  return P.runaway(name(now[0]))
 }
 
 const ROW = 72 // alto de fila + hueco, para recolocar con animación
 
 export function Leaderboard() {
   const { room, me, game } = useGame()
+  const t = useT()
   const seconds = useCountdown(room?.phaseEndsAt ?? null)
   // Primero se pintan en el orden de antes de la ronda; luego se recolocan y las barras crecen.
   const [settled, setSettled] = useState(false)
@@ -136,9 +150,9 @@ export function Leaderboard() {
   return (
     <Screen>
       <TopBar
-        title="Standings"
-        subtitle={`After round ${room.roundIndex + 1} of ${room.totalRounds}`}
-        right={room.roundIndex + 1 >= room.totalRounds ? <TopNote>Final round</TopNote> : undefined}
+        title={t.standings}
+        subtitle={t.afterRound(room.roundIndex + 1, room.totalRounds)}
+        right={room.roundIndex + 1 >= room.totalRounds ? <TopNote>{t.finalRound}</TopNote> : undefined}
       />
 
       <div className="relative mx-5 mt-5 shrink-0" style={{ height: now.length * ROW }}>
@@ -161,7 +175,7 @@ export function Leaderboard() {
                 />
                 <div className="relative flex h-full items-center gap-2.5 pr-4 pl-1.5 [text-shadow:0_1px_2px_rgba(0,0,0,0.25)]">
                   <Avatar player={p} size={46} ring />
-                  <span className="min-w-0 flex-1 truncate text-[18px] font-extrabold">{p.id === me?.id ? 'You' : p.name}</span>
+                  <span className="min-w-0 flex-1 truncate text-[18px] font-extrabold">{p.id === me?.id ? t.you : p.name}</span>
                   {settled && gained > 0 && <span className="animate-pop text-[14px] font-extrabold text-white/85">+{gained}</span>}
                   <span className="text-[19px] font-black tabular-nums">{score.toLocaleString('en')}</span>
                 </div>
@@ -172,21 +186,21 @@ export function Leaderboard() {
       </div>
 
       <div className="flex-1" />
-      <PandaHost text={pandaLine(room, me?.id, before[0] && prevScore(before[0]) > 0 && before[0].id !== now[0]?.id, now)} />
+      <PandaHost text={pandaLine(t, room, me?.id, before[0] && prevScore(before[0]) > 0 && before[0].id !== now[0]?.id, now)} />
       <Footer className="pt-0">
         {me?.isHost ? (
           <Button onClick={() => void game.skipPhase()} className="flex items-center justify-center gap-3">
-            {last ? 'See final results' : `Start round ${room.roundIndex + 2}`}
+            {last ? t.seeFinal : t.startRound(room.roundIndex + 2)}
             <Icon name="arrowRight" size={22} />
           </Button>
         ) : (
           <div className="flex h-[66px] items-center justify-center gap-3 rounded-full bg-white/15 text-[18px] font-bold">
             <span className="size-2.5 animate-pulse rounded-full bg-white" />
-            Waiting for {host?.name ?? 'the host'}…
+            {t.waitingFor(host?.name ?? t.theHost)}
           </div>
         )}
         {room.phaseEndsAt && seconds > 0 && (
-          <p className="-mt-1 text-center text-[14px] font-semibold text-white/70">Starts by itself in {seconds}s</p>
+          <p className="-mt-1 text-center text-[14px] font-semibold text-white/70">{t.startsBySelf(seconds)}</p>
         )}
       </Footer>
     </Screen>

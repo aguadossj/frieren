@@ -3,9 +3,11 @@ import { Bubble, Icon, Screen, TimeBar, TypingDots, groupInitials } from '../com
 import { useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH, PHASE_SECONDS } from '../game/types'
 import { focusWithoutScroll, retintSafariBars } from '../lib/viewport'
+import { useT } from '../i18n'
 
 export default function Writing() {
   const { room, me, game } = useGame()
+  const t = useT()
   const [text, setText] = useState('')
   const [mine, setMine] = useState<string | null>(null)
   const [typing, setTyping] = useState(false) // input con foco ⇒ teclado abierto
@@ -46,7 +48,7 @@ export default function Writing() {
   const sent = room.submittedIds.includes(me.id) || mine !== null
   const playerOf = (id: string) => room.players.find((p) => p.id === id)
   const step = 0.35 // s entre mensajes al entrar
-  const hint = isWriter ? `You're ${writer.name} · say it for real` : `Fool them · write like ${writer.name}`
+  const hint = isWriter ? t.hintWriter(writer.name) : t.hintFaker(writer.name)
 
   // Layout tipo WhatsApp para aprovechar la pantalla del móvil:
   // cabecera mínima (solo nombre del grupo + tiempo) · chat rojo con el nombre DENTRO de la burbuja ·
@@ -93,7 +95,7 @@ export default function Writing() {
               <Bubble dark className="max-w-[85%] animate-pop rounded-[20px] px-4 py-2 text-[17px]">{mine}</Bubble>
               <div className="mt-1 flex items-center gap-1 pr-1 text-[13px] font-extrabold">
                 <Icon name="check" size={12} />
-                Sent as {writer.name}
+                {t.sentAs(writer.name)}
               </div>
             </>
           ) : (
@@ -115,24 +117,24 @@ export default function Writing() {
         {sent ? (
           <div className="flex h-[38px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[15px] font-extrabold text-ink">
             <Icon name="check" size={18} className="text-good" />
-            Waiting for others {room.submittedIds.length}/{room.players.length}
+            {t.waitingOthers(room.submittedIds.length, room.players.length)}
           </div>
         ) : (
           <form
             className="flex items-center gap-2"
             onSubmit={(e) => {
               e.preventDefault()
-              const t = text.trim()
-              if (!t) return
-              setMine(t)
+              const reply = text.trim()
+              if (!reply) return
+              setMine(reply)
               setTyping(false)
-              void game.submitAnswer(t)
+              void game.submitAnswer(reply)
               setText('')
             }}
           >
             <input
               className="h-[38px] min-w-0 flex-1 rounded-full bg-neutral-100 px-4 text-[16px] text-ink outline-none placeholder:text-neutral-400"
-              placeholder={`Message as ${writer.name}`}
+              placeholder={t.messageAs(writer.name)}
               maxLength={MAX_ANSWER_LENGTH}
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -144,7 +146,7 @@ export default function Writing() {
             />
             <button
               type="submit"
-              aria-label="Send"
+              aria-label={t.send}
               onMouseDown={(e) => e.preventDefault() /* no cerrar el teclado al tocar enviar */}
               disabled={!text.trim()}
               className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50"

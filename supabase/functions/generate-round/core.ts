@@ -25,6 +25,7 @@ export interface Setup {
   topic?: string | null // texto libre ≤ 120
   situation?: string | null // pantalla de crear sala: drinks | party | dinner | home | trip | break
   know?: string | null // "¿os conocéis?": yes | no
+  lang?: 'en' | 'es' // idioma del host (selector EN · ES); por defecto inglés
   extra?: Record<string, string> // otras claves libres de save_setup (solo contexto)
 }
 
@@ -116,7 +117,7 @@ const SITUATIONS: Record<string, string> = {
   trip: 'on a trip together right now',
   break: 'on a class or work break right now',
 }
-const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know'])
+const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang'])
 const ADULT_VIBES = new Set(['spicy', 'exes'])
 const CLEAN_AGES = new Set(['under_18', 'mixed'])
 
@@ -163,6 +164,7 @@ export function parseInput(body: unknown): GenerateRoundInput {
     topic: clip(s.topic, 120) || null,
     situation: clip(s.situation, 20) || null,
     know: clip(s.know, 10) || null,
+    lang: s.lang === 'es' ? 'es' : 'en',
     extra: Object.fromEntries(
       Object.entries(s)
         .filter(([key]) => !SETUP_KEYS.has(key) && /^[a-z][a-z0-9_]{0,31}$/.test(key))
@@ -323,11 +325,11 @@ Your chat must read like those, not like a script. Copy how they text, not what 
 - most messages are 2 to 8 words, mostly lowercase, little punctuation, small typos are fine;
 - at least one message is just a reaction ("JAJAJA", "nooo", "wait what", "😭");
 - the same person may send two messages in a row; stretched words (siii, nooo) and caps for emphasis are welcome.
-Write everything in English. Never reuse their sentences, situations or details.
+Write everything in DATA.language. Never reuse their sentences, situations or details.
 The title is a real group chat name for these people, not a summary of the joke (no "Snack Heist" style titles).
 If audience.where_they_are is set, the chat happens right now at that place.
 
-CONTENT: English only. The humour comes from the situation, never from attacking someone. No insults about looks, body,
+CONTENT: write only in DATA.language. The humour comes from the situation, never from attacking someone. No insults about looks, body,
 race, religion, sexuality or health. Nothing sexually explicit.`
 
 interface ModelOutput {
@@ -374,6 +376,7 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string) 
   const memory = input.memory ?? {}
   const evidence = computeEvidence(input.players, input.history)
   return {
+    language: input.setup.lang === 'es' ? 'Spanish from Spain, informal texting' : 'English',
     round: input.round,
     total_rounds: input.total_rounds,
     style_examples: input.style_examples ?? [],

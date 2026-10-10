@@ -1,5 +1,6 @@
 import { Avatar, Body, Button, Footer, Icon, Row, Screen, TopBar, TopNote } from '../components/ui'
 import { useGame } from '../game/useGame'
+import { useT } from '../i18n'
 import type { Player } from '../game/types'
 
 // Podio: 2º a la izquierda, 1º en el centro (más alto, negro), 3º a la derecha.
@@ -15,20 +16,21 @@ export default function Final() {
 
   const ranking = [...room.players].sort((a, b) => b.score - a.score)
   const winner = ranking[0]
-  const label = (p: Player) => (p.id === me?.id ? 'You' : p.name)
+  const t = useT()
+  const label = (p: Player) => (p.id === me?.id ? t.you : p.name)
 
   const share = () => {
-    const text = `${winner.name} won Typing… with ${winner.score} points. Think you can fake your friends?`
+    const text = t.shareText(winner.name, winner.score)
     if (navigator.share) void navigator.share({ text, url: location.origin }).catch(() => {})
     else void navigator.clipboard?.writeText(`${text} ${location.origin}`)
   }
 
   return (
     <Screen>
-      <TopBar title="Game over" right={<TopNote>{room.totalRounds} rounds</TopNote>} />
+      <TopBar title={t.gameOver} right={<TopNote>{t.rounds(room.totalRounds)}</TopNote>} />
       <Body className="gap-3 pt-5">
         <div className="text-center">
-          <h1 className="animate-pop text-[44px] leading-none font-black tracking-[-0.03em]">{label(winner)} {winner.id === me?.id ? 'win' : 'wins'}! 👑</h1>
+          <h1 className="animate-pop text-[44px] leading-none font-black tracking-[-0.03em]">{t.wins(winner.name, winner.id === me?.id)}</h1>
         </div>
 
         <div className="flex items-end justify-center gap-2.5 pt-8">
@@ -61,14 +63,14 @@ export default function Final() {
       <Footer>
         <Button onClick={() => void game.playAgain()} className="flex items-center justify-center gap-3">
           <Icon name="replay" size={22} />
-          Play again
+          {t.playAgain}
         </Button>
         <Button variant="ink" onClick={() => void game.leave()}>
-          Menu
+          {t.menu}
         </Button>
         <button onClick={share} className="flex h-[44px] items-center justify-center gap-2 text-[16px] font-bold active:scale-95">
           <Icon name="share" size={18} />
-          Share the result
+          {t.shareResult}
         </button>
       </Footer>
     </Screen>

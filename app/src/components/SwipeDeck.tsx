@@ -33,7 +33,7 @@ export const GLYPHS = {
   ),
 }
 
-export default function SwipeDeck({ cards, onAnswer }: { cards: SwipeCard[]; onAnswer: (id: string, yes: boolean) => void }) {
+export default function SwipeDeck({ cards, intro, onAnswer }: { cards: SwipeCard[]; intro: string; onAnswer: (id: string, yes: boolean) => void }) {
   const [index, setIndex] = useState(0)
   const [dx, setDx] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -78,7 +78,7 @@ export default function SwipeDeck({ cards, onAnswer }: { cards: SwipeCard[]; onA
       {/* Respuestas dadas, como burbujas enviadas */}
       <div className="flex min-h-[34px] shrink-0 flex-wrap items-center justify-end gap-1.5">
         {given.length === 0 ? (
-          <span className="mr-auto text-[16px] font-bold text-white/80">4 quick ones. Swipe.</span>
+          <span className="mr-auto text-[16px] font-bold text-white/80">{intro}</span>
         ) : (
           given.map((g) => (
             <span
