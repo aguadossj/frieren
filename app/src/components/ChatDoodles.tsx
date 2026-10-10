@@ -1,26 +1,47 @@
-// Fondo del chat estilo "papel pintado" de WhatsApp: dibujitos blancos de línea, con poca opacidad,
+// Fondo del chat estilo "papel pintado" de WhatsApp: pandas y cervezas blancos de línea, con poca opacidad,
 // repartidos al azar (distintos en cada ronda, fijos durante la ronda). Puramente decorativo.
 import { useMemo } from 'react'
 
-// Iconos de línea en una caja de 24×24 (trazo blanco, sin relleno)
-const ICONS: string[] = [
-  'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z', // corazón
-  'M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z', // estrella
-  'M4 5h16v10H9l-5 4z', // bocadillo de chat
-  'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 14.5s1.3 2 3.5 2 3.5-2 3.5-2M9 9.5h.01M15 9.5h.01', // cara sonriente
-  'M9 18V6l10-2v12M9 18a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM19 16a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z', // nota musical
-  'M13 2L4 14h7l-1 8 9-12h-7z', // rayo
-  'M5 8h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h2a2 2 0 0 1 0 4h-2M8 3v2M11 3v2', // taza de café
-  'M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM11 19h2', // móvil
-  'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M18 6l-2.5 2.5M8.5 15.5L6 18', // destello
-  'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z', // luna
-  'M3 12h4l3-8 4 16 3-8h4', // pulso / onda
-  'M7 4h10l-1 16H8zM6 4h12M10 8v8M14 8v8', // vaso
-  'M4 18L18 4M14 4h4v4M6 14l4 4', // flecha
-  'M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7zM12 11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z', // pin
-  'M3 7h18M3 12h18M3 17h12', // líneas de texto
-  'M7 10a5 5 0 0 1 10 0v4l2 3H5l2-3zM10 20a2 2 0 0 0 4 0', // campana
-]
+// Solo pandas y cervezas, dibujados con línea en una caja de 24×24 (trazo blanco, sin relleno)
+const PANDA = [
+  'M4 13a8 8 0 1 0 16 0a8 8 0 1 0 -16 0', // cabeza
+  'M3.6 6.4a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0', // oreja izquierda
+  'M15.2 6.4a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0', // oreja derecha
+  'M7.3 12.8c-.2-1.7 1-2.9 2.3-2.5s1.5 2.1.7 3.2-2.8.9-3-.7z', // mancha ojo izq.
+  'M16.7 12.8c.2-1.7-1-2.9-2.3-2.5s-1.5 2.1-.7 3.2 2.8.9 3-.7z', // mancha ojo der.
+  'M11 15.6h2M12 15.6v1.1M10.7 17.6c.8.5 1.8.5 2.6 0', // nariz y boca
+].join(' ')
+
+const PANDA_WINK = [
+  'M4 13a8 8 0 1 0 16 0a8 8 0 1 0 -16 0',
+  'M3.6 6.4a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0',
+  'M15.2 6.4a2.6 2.6 0 1 0 5.2 0a2.6 2.6 0 1 0 -5.2 0',
+  'M7.3 12.8c-.2-1.7 1-2.9 2.3-2.5s1.5 2.1.7 3.2-2.8.9-3-.7z',
+  'M14 12.4c.8-.6 1.8-.6 2.6 0', // ojo guiñado
+  'M11 15.6h2M12 15.6v1.1M10.4 17.3c1 1 2.2 1 3.2 0', // sonrisa
+].join(' ')
+
+const BEER_MUG = [
+  'M5 9h10v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z', // jarra
+  'M15 11h2.4a2.4 2.4 0 0 1 0 4.8H15', // asa
+  'M4.4 9c-.3-1.9 1.2-3.5 3-3.1a3 3 0 0 1 4.8-.7 2.7 2.7 0 0 1 3.4 2.3c.1.6-.1 1.1-.4 1.5', // espuma
+  'M8.5 12.5v5.5M11.5 12.5v5.5', // reflejos
+].join(' ')
+
+const BEER_BOTTLE = [
+  'M10.5 2h3v4.2l1.8 2.6c.4.5.6 1.1.6 1.8V20a2 2 0 0 1-2 2h-3.8a2 2 0 0 1-2-2v-9.4c0-.7.2-1.3.6-1.8l1.8-2.6z', // botella
+  'M8.1 13h7.8M8.1 18h7.8', // etiqueta
+].join(' ')
+
+const CHEERS = [
+  'M3 8l6-1.6 1.8 7a3 3 0 0 1-2.1 3.6l-.4.1a3 3 0 0 1-3.6-2.1z', // vaso izq.
+  'M21 8l-6-1.6-1.8 7a3 3 0 0 0 2.1 3.6l.4.1a3 3 0 0 0 3.6-2.1z', // vaso der.
+  'M3.5 10l6.1-1.6M20.5 10l-6.1-1.6', // espuma
+  'M12 2.5v2M9.5 3.5l.8 1.6M14.5 3.5l-.8 1.6', // chin-chin
+].join(' ')
+
+// Más pandas que cervezas (y de vez en cuando un brindis)
+const ICONS: string[] = [PANDA, PANDA, PANDA_WINK, BEER_MUG, BEER_MUG, BEER_BOTTLE, CHEERS]
 
 /** Pseudoaleatorio con semilla: mismo dibujo durante toda la ronda, distinto en cada una. */
 function rng(seed: number) {
@@ -47,7 +68,7 @@ export default function ChatDoodles({ seed, opacity = 0.13 }: { seed: number; op
           x: col * CELL + 10 + rand() * (CELL - 40) + (row % 2 ? CELL / 2 : 0),
           y: row * CELL + 10 + rand() * (CELL - 40),
           r: Math.round(rand() * 60 - 30),
-          s: 0.9 + rand() * 0.5,
+          s: 1.05 + rand() * 0.45,
         })
       }
     }
