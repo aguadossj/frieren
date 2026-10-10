@@ -25,6 +25,7 @@ const glyph = (d: string) => (
 export const GLYPHS = {
   people: glyph('M8.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2 20.5c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5M16 4.3a3.5 3.5 0 0 1 0 6.4M17.5 14.3c2.6.8 4.5 3.2 4.5 6.2'),
   flame: glyph('M12 2.5c.8 3.4 5.5 5.6 5.5 11a5.5 5.5 0 0 1-11 0c0-2.4 1.1-4 2.4-5.2.1 2.2 1 3.4 2.3 3.4 0-3.3-1.6-5.6.8-9.2z'),
+  pin: glyph('M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z'),
   robot: glyph('M5 9.5h14v10H5zM12 5.5v4M12 5.5a1.2 1.2 0 1 0 0-.1M9 13.5v1M15 13.5v1M9.5 17h5M2.5 13v3M21.5 13v3'),
   age: (
     <span className="text-[28px] leading-none font-black tracking-[-0.04em]" aria-hidden="true">

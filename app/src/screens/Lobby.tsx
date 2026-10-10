@@ -13,6 +13,19 @@ export default function Lobby() {
   const missing = MIN_PLAYERS - room.players.length
   const host = room.players.find((p) => p.isHost)
   const situation = typeof room.setup?.situation === 'string' ? room.setup.situation : null
+  // Lugar detectado (si el host compartió la ubicación): barrio/ciudad + 2 sitios cercanos
+  // del "calle, barrio, ciudad" enseñamos solo el barrio (o la ciudad si no hay barrio)
+  const place = typeof room.setup?.place === 'string' ? (room.setup.place.split(', ').slice(-2)[0] ?? null) : null
+  const nearby = Array.isArray(room.setup?.nearby) ? room.setup.nearby.slice(0, 2).map((n) => String(n).replace(/ \([^)]*\)$/, '')) : []
+  const placeChip = place && (
+    <p className="flex max-w-full items-start gap-1.5 rounded-[18px] bg-ink px-4 py-1.5 text-[14px] leading-snug font-bold">
+      <Icon name="pin" size={15} className="mt-0.5 shrink-0" />
+      <span className="line-clamp-2">
+        {place}
+        {nearby.length > 0 && <span className="text-white/60"> · {t.near}: {nearby.join(', ')}</span>}
+      </span>
+    </p>
+  )
 
   // Tocar el código abre el menú de compartir del móvil con la invitación (texto + código + enlace)
   const copy = async () => {
@@ -59,6 +72,7 @@ export default function Lobby() {
             {situation && (
               <p className="line-clamp-2 max-w-full rounded-[18px] bg-white/15 px-4 py-1.5 text-center text-[14px] font-bold">“{situation}”</p>
             )}
+            {placeChip}
             {room.mimic && <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">{t.aiHiding}</p>}
           </div>
         ) : (
@@ -77,6 +91,7 @@ export default function Lobby() {
             {situation && (
               <p className="line-clamp-2 max-w-full rounded-[18px] bg-white/15 px-4 py-1.5 text-[14px] font-bold">“{situation}”</p>
             )}
+            {placeChip}
             {room.mimic && <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">{t.aiHiding}</p>}
           </div>
         )}

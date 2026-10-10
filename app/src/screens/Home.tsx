@@ -4,6 +4,8 @@ import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
 import { getLang, useT } from '../i18n'
+import { describePlace, getPosition } from '../lib/place'
+import type { PlaceContext } from '../lib/place'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
 
@@ -107,8 +109,9 @@ function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void 
 
 // Preguntas sí/no del setup (mazo tipo Tinder). Van a `setup` como contexto libre para la IA;
 // `mimic` activa el bot impostor en `settings`.
-const CARD_ICONS = { know: GLYPHS.people, adults: GLYPHS.age, spicy: GLYPHS.flame, mimic: GLYPHS.robot }
-const CARD_IDS = ['know', 'adults', 'spicy', 'mimic'] as const
+const CARD_ICONS = { together: GLYPHS.pin, know: GLYPHS.people, adults: GLYPHS.age, spicy: GLYPHS.flame, mimic: GLYPHS.robot }
+// `together` = estáis todos en el mismo sitio → se pide la ubicación para personalizar los chats
+const CARD_IDS = ['together', 'know', 'adults', 'spicy', 'mimic'] as const
 
 const MAX_SITUATION = 120
 
@@ -122,10 +125,25 @@ function NamePage({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false)
   const answers = useRef<Record<string, boolean>>({})
 
+  // Ubicación: se pide al deslizar "sí" en la tarjeta de "estáis juntos" (ahí sale el aviso del navegador)
+  // y se traduce a calle, barrio y sitios cercanos mientras el host contesta el resto de tarjetas.
+  const placeLookup = useRef<Promise<PlaceContext | null> | null>(null)
+  const [lookingAround, setLookingAround] = useState(false)
+  const locate = () => {
+    placeLookup.current = getPosition().then((pos) => (pos ? describePlace(pos.lat, pos.lon, getLang()) : null))
+  }
+
   const create = async () => {
     setBusy(true)
     const a = answers.current
     try {
+      // Esperar al contexto del lugar como mucho 10 s más; si no llega, se crea la sala sin él
+      let place: PlaceContext | null = null
+      if (placeLookup.current) {
+        setLookingAround(true)
+        place = await Promise.race([placeLookup.current, new Promise<null>((r) => setTimeout(() => r(null), 10000))])
+        setLookingAround(false)
+      }
       await game.createRoom(name)
       await game.saveSetup({
         ...(situation.trim() && { situation: situation.trim() }),
@@ -135,6 +153,10 @@ function NamePage({ onBack }: { onBack: () => void }) {
         spicy: a.spicy ? 'yes' : 'no',
         // Con menores, el backend apaga el contenido picante
         ...(!a.adults && { age: 'mixed' }),
+        together: a.together ? 'yes' : 'no',
+        ...(place?.place && { place: place.place }),
+        ...(place && place.nearby.length > 0 && { nearby: place.nearby }),
+        ...(place && { local_time: place.local_time }),
       })
       if (a.mimic) await game.updateSettings({ mimic: true })
     } finally {
@@ -145,6 +167,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
   const submit = () => {
     if (!name.trim() || busy) return
     answers.current = {}
+    placeLookup.current = null
     setStep('swipe')
   }
 
@@ -169,7 +192,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
               <div className="flex h-[52px] w-[70px] items-center justify-center rounded-full bg-white">
                 <TypingDots />
               </div>
-              <p className="text-[19px] font-extrabold">{t.openingRoom}</p>
+              <p className="text-[19px] font-extrabold">{lookingAround ? t.lookingAround : t.openingRoom}</p>
             </div>
           ) : (
             <SwipeDeck
@@ -177,6 +200,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
               intro={t.quickOnes}
               onAnswer={(id, yes) => {
                 answers.current[id] = yes
+                if (id === 'together' && yes) locate()
                 if (id === cards[cards.length - 1].id) void create()
               }}
             />
