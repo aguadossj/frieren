@@ -98,7 +98,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v8'
+export const PROMPT_VERSION = 'round-v9'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -574,6 +574,8 @@ FIELDS:
   "text" is only what they type: never start it with the sender's name or "name:". Max 60 characters each.
   Nobody ever says their own name: a message that mentions a player is sent by someone else.
 - The LAST message is addressed to the writer by name: a question or a direct demand ("Laura explain", "Laura what did you do").
+  It must invite a funny or revealing reply that friends could plausibly fake. Nothing comes after it: no reaction,
+  no extra comment. The chat ends on that question.
 - Follow the audience (group, know_each_other, content, vibes, topic, extra_context). From round 2 on, call back a
   running joke or something a player said when it fits, and follow the steer. If the writer has been easy to spot
   (stats.spotted_by), ask something more open-ended.
@@ -774,8 +776,11 @@ function repairChat(
       }
     }
   })
+  endOnQuestion(lines, writerName)
   const last = lines[lines.length - 1]
-  if (typeof last?.text === 'string' && !mentions(last.text, writerName)) {
+  // Solo se arregla una PREGUNTA que no nombra al writer. Una línea final que no es pregunta ni le nombra
+  // ("Oh noooo") no se convierte en "Nico Oh noooo": falla la validación y se reintenta.
+  if (typeof last?.text === 'string' && !mentions(last.text, writerName) && isQuestion(last.text)) {
     // Si la pregunta va a otro jugador (p. ej. al writer de la ronda anterior), se cambia ese nombre por el del writer.
     const other = Object.values(nameOf).find((name) => name !== writerName && mentions(last.text, name))
     const word =
@@ -783,10 +788,30 @@ function repairChat(
       (last.text.toLowerCase().includes(other.toLowerCase())
         ? other
         : other.split(/\s+/).find((w) => w.length >= 2 && mentions(last.text, w)))
-    last.text = word
-      ? last.text.replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), writerName)
-      : `${writerName} ${last.text.replace(/^[^\p{L}\p{N}]*/u, '')}`
+    if (word) {
+      last.text = last.text.replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), writerName)
+    } else {
+      // "Qué ha pasado aquí?" -> "Nico qué ha pasado aquí?" (sin la mayúscula a mitad de frase de "Nico Qué…").
+      const rest = last.text.replace(/^[^\p{L}\p{N}]*/u, '')
+      last.text = `${writerName} ${startsWithCapsWord(rest) ? rest : rest.charAt(0).toLowerCase() + rest.slice(1)}`
+    }
   }
+}
+
+// Pregunta: acaba en "?" (aunque detrás vaya algún emoji o "!").
+const isQuestion = (text: string) => /\?[\s!\p{Extended_Pictographic}\u{FE0F}]*$/u.test(text.trim())
+
+/**
+ * El chat acaba en la pregunta al writer. El modelo a veces sigue después ("Ana tía qué haces?" + "Oh noooo"):
+ * se corta tras la última pregunta que nombra al writer o, si no hay, tras la última pregunta. Siempre quedan 2+ líneas.
+ */
+function endOnQuestion(lines: { from: string; text: string }[], writerName: string): void {
+  const lastIndex = (test: (text: string) => boolean) =>
+    lines.findLastIndex((line) => typeof line?.text === 'string' && test(line.text))
+  const toWriter = lastIndex((text) => isQuestion(text) && mentions(text, writerName))
+  const anyQuestion = lastIndex(isQuestion)
+  const cut = toWriter >= 1 ? toWriter : mentions(lines[lines.length - 1]?.text ?? '', writerName) ? -1 : anyQuestion
+  if (cut >= 1 && cut < lines.length - 1) lines.splice(cut + 1)
 }
 
 function validateChat(output: ModelOutput, writerName: string, otherHandles: Set<string>): string | null {
