@@ -1,6 +1,6 @@
-// Mazo de preguntas sí/no estilo Tinder: arrastra a la derecha (sí) o a la izquierda (no).
-// Cada tarjeta entra desdoblándose como un papel. Los botones de abajo hacen lo mismo (sin depender del gesto).
-import { useRef, useState } from 'react'
+// Mazo de preguntas sí/no estilo Tinder a pantalla completa: arrastra a la derecha (sí) o a la izquierda (no).
+// Cada tarjeta entra desdoblándose como un papel. Sin botones; en escritorio también vale arrastrar con el ratón o ← →.
+import { useEffect, useRef, useState } from 'react'
 
 export interface SwipeCard {
   id: string
@@ -10,12 +10,13 @@ export interface SwipeCard {
   yes: string
 }
 
-const THRESHOLD = 90 // px para que cuente como respuesta
-const FLY_MS = 280
+const THRESHOLD = 80 // px para que cuente como respuesta
+const FLY_MS = 300
 
 export default function SwipeDeck({ cards, onAnswer }: { cards: SwipeCard[]; onAnswer: (id: string, yes: boolean) => void }) {
   const [index, setIndex] = useState(0)
   const [dx, setDx] = useState(0)
+  const [dragging, setDragging] = useState(false)
   const [leaving, setLeaving] = useState<null | 'yes' | 'no'>(null)
   const start = useRef<number | null>(null)
 
@@ -34,103 +35,105 @@ export default function SwipeDeck({ cards, onAnswer }: { cards: SwipeCard[]; onA
     }, FLY_MS)
   }
 
+  // Flechas del teclado (escritorio)
+  const answerRef = useRef(answer)
+  answerRef.current = answer
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') answerRef.current(true)
+      if (e.key === 'ArrowLeft') answerRef.current(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   if (!card) return null
 
-  const offset = leaving ? (leaving === 'yes' ? 520 : -520) : dx
-  const tilt = offset / 18
+  const offset = leaving ? (leaving === 'yes' ? 560 : -560) : dx
+  const tilt = offset / 16
   const yesOpacity = Math.min(1, Math.max(0, offset / THRESHOLD))
   const noOpacity = Math.min(1, Math.max(0, -offset / THRESHOLD))
 
   return (
-    <div className="flex flex-col items-center gap-5">
-      <div className="relative h-[330px] w-full">
-        {/* Siguiente tarjeta, doblada y esperando detrás */}
-        {next && (
-          <div className="absolute inset-0 translate-y-3 scale-[0.94] rounded-[32px] bg-white/35" aria-hidden="true" />
-        )}
+    <div className="relative min-h-0 w-full flex-1">
+      {/* Siguiente tarjeta esperando detrás */}
+      {next && <div className="absolute inset-0 translate-y-3 scale-[0.95] rounded-[36px] bg-white/35" aria-hidden="true" />}
 
-        <div
-          key={card.id}
-          className="absolute inset-0 touch-none select-none"
-          style={{
-            transform: `translateX(${offset}px) rotate(${tilt}deg)`,
-            transition: start.current === null ? `transform ${FLY_MS}ms ease-out` : 'none',
-          }}
-          onPointerDown={(e) => {
-            if (leaving) return
-            start.current = e.clientX
-            e.currentTarget.setPointerCapture(e.pointerId)
-          }}
-          onPointerMove={(e) => {
-            if (start.current !== null) setDx(e.clientX - start.current)
-          }}
-          onPointerUp={() => {
-            if (start.current === null) return
-            start.current = null
-            if (Math.abs(dx) > THRESHOLD) answer(dx > 0)
-            else setDx(0)
-          }}
-          onPointerCancel={() => {
-            start.current = null
-            setDx(0)
-          }}
-        >
-          <div className="relative flex h-full origin-top animate-unfold flex-col justify-between overflow-hidden rounded-[32px] bg-white p-7 text-ink shadow-[0_18px_40px_rgba(0,0,0,0.18)]">
-            {/* Pliegue del papel: una línea en el centro que se desvanece al desdoblarse */}
-            <div
-              className="pointer-events-none absolute inset-x-0 top-1/2 h-10 -translate-y-1/2 bg-gradient-to-b from-transparent via-black/15 to-transparent"
-              style={{ animation: 'crease 0.9s ease-out both' }}
-            />
+      <div
+        key={card.id}
+        className="absolute inset-0 cursor-grab touch-none select-none active:cursor-grabbing"
+        style={{
+          transform: `translateX(${offset}px) rotate(${tilt}deg)`,
+          transition: dragging ? 'none' : `transform ${FLY_MS}ms ease-out`,
+        }}
+        onPointerDown={(e) => {
+          if (leaving) return
+          start.current = e.clientX
+          setDragging(true)
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          if (start.current !== null) setDx(e.clientX - start.current)
+        }}
+        onPointerUp={() => {
+          if (start.current === null) return
+          start.current = null
+          setDragging(false)
+          if (Math.abs(dx) > THRESHOLD) answer(dx > 0)
+          else setDx(0)
+        }}
+        onPointerCancel={() => {
+          start.current = null
+          setDragging(false)
+          setDx(0)
+        }}
+      >
+        <div className="relative flex h-full origin-top animate-unfold flex-col justify-between overflow-hidden rounded-[36px] bg-white px-7 pt-7 pb-8 text-ink shadow-[0_18px_40px_rgba(0,0,0,0.2)]">
+          {/* Pliegue del papel: línea central que se desvanece al desdoblarse */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-1/2 h-12 -translate-y-1/2 bg-gradient-to-b from-transparent via-black/15 to-transparent"
+            style={{ animation: 'crease 0.9s ease-out both' }}
+          />
 
-            <div className="flex items-center justify-between text-[14px] font-extrabold tracking-[0.14em] text-neutral-400">
-              <span>
-                {index + 1} / {cards.length}
-              </span>
-              <span>SWIPE</span>
+          <div className="flex items-center justify-between">
+            <div className="flex gap-1.5" aria-label={`Question ${index + 1} of ${cards.length}`}>
+              {cards.map((c, i) => (
+                <span key={c.id} className={`h-1.5 rounded-full transition-all ${i === index ? 'w-7 bg-ink' : i < index ? 'w-3 bg-ink/40' : 'w-3 bg-neutral-200'}`} />
+              ))}
             </div>
+            <span className="text-[13px] font-extrabold tracking-[0.16em] text-neutral-400">SWIPE</span>
+          </div>
 
-            <div>
-              <p className="text-[32px] leading-[1.08] font-black tracking-[-0.02em]">{card.question}</p>
-              {card.hint && <p className="mt-3 text-[16px] font-semibold text-neutral-500">{card.hint}</p>}
-            </div>
+          <div>
+            <p className="text-[42px] leading-[1.02] font-black tracking-[-0.03em]">{card.question}</p>
+            {card.hint && <p className="mt-4 text-[18px] font-semibold text-neutral-500">{card.hint}</p>}
+          </div>
 
-            <div className="flex items-center justify-between text-[15px] font-extrabold">
-              <span className="text-neutral-400">← {card.no}</span>
-              <span className="text-good">{card.yes} →</span>
-            </div>
-
-            {/* Sellos que aparecen al arrastrar */}
-            <span
-              className="pointer-events-none absolute top-8 left-6 -rotate-12 rounded-xl border-4 border-good px-3 py-1 text-[30px] font-black text-good"
-              style={{ opacity: yesOpacity }}
-            >
-              YES
+          <div className="flex items-end justify-between gap-4 text-[18px] leading-tight font-extrabold">
+            <span className="flex items-center gap-2 text-brand">
+              <span className="text-[26px] leading-none">←</span>
+              {card.no}
             </span>
-            <span
-              className="pointer-events-none absolute top-8 right-6 rotate-12 rounded-xl border-4 border-brand px-3 py-1 text-[30px] font-black text-brand"
-              style={{ opacity: noOpacity }}
-            >
-              NO
+            <span className="flex items-center gap-2 text-right text-good">
+              {card.yes}
+              <span className="text-[26px] leading-none">→</span>
             </span>
           </div>
-        </div>
-      </div>
 
-      <div className="grid w-full grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => answer(false)}
-          className="h-[60px] rounded-full bg-ink text-[18px] font-extrabold text-white transition active:scale-95"
-        >
-          {card.no}
-        </button>
-        <button
-          type="button"
-          onClick={() => answer(true)}
-          className="h-[60px] rounded-full bg-white text-[18px] font-extrabold text-brand transition active:scale-95"
-        >
-          {card.yes}
-        </button>
+          {/* Sellos que aparecen al arrastrar */}
+          <span
+            className="pointer-events-none absolute top-24 left-6 -rotate-12 rounded-2xl border-[5px] border-good px-4 py-1 text-[44px] font-black text-good"
+            style={{ opacity: yesOpacity }}
+          >
+            YES
+          </span>
+          <span
+            className="pointer-events-none absolute top-24 right-6 rotate-12 rounded-2xl border-[5px] border-brand px-4 py-1 text-[44px] font-black text-brand"
+            style={{ opacity: noOpacity }}
+          >
+            NO
+          </span>
+        </div>
       </div>
     </div>
   )

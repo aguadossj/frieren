@@ -174,12 +174,7 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
     return (
       <Screen>
         <AppHeader left={back} />
-        <Body className="gap-6 overflow-x-hidden pt-4">
-          <div className="animate-rise">
-            <Eyebrow>New room · 2/2</Eyebrow>
-            <h1 className="mt-2 text-[36px] leading-[1.05] font-black tracking-[-0.03em]">Quick questions</h1>
-            <p className="mt-2 text-[17px] font-semibold text-white/85">Swipe right for yes, left for no.</p>
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-4 pb-6">
           {busy ? (
             <div className="flex flex-1 animate-pop flex-col items-center justify-center gap-4">
               <div className="flex h-[52px] w-[70px] items-center justify-center rounded-full bg-white">
@@ -196,8 +191,8 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
               }}
             />
           )}
-          {error && <p className="text-center text-[16px] font-bold">{error}</p>}
-        </Body>
+          {error && <p className="pt-3 text-center text-[16px] font-bold">{error}</p>}
+        </div>
       </Screen>
     )
   }
