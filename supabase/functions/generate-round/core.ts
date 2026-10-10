@@ -22,6 +22,8 @@ export interface AiConfig {
   jsonMode?: 'json_schema' | 'json_object' | 'none'
   // Solo para probar prompts (prompt-lab.mjs): sustituye SYSTEM_PROMPT de las rondas. La partida nunca lo pone.
   systemPrompt?: string
+  // Si el modelo principal (Hermes 405B) no contesta a tiempo, un intento con este (70B) en el tiempo que queda.
+  fallbackModel?: string
 }
 
 export interface Setup {
@@ -103,7 +105,7 @@ export interface GenerateRoundOutput {
   device?: string
 }
 
-export const PROMPT_VERSION = 'round-v9'
+export const PROMPT_VERSION = 'round-v10'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -319,7 +321,13 @@ export const FORMATS: Format[] = [
   { id: 'photo', en: 'someone just sent a photo of the writer (describe it)', es: 'alguien acaba de mandar una foto del writer (describidla)' },
   { id: 'seen', en: "the writer left someone on 'seen' or was online at a suspicious time", es: "el writer dejó a alguien en visto o estaba en línea a una hora sospechosa" },
 ]
-export const pickFormat = (): Format => (Math.random() < 0.25 ? FORMATS[0] : pickOne(FORMATS.slice(1)))
+export const pickFormat = (): Format => (Math.random() < 0.5 ? FORMATS[0] : pickOne(FORMATS.slice(1)))
+
+/** "un secreto… — happening during: <lo que dijo el host>" */
+export const hostAngle = (angle: string, setup: Setup): string => {
+  const host = SITUATIONS[setup.situation ?? ''] ?? setup.situation
+  return host ? `${angle} — happening during: "${host}"` : angle
+}
 
 // Cómo se cuenta (la estructura del chiste), también al azar: si no, todos los chats tienen la misma forma.
 export const DEVICES = [
@@ -618,11 +626,30 @@ Ignore the chat lines you wrote in past rounds: those were invented by you, not 
 
 STEP 2, WRITE THE CHAT ("chat"), using what you just learned.
 
+THE ROOM COMES FIRST. DATA.room is what the host chose for this game. It overrides everything else in DATA and in
+these instructions, including the theme and the examples.
+- room.host_says is what is happening right now, in the host's words. The chat is ABOUT it: use the people, ages,
+  places and details it mentions ("Mario's 30th, he can't get over his ex" means a chat at Mario's 30th about that ex).
+- room.content is a hard rule about what is allowed. When room.spicy is "yes", lean into it: the group asked for it.
+  When it is "no", nothing flirty, romantic or boozy at all, not even as a hint.
+- room.format_this_round is what gets shared in the chat (a screenshot, a payment note, a voice note…). Build the
+  chat around it when it fits room.host_says; skip it if it clearly does not fit.
+- room.how_to_tell_it is the shape of the joke this round. Follow it.
+
+THE WRITER IS THE MAIN CHARACTER. The incident is something the WRITER did, said, posted, bought or hid. The others
+only discover it, comment and react; they never confess to anything themselves. The final question asks the writer
+about THEIR own incident, so it makes sense on its own ("Mario who was that message for??").
+
 LANGUAGE (the most important rule): every title and message is written in DATA.language, whatever the language of
 the examples, the history or the player names. Follow DATA.language_notes.
 
-TOPIC: the chat is about DATA.theme_this_round, told as a concrete little scandal, mystery or dilemma that involves the
-writer or the group. Food is never the topic: no pizza, snacks, chips, nachos, tacos, fridges or stolen food.
+TOPIC: DATA.theme_this_round is only an ANGLE on room.host_says (a secret, a lie, a dare… during THAT situation).
+If the angle does not fit the situation, drop it. Turn it into ONE specific, slightly absurd, petty incident that
+involves the writer. A concrete object, a number, a time or a place is what makes it funny. Low stakes, big drama.
+Vague is bad ("X did something embarrassing", "X has a new crush"). Specific is good: one invented detail nobody
+would guess. Invent your own details every time; never reuse wording or details from these instructions.
+Keep it petty: never politics, the news, causes or opinions about society.
+Food is never the topic: no pizza, snacks, chips, nachos, tacos, fridges or stolen food.
 audience.where_they_are is only the backdrop (where they are right now), not the topic.
 If audience.right_now is set, they are physically together at that real spot at that local time: the theme happens
 during this exact night/day out. Read the plan from where_they_are + local_time + nearby (e.g. Saturday past midnight
@@ -630,22 +657,34 @@ next to clubs = going out clubbing around there; lunchtime next to restaurants =
 the street or neighbourhood, or ONE real nearby place by name when it makes the chat feel like theirs (where they go
 next, who will not get in, the queue). Never invent other venues, never give addresses or house numbers.
 
+HUMOUR: the group is teasing the writer the way close friends do: affectionate roasting, never mean.
+- Build it like a comedy bit. The first message drops the incident. Each next message escalates with ONE new detail
+  (proof, a screenshot, a witness, an even worse detail). Then the question.
+- Every message adds information. No filler: never "guys you won't believe this", "what happened?", "tell us", "omg".
+- Vary how chats start: never open with "guys", "tío", "tía", "ok so" or "bro". Start with the incident itself.
+- The joke lives in specific details and deadpan delivery, not in laughter. Only react ("JAJAJA", "💀", "nooo") right
+  after something that is actually funny. Never explain the joke.
+- The final question cannot be answered with yes or no, and has many plausible funny answers, so friends can fake it:
+  ask the writer to explain, justify, choose, or say exactly what they did or said.
+  Good shapes: "WRITER explain the …", "WRITER what did you write him", "WRITER which one was it", "WRITER why …".
+  Bad: "WRITER what do you think?", "is it true?", "WRITER??", "what happened?", "are you ok?".
+
 STRUCTURE: DATA.house_examples are the game's reference chats, written by the team (WRITER = the writer's name).
-Match their shape: 2 to 4 short messages that build a situation fast, then a direct, specific question to the writer
-that is fun to answer for real and fun to fake ("WRITER?? explain", "WRITER what did you do exactly").
-Never copy them; write a new situation with the same punch.
+Match their punch: a few short messages that build the situation fast, then the question to the writer.
+Never copy them; write a new situation that is funnier.
 
 STYLE: DATA.style_examples are real group chats from real people (A, B, C), in DATA.language.
-DATA.texting_targets were measured on hundreds of real messages: match them. Real people send bursts of very short
-messages instead of one long sentence: split every thought into its own message, almost never use commas, never use
-opening ¿ or ¡, and drop the final period. A pure reaction ("JAJAJA", "nooo", "wait what", "😭") counts as a message.
+DATA.texting_targets were measured on hundreds of real messages: match them. Real people send bursts of short
+messages instead of one long sentence: almost never use commas, never use opening ¿ or ¡, and drop the final period.
+Keep each punchline whole in one message. A pure reaction ("JAJAJA", "nooo", "wait what", "😭") counts as a message.
 The same person often sends two or three messages in a row. Small typos are fine.
 The same kinds of situations they talk about are welcome; never reuse their sentences or details.
 
 FIELDS:
-- "situation": a few words naming the situation. It must differ from everything in memory.used_situations.
+- "situation": write this FIRST: room.host_says in a few words + this round's incident ("Mario's 30th: Bizum to
+  his ex"). It must differ from everything in memory.used_situations. Then write the lines about exactly that.
 - "title": a real group chat name for these people (max 24 characters, may include one emoji), not a summary of the joke.
-- "lines": 3 to 6 short messages. "from" is the handle of the sender. The writer NEVER sends a message.
+- "lines": 2 to 5 short messages; most chats are 3 or 4. Shorter is funnier. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
   "text" is only what they type: never start it with the sender's name or "name:". Max 60 characters each.
   Nobody ever says their own name: a message that mentions a player is sent by someone else.
@@ -732,7 +771,8 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, 
     language: LANGUAGES[lang].name,
     language_notes: LANGUAGES[lang].notes,
     texting_targets: TEXTING[lang],
-    theme_this_round: theme[lang],
+    // El tema es un ángulo SOBRE lo que dijo el host: van juntos para que el modelo no se olvide de lo segundo.
+    theme_this_round: hostAngle(theme[lang], input.setup),
     round: input.round,
     total_rounds: input.total_rounds,
     house_examples: input.house_examples ?? [],
@@ -865,6 +905,29 @@ function repairChat(
     const rest = last.text.replace(/^[^\p{L}\p{N}]*/u, '')
     last.text = `${writerName} ${startsWithCapsWord(rest) ? rest : rest.charAt(0).toLowerCase() + rest.slice(1)}`
   }
+}
+
+/**
+ * Muletillas al empezar un mensaje ("Tío, acaba de…", "Guys look…"): el prompt las prohíbe y 70B las sigue poniendo
+ * en casi todos los chats. Se quitan si detrás queda texto.
+ */
+const FILLER_OPENER = /^(?:(?:ok(?:ay)?(?:\s+so)?|vale|eh|oye|bueno|buah|wait|so)[\s,]+)?(?:t[íi]os?|t[íi]as?|guys|bro|dude|chicos|peña)(?![\p{L}])[\s,!.:]*(?=\S)/iu
+export function stripFillerOpeners<T extends { text: string }>(lines: T[]): T[] {
+  for (const line of lines) {
+    const stripped = line.text.replace(FILLER_OPENER, '')
+    if (stripped !== line.text && stripped.trim().length >= 3) line.text = stripped
+  }
+  return lines
+}
+
+/** Como mucho `max` mensajes: sobran primero las reacciones sueltas ("😂", "nooo") y luego el segundo mensaje. */
+export function capLines<T extends { text: string }>(lines: T[], max: number): T[] {
+  const out = [...lines]
+  while (out.length > max) {
+    const reaction = out.findIndex((l, i) => i > 0 && i < out.length - 1 && words(l.text) <= 2)
+    out.splice(reaction > 0 ? reaction : 1, 1)
+  }
+  return out
 }
 
 // Pregunta: acaba en "?" (aunque detrás vaya algún emoji o "!").
@@ -1015,9 +1078,9 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
 export async function generateRound(input: GenerateRoundInput, config: AiConfig): Promise<GenerateRoundOutput> {
   const started = Date.now()
   const deadline = started + (config.timeoutMs ?? 8000)
-  const done = (output: Attempt, attempts: number): GenerateRoundOutput => ({
+  const done = (output: Attempt, attempts: number, model = config.model): GenerateRoundOutput => ({
     ...output,
-    model: config.model,
+    model,
     prompt_version: PROMPT_VERSION,
     latency_ms: Date.now() - started,
     attempts,
@@ -1028,21 +1091,38 @@ export async function generateRound(input: GenerateRoundInput, config: AiConfig)
   const theme = pickTheme(input)
   const format = pickFormat()
   const device = pickDevice()
+  const budget = config.timeoutMs ?? 8000
+  const fallback = config.fallbackModel && config.fallbackModel !== config.model ? config.fallbackModel : null
+  // Con modelo de respaldo y tiempo suficiente, se le guardan ~16 s (70B con carga tarda 12–16 s): el principal (405B) se corta antes.
+  const reserve = fallback && budget >= 30000 ? 16000 : 0
   try {
-    return done(await generateOnce(input, config, theme, format, device), 1)
+    // Primer intento estricto (el writer tiene que ser el protagonista) solo si hay tiempo para un segundo.
+    const first = { ...config, timeoutMs: budget - reserve }
+    return done(await generateOnce(input, first, theme, format, device, reserve > 0 || budget >= 24000), 1)
   } catch (error) {
+    const timedOut = error instanceof AiError && error.code === 'timeout'
     const retryable =
       error instanceof AiError &&
-      (error.code === 'invalid_output' || (error.code === 'provider_status' && error.message.startsWith('400')))
+      (error.code === 'invalid_output' ||
+        (error.code === 'provider_status' && error.message.startsWith('400')) ||
+        (timedOut && reserve > 0))
     const left = deadline - Date.now()
     if (!retryable || left < 2500) throw error
-    return done(await generateOnce(input, { ...config, timeoutMs: left }, theme, format, device), 2)
+    const model = fallback ?? config.model
+    return done(await generateOnce(input, { ...config, model, timeoutMs: left }, theme, format, device), 2, model)
   }
 }
 
 type Attempt = Pick<GenerateRoundOutput, 'chat' | 'memory' | 'input_tokens' | 'output_tokens'>
 
-async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme, format: Format, device: string): Promise<Attempt> {
+async function generateOnce(
+  input: GenerateRoundInput,
+  config: AiConfig,
+  theme: Theme,
+  format: Format,
+  device: string,
+  strictStory = false,
+): Promise<Attempt> {
   const handles = new Map(input.players.map((p, i) => [p.id, `P${i}`]))
   const handleToId = Object.fromEntries([...handles].map(([id, handle]) => [handle, id]))
   const handleOf = (id: string) => handles.get(id) ?? 'gone' // jugadores que ya se fueron
@@ -1063,14 +1143,19 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
     const nameOf = Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name]))
     output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()), lang)
     if (!fixSelfReferences(output.chat.lines, nameOf, otherHandles)) throw new AiError('invalid_output', 'self_reference')
+    output.chat.lines = capLines(stripFillerOpeners(output.chat.lines), MAX_LINES)
     output.chat.title = String(output.chat.title ?? '')
       .replace(/[¿¡]/g, '')
       .replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
       .trim()
   }
   const texts = output?.chat?.lines?.map((l) => l.text) ?? []
+  // El writer es el protagonista: sale nombrado antes de la pregunta final. Solo se exige si queda tiempo para
+  // reintentar (rondas 2+); en la ronda 1 en directo vale el chat antes que el respaldo.
+  const writerInStory = texts.slice(0, -1).some((text) => namesPerson(text, writer.name))
   const problem =
     validateChat(output, writer.name, new Set(otherHandles)) ??
+    (strictStory && texts.length > 2 && !writerInStory ? 'writer_not_main' : null) ??
     languageProblem([output.chat.title, ...texts], lang) ??
     copiedFrom(texts, [...(input.style_examples ?? []), ...(input.house_examples ?? []).map((ex) => ex.lines)])
   if (problem) throw new AiError('invalid_output', problem)
