@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { retintSafariBars } from '../lib/viewport'
 import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
@@ -7,12 +8,36 @@ import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
 
 // El QR de la sala apunta a ?room=CODE: entramos directamente a la página de unirse.
-const codeFromUrl = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? ''
+// Se lee UNA vez y se borra de la URL: así, al volver al menú tras una partida, Home es la de siempre
+// (antes reabría "unirse" con el código de la partida anterior).
+let pendingCode = (() => {
+  const params = new URLSearchParams(location.search)
+  const code = params.get('room')?.toUpperCase() ?? ''
+  if (code) {
+    params.delete('room')
+    const rest = params.toString()
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash)
+  }
+  return code
+})()
 
 type Page = 'start' | 'create' | 'join'
 
 export default function Home() {
+  const [codeFromUrl] = useState(() => pendingCode)
   const [page, setPage] = useState<Page>(codeFromUrl ? 'join' : 'start')
+
+  // Home siempre "limpia", también al volver de una partida: sin restos del chat (fondo blanco, teclado),
+  // sin foco en ningún campo, página arriba del todo y barras de Safari recalculadas.
+  useEffect(() => {
+    pendingCode = '' // el código del QR solo sirve para la primera vez
+    const root = document.documentElement
+    delete root.dataset.page
+    root.dataset.keyboard = 'closed'
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    window.scrollTo(0, 0)
+    retintSafariBars()
+  }, [])
 
   if (page === 'create') return <NamePage onBack={() => setPage('start')} />
   if (page === 'join') return <JoinPage initialCode={codeFromUrl} onBack={() => setPage('start')} />
