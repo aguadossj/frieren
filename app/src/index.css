@@ -60,18 +60,21 @@ html[data-keyboard='open'] #root { padding-bottom: 0; }
   html[data-page-bg='chat'] body { background: linear-gradient(#fff 50%, var(--color-brand) 50%); }
   /* El hueco de arriba de #root (bajo la barra de estado / de Safari) blanco, el de abajo rojo */
   html[data-page-bg='chat'] #root { background: linear-gradient(#fff 50%, var(--color-brand) 50%); }
-  /* Franja fija blanca pegada arriba: Safari tiñe su barra superior con el color de lo que hay fijo en el borde */
-  html[data-page-bg='chat'] body::before {
+  /* Safari (iOS 26) ignora theme-color: tiñe sus barras con el background-color de un elemento FIJO y de
+     ancho completo que toque el borde. Dos franjas fijas de color sólido, invisibles porque coinciden con
+     lo que hay debajo: blanca arriba (cabecera blanca) y roja abajo (barra de escribir roja). */
+  html[data-page-bg='chat'] body::before,
+  html[data-page-bg='chat'] body::after {
     content: '';
     position: fixed;
-    top: 0;
     left: 0;
     right: 0;
-    height: max(env(safe-area-inset-top), 1px);
-    background: #fff;
+    height: 12px;
     z-index: 50;
     pointer-events: none;
   }
+  html[data-page-bg='chat'] body::before { top: 0; background-color: #fff; }
+  html[data-page-bg='chat'] body::after { bottom: 0; background-color: var(--color-brand); }
 }
 
 /* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
