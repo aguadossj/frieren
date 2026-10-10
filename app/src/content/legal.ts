@@ -84,7 +84,8 @@ const en: Record<LegalPage, PageCopy> & { ui: Record<string, string> } = {
         lines: [
           'Supabase: database and live sync.',
           'Cloudflare: hosts the website.',
-          'Groq: runs the AI that writes the chats.',
+          'OpenRouter and DeepInfra: run the AI that writes the chats and plays Mimic.',
+          'Groq: runs the AI that writes the first chat while the room fills up.',
           'OpenStreetMap (Nominatim): turns a location into place names.',
           'Some of them process data outside the EU.',
         ],
@@ -204,7 +205,10 @@ const en: Record<LegalPage, PageCopy> & { ui: Record<string, string> } = {
       {
         id: 'model',
         title: 'The model',
-        lines: ['gpt-oss-120b, an open-weight model by OpenAI, run by Groq.'],
+        lines: [
+          'Hermes 3 70B, an open-weight model by Nous Research (built on Meta Llama 3.1), run by DeepInfra through OpenRouter: writes the chats and plays Mimic.',
+          'gpt-oss-120b, an open-weight model by OpenAI, run by Groq: writes the first chat while the room fills up.',
+        ],
       },
       {
         id: 'why',
@@ -329,7 +333,8 @@ const es: typeof en = {
         lines: [
           'Supabase: base de datos y sincronización en directo.',
           'Cloudflare: aloja la web.',
-          'Groq: ejecuta la IA que escribe los chats.',
+          'OpenRouter y DeepInfra: ejecutan la IA que escribe los chats y hace de Mimic.',
+          'Groq: ejecuta la IA que escribe el primer chat mientras se llena la sala.',
           'OpenStreetMap (Nominatim): convierte una ubicación en nombres de sitios.',
           'Algunos tratan datos fuera de la UE.',
         ],
@@ -449,7 +454,10 @@ const es: typeof en = {
       {
         id: 'model',
         title: 'El modelo',
-        lines: ['gpt-oss-120b, un modelo de pesos abiertos de OpenAI, ejecutado por Groq.'],
+        lines: [
+          'Hermes 3 70B, un modelo de pesos abiertos de Nous Research (basado en Meta Llama 3.1), ejecutado por DeepInfra a través de OpenRouter: escribe los chats y hace de Mimic.',
+          'gpt-oss-120b, un modelo de pesos abiertos de OpenAI, ejecutado por Groq: escribe el primer chat mientras se llena la sala.',
+        ],
       },
       {
         id: 'why',

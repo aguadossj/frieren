@@ -28,11 +28,13 @@ function devAi(env: Record<string, string>): Plugin {
           const input = core.parseInput(JSON.parse(Buffer.concat(chunks).toString() || 'null'))
           reply(
             200,
+            // Mismos valores por defecto que la Edge Function (Hermes 3 70B en OpenRouter, ~10 s por ronda).
             await core.generateRound(input, {
               apiKey: env.AI_API_KEY,
-              baseUrl: env.AI_BASE_URL || 'https://api.groq.com/openai/v1',
-              model: env.AI_MODEL || 'openai/gpt-oss-120b',
-              timeoutMs: 12000,
+              baseUrl: env.AI_BASE_URL || 'https://openrouter.ai/api/v1',
+              model: env.AI_MODEL || 'nousresearch/hermes-3-llama-3.1-70b',
+              jsonMode: env.AI_JSON_MODE || 'json_schema',
+              timeoutMs: 20000,
             }),
           )
         } catch (error) {
