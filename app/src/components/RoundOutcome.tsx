@@ -125,7 +125,8 @@ export function RoundOutcome() {
   return createPortal(
     <div
       onClick={() => setStage('out')}
-      className={`fixed inset-0 z-[95] flex flex-col items-center justify-center gap-5 overflow-hidden px-8 text-center text-white ${
+      // Móvil: ocupa toda la pantalla. PC: el mismo marco de "móvil" que <Screen> (440 px, márgenes y esquinas).
+      className={`absolute inset-0 z-[95] flex flex-col items-center justify-center gap-5 overflow-hidden px-8 text-center text-white sm:top-6 sm:bottom-auto sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] ${
         stage === 'out' ? 'animate-fade-out' : 'animate-fade-in'
       } ${kind === 'wrong' ? 'ro-shake' : ''}`}
       style={{ background: s.bg }}
@@ -172,7 +173,8 @@ export function RoundOutcome() {
         {kind !== 'writer' && fooledN > 0 && <Chip>{t.fooledBy(fooledN)}</Chip>}
       </div>
     </div>,
-    document.body,
+    // Dentro de #root (el contenedor del juego, 440 px en PC) para no tapar toda la ventana del ordenador
+    document.getElementById('root') ?? document.body,
   )
 }
 
