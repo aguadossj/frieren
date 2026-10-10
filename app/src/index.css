@@ -52,9 +52,11 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 html[data-keyboard='open'] #root { padding-bottom: 0; }
-/* Con el teclado abierto, lo que asoma bajo la app (detrás de la barra ˄ ˅ ✓ de iOS) es blanco,
-   igual que la barra de escribir (solo en pantallas con barra blanca abajo, p. ej. el chat, vía data-kb-bg): así el teclado "sale" de la barra en vez de dejar una franja roja. */
-html[data-keyboard='open'][data-kb-bg='white'], html[data-keyboard='open'][data-kb-bg='white'] body { background: #fff; }
+/* Chat: cabecera y barra de escribir blancas, así que lo que hay por encima (barra de estado / de Safari)
+   y por debajo (detrás de la barra ˄ ˅ ✓ de iOS con el teclado abierto) también es blanco. Lo activa Writing.tsx. */
+@media (max-width: 639px) {
+  html[data-page-bg='white'], html[data-page-bg='white'] body { background: #fff; }
+}
 
 /* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
 @media (min-width: 640px) {

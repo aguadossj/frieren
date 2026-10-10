@@ -14,9 +14,14 @@ export default function Writing() {
 
   // La barra de escribir es blanca: lo que asoma bajo ella con el teclado abierto también (ver index.css)
   useEffect(() => {
-    document.documentElement.dataset.kbBg = 'white'
+    const html = document.documentElement
+    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    const prevTheme = meta?.content
+    html.dataset.pageBg = 'white'
+    if (meta) meta.content = '#ffffff'
     return () => {
-      delete document.documentElement.dataset.kbBg
+      delete html.dataset.pageBg
+      if (meta && prevTheme) meta.content = prevTheme
     }
   }, [])
 
@@ -91,7 +96,7 @@ export default function Writing() {
         </div>
       </div>
 
-      <div className={`shrink-0 bg-white px-5 pt-3 text-ink ${typing ? 'pb-3' : 'pb-6'}`}>
+      <div className={`shrink-0 bg-white px-4 text-ink ${typing ? 'pt-2 pb-2' : 'pt-3 pb-6'}`}>
         {sent ? (
           <div className="flex h-[54px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[17px] font-extrabold">
             <Icon name="check" size={18} className="text-good" />
@@ -99,12 +104,8 @@ export default function Writing() {
           </div>
         ) : (
           <>
-            {/* Con el teclado abierto, el hint pasa a ser una línea fina para no comerse el chat */}
-            {typing ? (
-              <p className="mb-2 truncate text-center text-[14px] font-extrabold text-neutral-500">
-                {isWriter ? `You're ${writer.name} · say it for real` : `Fool them · write like ${writer.name}`}
-              </p>
-            ) : (
+            {/* Con el teclado abierto desaparece el hint (pasa al placeholder) para dejar el máximo de chat */}
+            {!typing && (
               <RolePill className="mb-3 text-center text-[16px]">
                 {isWriter ? `You're ${writer.name}. Say it for real.` : `Write what ${writer.name} would say. Fool them.`}
               </RolePill>
@@ -122,8 +123,8 @@ export default function Writing() {
               }}
             >
               <input
-                className="h-[54px] min-w-0 flex-1 rounded-full bg-neutral-100 px-6 text-[18px] text-ink outline-none placeholder:text-neutral-400"
-                placeholder={`Message as ${writer.name}`}
+                className={`min-w-0 flex-1 rounded-full bg-neutral-100 px-5 text-[17px] text-ink outline-none transition-[height] placeholder:text-neutral-400 ${typing ? 'h-[44px]' : 'h-[54px]'}`}
+                placeholder={typing ? (isWriter ? `Say it for real, ${writer.name}` : `Fool them · write like ${writer.name}`) : `Message as ${writer.name}`}
                 maxLength={MAX_ANSWER_LENGTH}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
@@ -138,7 +139,7 @@ export default function Writing() {
                 aria-label="Send"
                 onMouseDown={(e) => e.preventDefault() /* no cerrar el teclado al tocar enviar */}
                 disabled={!text.trim()}
-                className="flex size-[54px] shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50"
+                className={`flex shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50 ${typing ? 'size-[44px]' : 'size-[54px]'}`}
               >
                 <Icon name="arrowRight" size={24} className="-rotate-90" />
               </button>
