@@ -84,6 +84,7 @@ export interface Room {
   result: RoundResult | null // reveal/leaderboard
   setup?: Setup // contexto para la IA (preguntas iniciales); lo edita el host
   settings?: RoomSettings
+  pendingPlayers?: PendingPlayer[] // solo el host: solicitudes para entrar (sala con aprobación)
   mimic?: boolean // hay un bot IA escondido entre las respuestas (avisar en lobby y votación)
 }
 
@@ -98,6 +99,7 @@ export interface RoomSettings {
   leaderboard_seconds: number
   max_players: number
   mimic?: boolean // el host activa el bot "Mimic" con updateSettings({ mimic: true })
+  require_approval?: boolean // sala privada: el host acepta a cada persona que quiere entrar
   host_advance?: boolean // por defecto true: tras cada ronda se espera a que el host pulse "siguiente" (skipPhase)
 }
 
@@ -115,6 +117,15 @@ export interface GameState {
   room: Room | null
   meId: string | null
   error: string | null
+  /** Sala con aprobación: he pedido entrar y espero a que el host me acepte (room = null mientras tanto). */
+  pending?: { code: string; hostName: string | null } | null
+}
+
+/** Solicitud para entrar en una sala con aprobación (solo la ve el host). */
+export interface PendingPlayer {
+  id: string
+  name: string
+  emoji?: string
 }
 
 export interface GameClient {
@@ -128,6 +139,8 @@ export interface GameClient {
   updateSettings(settings: Partial<RoomSettings>): Promise<void>
   getSetupQuestions(): Promise<SetupQuestion[]>
   kick(playerId: string): Promise<void>
+  approve(playerId: string): Promise<void> // sala con aprobación: dejar entrar
+  reject(playerId: string): Promise<void> // sala con aprobación: no dejar entrar (no puede volver a pedirlo)
   skipPhase(): Promise<void>
   endGame(): Promise<void>
   startGame(): Promise<void> // solo host, ≥ MIN_PLAYERS

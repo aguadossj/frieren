@@ -18,6 +18,7 @@ const TEXT = {
     auto: 'Auto',
     mimic: 'Mimic AI hides among the answers',
     hostNext: 'Wait for me before each round',
+    approval: 'Ask me before letting people in',
     on: 'On',
     off: 'Off',
     done: 'Done',
@@ -33,6 +34,7 @@ const TEXT = {
     auto: 'Auto',
     mimic: 'La IA Mimic se esconde entre las respuestas',
     hostNext: 'Esperarme antes de cada ronda',
+    approval: 'Pedirme permiso para dejar entrar',
     on: 'Sí',
     off: 'No',
     done: 'Listo',
@@ -80,6 +82,7 @@ function SettingsSheet({ onClose, game }: { onClose: () => void; game: ReturnTyp
   const rounds = s?.rounds ?? null
   const mimic = Boolean(s?.mimic)
   const hostNext = s?.host_advance ?? true
+  const approval = Boolean(s?.require_approval)
   const inLobby = room.phase === 'lobby'
 
   return (
@@ -116,6 +119,7 @@ function SettingsSheet({ onClose, game }: { onClose: () => void; game: ReturnTyp
         </Row>
 
         <Toggle label={t.mimic} value={mimic} on={t.on} off={t.off} onChange={(v) => set({ mimic: v })} />
+        <Toggle label={t.approval} value={approval} on={t.on} off={t.off} onChange={(v) => set({ require_approval: v })} />
         <Toggle label={t.hostNext} value={hostNext} on={t.on} off={t.off} onChange={(v) => set({ host_advance: v })} />
 
         <button onClick={onClose} className="mt-6 h-[56px] w-full rounded-full bg-ink text-[18px] font-extrabold text-white active:scale-[0.98]">

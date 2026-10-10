@@ -374,6 +374,8 @@ export function createMockClient(): GameClient {
       if (typeof situation === 'string' && PACK_BY_SITUATION[situation]) pack = PACK_BY_SITUATION[situation]
       emit()
     },
+    async approve() {},
+    async reject() {},
     async playAgain() {
       if (phase !== 'final') return
       players = players.map((p) => ({ ...p, score: 0 }))

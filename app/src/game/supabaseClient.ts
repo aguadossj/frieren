@@ -24,6 +24,7 @@ const ERRORS: Record<Lang, Record<string, string>> = {
     game_in_progress: 'That game already started. Wait for the next one.',
     room_full: 'That room is full.',
     kicked: 'You were removed from this room.',
+    rejected: "The host didn't let you in.",
     not_enough_players: 'You need at least 3 players.',
     invalid_name: 'Pick a name (1–16 characters).',
     host_only: 'Only the host can do that.',
@@ -41,6 +42,7 @@ const ERRORS: Record<Lang, Record<string, string>> = {
     game_in_progress: 'Esa partida ya ha empezado. Espera a la siguiente.',
     room_full: 'La sala está llena.',
     kicked: 'Te han sacado de esta sala.',
+    rejected: 'El anfitrión no te ha dejado entrar.',
     not_enough_players: 'Hacen falta al menos 3 jugadores.',
     invalid_name: 'Elige un nombre (1–16 caracteres).',
     host_only: 'Solo el anfitrión puede hacer eso.',
@@ -86,6 +88,9 @@ type ServerRoom = Omit<Room, 'pack' | 'groupType'> & {
   version: number
   kicked?: boolean
   left?: boolean
+  rejected?: boolean
+  pending?: boolean
+  hostName?: string | null
 }
 
 export function createSupabaseClient(): GameClient {
@@ -155,6 +160,7 @@ export function createSupabaseClient(): GameClient {
       setup,
       settings: s.settings as RoomSettings,
       mimic: Boolean(s.mimic),
+      pendingPlayers: s.pendingPlayers ?? [],
     }
   }
 
@@ -163,7 +169,7 @@ export function createSupabaseClient(): GameClient {
     roomId = null
     lastVersion = -1
     writeRoomId(null)
-    state = { room: null, meId: null, error }
+    state = { room: null, meId: null, error, pending: null }
     emit()
   }
 
@@ -174,9 +180,15 @@ export function createSupabaseClient(): GameClient {
       const s = await rpc<ServerRoom>('get_room_state', { p_room_id: roomId })
       if (seq !== requestSeq) return // llegó una respuesta más nueva
       if (s.kicked) return leaveLocally(ERRORS[getLang()].kicked)
+      if (s.rejected) return leaveLocally(ERRORS[getLang()].rejected)
       if (s.left) return leaveLocally()
+      if (s.pending) {
+        // Sala con aprobación: esperando al host (sin ver nada de la sala)
+        state = { ...state, room: null, meId: s.meId, pending: { code: s.code, hostName: s.hostName ?? null } }
+        return emit()
+      }
       lastVersion = s.version
-      state = { ...state, room: toRoom(s), meId: s.meId }
+      state = { ...state, room: toRoom(s), meId: s.meId, pending: null }
       emit()
       schedulePhaseTimer()
     } catch (e) {
@@ -295,6 +307,8 @@ export function createSupabaseClient(): GameClient {
     updateSettings: (settings) => act(() => rpc('update_settings', { ...roomArgs(), p_settings: settings })),
     getSetupQuestions: () => rpc<SetupQuestion[]>('get_setup_questions').catch(() => []),
     kick: (playerId) => act(() => rpc('kick_player', { ...roomArgs(), p_player_id: playerId })),
+    approve: (playerId) => act(() => rpc('approve_player', { ...roomArgs(), p_player_id: playerId })),
+    reject: (playerId) => act(() => rpc('reject_player', { ...roomArgs(), p_player_id: playerId })),
     skipPhase: () => act(() => rpc('skip_phase', roomArgs())),
     endGame: () => act(() => rpc('end_game', roomArgs())),
     startGame: () => act(() => rpc('start_game', roomArgs())),
