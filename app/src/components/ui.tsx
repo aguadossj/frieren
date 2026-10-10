@@ -60,34 +60,16 @@ export const Eyebrow = ({ children, className = '' }: { children: ReactNode; cla
 )
 
 /** Marco de pantalla. En escritorio se ve como un móvil centrado (como el mockup). */
-/**
- * Marco de pantalla: la PÁGINA es blanca y el contenido va en una tarjeta roja redondeada con un margen blanco.
- * Así los bordes de la pantalla son siempre blancos y Safari (iOS 26) pinta sus barras de blanco en todas las
- * pantallas (elige el color por lo que toca los bordes al cargar). `bare`: sin tarjeta (la pantalla dibuja
- * sus propias zonas rojas, p. ej. el chat). En escritorio se ve como un móvil centrado.
- */
-export function Screen({ children, dark = false, bare = false, className = '' }: { children: ReactNode; dark?: boolean; bare?: boolean; className?: string }) {
+export function Screen({ children, dark = false, className = '' }: { children: ReactNode; dark?: boolean; className?: string }) {
   return (
     <main
       className={cx(
-        'flex h-full flex-col overflow-hidden bg-white sm:my-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] sm:shadow-2xl',
-        bare ? 'text-ink' : 'p-2',
-        bare && className,
+        'flex h-full flex-col overflow-hidden text-white sm:my-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] sm:shadow-2xl',
+        dark ? 'bg-ink' : 'bg-brand',
+        className,
       )}
     >
-      {bare ? (
-        children
-      ) : (
-        <div
-          className={cx(
-            'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] text-white sm:rounded-[38px]',
-            dark ? 'bg-ink' : 'bg-brand',
-            className,
-          )}
-        >
-          {children}
-        </div>
-      )}
+      {children}
     </main>
   )
 }

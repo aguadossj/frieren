@@ -44,7 +44,7 @@ export default function Writing() {
   // pista como nota pequeña al final del chat · abajo solo la barra de escribir.
   // Pantalla blanca; solo el chat es una tarjeta roja. Bordes blancos ⇒ Safari pinta sus barras en blanco.
   return (
-    <Screen bare>
+    <Screen className="bg-white!">
       <header className="flex min-h-[60px] shrink-0 items-center gap-3 bg-white px-4 py-2.5 text-ink">
         <span className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-brand text-[16px] font-extrabold text-white">
           {groupInitials(room.chat.title)}
