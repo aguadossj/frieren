@@ -47,7 +47,10 @@ export function useT() {
   return STRINGS[useLang()]
 }
 
-const fmt = (n: number) => n.toLocaleString('en')
+/** 1,250 / −100 (signo menos de verdad, no guion: la puntuación puede ser negativa) */
+export const fmt = (n: number) => (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('en')
+/** +170 / −100 */
+export const signed = (n: number) => (n < 0 ? fmt(n) : `+${fmt(n)}`)
 const MEDALS = ['🥇', '🥈', '🥉']
 const ordinalEn = (n: number) => {
   const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'
@@ -59,25 +62,17 @@ const en = {
   // Portada
   pitch1: 'Your friends fake your replies.',
   pitch2: 'Spot the real one.',
-  steps: [
-    ['Get a message', 'The group chat asks you something.'],
-    ['Everyone fakes it', 'Friends copy how you text.'],
-    ['Spot the real one', 'Vote fast. Faster = more points.'],
-  ] as [string, string][],
   createRoom: 'Create room',
   joinWithCode: 'Join with code',
   // Cómo se juega (pop-up)
   howToPlay: 'How to play',
-  howEyebrow: 'How to play',
-  howTitle: 'Three steps',
-  howSteps: [
-    ['A message drops', 'The AI writes your group chat. One of you answers for real.'],
-    ['Everyone fakes it', 'The rest write what that person would say.'],
-    ['Spot the real one', 'Vote for the real one. The faster you get it, the more points.'],
-  ] as [string, string][],
-  howDemoMessage: 'who ate my pizza?? 🍕',
-  howDemoFake: 'not me',
-  howDemoReal: 'ok it was me',
+  howPages: [
+    { title: 'A group chat drops', body: 'The AI writes a chat about your group. One of you replies for real, everyone else fakes it.' },
+    { title: 'Spot the real one', body: 'All the replies show up. Vote for the real one, and fast: the quicker, the more points.' },
+    { title: 'The big reveal', body: 'See who wrote what, and who got fooled.' },
+    { title: 'Next round', body: 'Every round it’s someone else’s turn. The panda keeps you posted.' },
+  ],
+  howNext: 'Next',
   howPlay: 'Let’s play!',
   howSkip: 'Skip',
   back: 'Back',
@@ -158,7 +153,7 @@ const en = {
   nobodyGotIt: 'Nobody got it',
   tooEasy: 'Too easy',
   fooled: (n: number) => `${n} fooled`,
-  youPoints: (n: number) => `You +${n}`,
+  youPoints: (n: number) => `You ${signed(n)}`,
   realBy: (name: string) => `REAL · ${name}`,
   mimicTag: 'MIMIC · the AI',
   by: (name: string) => `by ${name}`,
@@ -214,24 +209,16 @@ const en = {
 const es: typeof en = {
   pitch1: 'Tus amigos imitan tus respuestas.',
   pitch2: 'Adivina cuál es la de verdad.',
-  steps: [
-    ['Te llega un mensaje', 'El chat del grupo te pregunta algo.'],
-    ['Todos lo imitan', 'Tus amigos copian cómo escribes.'],
-    ['Pilla la de verdad', 'Vota rápido: cuanto antes, más puntos.'],
-  ],
   createRoom: 'Crear sala',
   joinWithCode: 'Unirme con código',
   howToPlay: 'Cómo jugar',
-  howEyebrow: 'Cómo se juega',
-  howTitle: 'Tres pasos',
-  howSteps: [
-    ['Llega un mensaje', 'La IA crea vuestro chat de grupo. A uno le toca contestar de verdad.'],
-    ['Los demás le imitan', 'El resto escribe lo que diría esa persona.'],
-    ['Pilla la de verdad', 'Vota la real. Cuanto antes aciertes, más puntos.'],
+  howPages: [
+    { title: 'Os llega un chat', body: 'La IA escribe un chat de vuestro grupo. Uno contesta de verdad y el resto se hace pasar por él.' },
+    { title: 'Pilla la de verdad', body: 'Salen todas las respuestas. Vota la auténtica, y rápido: cuanto antes, más puntos.' },
+    { title: 'Se destapa todo', body: 'Se ve quién escribió cada una y a quién habéis engañado.' },
+    { title: 'Y otra ronda', body: 'Cada ronda le toca a otro. El panda os va contando cómo va la partida.' },
   ],
-  howDemoMessage: '¿quién se comió mi pizza? 🍕',
-  howDemoFake: 'no fui yo',
-  howDemoReal: 'vale, fui yo',
+  howNext: 'Siguiente',
   howPlay: '¡A jugar!',
   howSkip: 'Saltar',
   back: 'Atrás',
@@ -306,7 +293,7 @@ const es: typeof en = {
   nobodyGotIt: 'Nadie acertó',
   tooEasy: 'Demasiado fácil',
   fooled: (n) => `${n} engañados`,
-  youPoints: (n) => `Tú +${n}`,
+  youPoints: (n) => `Tú ${signed(n)}`,
   realBy: (name) => `REAL · ${name}`,
   mimicTag: 'MIMIC · la IA',
   by: (name) => `de ${name}`,

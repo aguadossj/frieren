@@ -17,7 +17,8 @@ export const MIMIC_AUTHOR_ID = 'mimic'
 
 /**
  * Puntuación (estilo Kahoot): solo puntúa acertar la respuesta real, y cuanto antes votes, más.
- * Votar al instante = 200, en el último segundo = 100, de 10 en 10. Fallar = 0. Votar al bot Mimic = −100.
+ * Votar al instante = 200, en el último segundo = 100, de 10 en 10. Fallar = 0. Votar al bot Mimic = −100
+ * (la puntuación puede quedar en negativo).
  * Engañar, ser reconocido o recibir 😂 ya NO dan puntos (se siguen mostrando, pero no suman).
  * Misma fórmula en SQL: game.speed_points (migración speed_scoring).
  */

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import PandaHost from '../components/Panda'
+import { RoundOutcome } from '../components/RoundOutcome'
 import { Avatar, AwardCard, Button, Footer, Icon, Screen, TimeBar, TopBar, TopNote } from '../components/ui'
 import { useGame } from '../game/useGame'
 import { MIMIC_AUTHOR_ID, PHASE_SECONDS } from '../game/types'
 import type { Player, RoundResult, Room } from '../game/types'
-import { useLang, useT } from '../i18n'
+import { fmt, signed, useLang, useT } from '../i18n'
 import { avatarFor, textOn } from '../lib/avatars'
 
 type Strings = ReturnType<typeof useT>
@@ -27,6 +28,7 @@ export function Reveal() {
 
   return (
     <Screen>
+      <RoundOutcome key={room.roundIndex} />
       <TopBar title={t.theRealSaid(writer.name)} right={<TopNote>{t.round(room.roundIndex + 1)}</TopNote>} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-3">
@@ -34,7 +36,7 @@ export function Reveal() {
           <div className="min-w-0 text-[32px] leading-none font-black tracking-[-0.03em] whitespace-nowrap">
             {real.voterIds.length === 0 ? t.nobodyGotIt : fooled === 0 ? t.tooEasy : t.fooled(fooled)}
           </div>
-          <div className={`shrink-0 rounded-full px-4 py-2 text-[18px] font-black tabular-nums ${myPoints ? 'bg-white text-good' : 'bg-white/15 text-white'}`}>
+          <div className={`shrink-0 rounded-full px-4 py-2 text-[18px] font-black tabular-nums ${myPoints > 0 ? 'bg-white text-good' : myPoints < 0 ? 'bg-ink text-white' : 'bg-white/15 text-white'}`}>
             {t.youPoints(myPoints)}
           </div>
         </div>
@@ -64,8 +66,19 @@ export function Reveal() {
                   <div className="flex shrink-0 items-center">
                     {voters.length === 0 ? (
                       <span className={`text-[13px] font-bold ${a.isReal || bot ? 'text-white/60' : 'text-neutral-300'}`}>{t.noVotes}</span>
+                    ) : a.isReal ? (
+                      // Respuesta real: los puntos de cada uno (cuanto antes votó, más)
+                      <div className="flex max-w-[150px] flex-wrap justify-end gap-1">
+                        {voters.slice(0, 3).map((v) => (
+                          <span key={v.id} className="flex items-center gap-0.5 rounded-full bg-white/25 py-0.5 pr-2 pl-0.5 text-[12px] font-black tabular-nums">
+                            <Avatar player={v} size={22} />⚡{result.points[v.id] ?? 0}
+                          </span>
+                        ))}
+                        {voters.length > 3 && <span className="text-[12px] font-black">+{voters.length - 3}</span>}
+                      </div>
                     ) : (
-                      <div className="flex -space-x-2">
+                      <div className="flex items-center -space-x-2">
+                        {bot && <span className="mr-3 text-[13px] font-black text-[#FF8A8A]">−100</span>}
                         {voters.slice(0, 4).map((v) => (
                           <Avatar key={v.id} player={v} size={26} ring />
                         ))}
@@ -178,8 +191,8 @@ export function Leaderboard() {
                 <div className={`relative flex h-full items-center gap-2.5 pr-4 pl-1.5 ${light ? '[text-shadow:0_1px_3px_rgba(0,0,0,0.6)]' : '[text-shadow:0_1px_2px_rgba(0,0,0,0.25)]'}`}>
                   <Avatar player={p} size={46} ring />
                   <span className="min-w-0 flex-1 truncate text-[18px] font-extrabold">{p.id === me?.id ? t.you : p.name}</span>
-                  {settled && gained > 0 && <span className="animate-pop text-[14px] font-extrabold text-white/85">+{gained}</span>}
-                  <span className="text-[19px] font-black tabular-nums">{score.toLocaleString('en')}</span>
+                  {settled && gained !== 0 && <span className="animate-pop text-[14px] font-extrabold text-white/85">{signed(gained)}</span>}
+                  <span className="text-[19px] font-black tabular-nums">{fmt(score)}</span>
                 </div>
               </div>
             </div>

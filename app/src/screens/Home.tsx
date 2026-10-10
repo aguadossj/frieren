@@ -88,20 +88,6 @@ function Start({ onCreate, onJoin, onHowTo }: { onCreate: () => void; onJoin: ()
             </p>
           </div>
 
-          <ol
-            className="flex animate-rise flex-col gap-3 rounded-[28px] bg-white/15 p-4 [@media(max-height:620px)]:hidden [@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:p-3"
-            style={{ animationDelay: '0.15s' }}
-          >
-            {t.steps.map(([title, line], i) => (
-              <li key={title} className="flex items-center gap-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[15px] font-black text-brand">{i + 1}</span>
-                <div className="leading-tight">
-                  <div className="text-[17px] font-extrabold">{title}</div>
-                  <div className="text-[15px] font-medium text-white/80">{line}</div>
-                </div>
-              </li>
-            ))}
-          </ol>
         </div>
       </div>
 
