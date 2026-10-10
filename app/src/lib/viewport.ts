@@ -51,7 +51,10 @@ export function trackVisualViewport() {
       // 2) …y DESPUÉS leemos la posición del área visible. Antes se leía antes de deshacer el scroll:
       //    #root se quedaba desplazado hacia abajo y la pantalla se veía en blanco (pantalla del nombre).
       setVar('--vv-h', `${Math.round(vv.height)}px`)
-      setVar('--vv-top', `${Math.max(0, Math.round(vv.offsetTop))}px`)
+      // La posición del área visible solo importa con el teclado (iOS la desplaza para enseñar el campo).
+      // Sin escribir, al arrastrar o en el rebote iOS también la mueve, y seguirla hacía que la app se moviera
+      // en dirección CONTRARIA al dedo. Sin teclado, la app se queda anclada arriba.
+      setVar('--vv-top', typing ? `${Math.max(0, Math.round(vv.offsetTop))}px` : '0px')
       // teclado abierto ⇔ el área visible es bastante más baja que la ventana
       const kb = window.innerHeight - vv.height > 120 || isField(document.activeElement) ? 'open' : 'closed'
       if (root.dataset.keyboard !== kb) root.dataset.keyboard = kb
