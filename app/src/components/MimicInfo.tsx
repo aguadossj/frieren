@@ -1,52 +1,33 @@
 /**
- * "¿Qué es Mimic?": mismo formato que "Cómo jugar" (HowToPlay): pantalla completa oscura, progreso tipo stories,
- * páginas que se pasan deslizando a los lados (scroll-snap nativo, o botón / ← →) y en cada una una ilustración
- * grande + título + una frase. Poca información: qué es, qué hace y qué pasa si la votas.
- * Se abre desde la tarjeta de Mimic del mazo al crear sala; cerrar devuelve a esa misma tarjeta.
+ * "¿Qué es Mimic?": UNA sola pantalla, con los colores de la app (fondo rojo con dibujitos, tarjeta blanca,
+ * botón blanco con texto rojo). Solo dos ideas: qué es Mimic y que evites su respuesta porque si la votas pierdes 100.
+ * Se abre desde la tarjeta de Mimic del mazo al crear sala; cerrar (Entendido / ✕ / Esc) devuelve a esa tarjeta.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useT } from '../i18n'
-import { Icon, TypingDots } from './ui'
+import ChatDoodles from './ChatDoodles'
+import { Button, Icon } from './ui'
 
 export default function MimicInfo({ onClose, moreHref }: { onClose: () => void; moreHref?: string }) {
-  const t = useT()
-  const m = t.mimicInfo
-  const pages = m.pages
-  const [page, setPage] = useState(0)
+  const m = useT().mimicInfo
   const [leaving, setLeaving] = useState(false)
-  const pager = useRef<HTMLDivElement>(null)
-  const last = page === pages.length - 1
 
   const close = () => {
     if (leaving) return
     setLeaving(true)
     setTimeout(onClose, 250)
   }
-  const go = (to: number) => {
-    const el = pager.current
-    if (!el || to < 0 || to >= pages.length) return
-    el.scrollTo({ left: to * el.clientWidth, behavior: 'smooth' })
-  }
-  const next = () => (last ? close() : go(page + 1))
 
-  // Teclado: ← → pasan página y Esc cierra. En fase de captura y sin propagar: el mazo de debajo no debe enterarse.
-  const keys = useRef({ next, prev: () => go(page - 1), close })
-  useEffect(() => {
-    keys.current = { next, prev: () => go(page - 1), close }
-  })
+  // Esc cierra; las flechas no deben responder la tarjeta del mazo que hay debajo
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') keys.current.next()
-      else if (e.key === 'ArrowLeft') keys.current.prev()
-      else if (e.key === 'Escape') keys.current.close()
-      else return
+      if (e.key === 'Escape') close()
+      else if (!e.key.startsWith('Arrow')) return
       e.stopImmediatePropagation()
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [])
-
-  const visuals = [<SceneAI key="ai" />, <SceneCopy key="copy" />, <ScenePenalty key="penalty" />]
+  })
 
   return (
     <div
@@ -54,80 +35,65 @@ export default function MimicInfo({ onClose, moreHref }: { onClose: () => void; 
       aria-modal="true"
       aria-labelledby="mimic-title"
       onPointerDown={(e) => e.stopPropagation()}
-      className={`absolute inset-x-0 top-0 z-[60] flex h-full flex-col overflow-hidden bg-ink text-white sm:top-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
+      className={`absolute inset-x-0 top-0 isolate z-[60] flex h-full flex-col overflow-hidden bg-brand text-white sm:top-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      {/* Progreso tipo "stories" + Saltar (igual que "Cómo jugar") */}
-      <div className="flex shrink-0 items-center gap-3 px-4 pt-2">
-        <div className="flex flex-1 gap-1.5">
-          {pages.map((p, i) => (
-            <button key={p.title} onClick={() => go(i)} aria-label={`${i + 1} / ${pages.length}`} className="flex h-[44px] flex-1 items-center">
-              <span className={`h-[5px] w-full rounded-full transition-colors duration-300 ${i <= page ? 'bg-white' : 'bg-white/20'}`} />
-            </button>
-          ))}
-        </div>
-        {!last && (
-          <button onClick={close} className="h-[44px] shrink-0 px-2 text-[15px] font-extrabold text-white/60">
-            {t.howSkip}
-          </button>
-        )}
-      </div>
+      <ChatDoodles seed={7} className="-z-10" />
 
-      <div
-        ref={pager}
-        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        onScroll={(e) => {
-          const el = e.currentTarget
-          const i = Math.round(el.scrollLeft / el.clientWidth)
-          if (i !== page) setPage(Math.max(0, Math.min(pages.length - 1, i)))
-        }}
+      <button
+        onClick={close}
+        aria-label={m.close}
+        className="absolute top-2 right-2 z-10 flex size-[44px] items-center justify-center text-white active:scale-90"
+        style={{ marginTop: 'env(safe-area-inset-top)' }}
       >
-        {pages.map((p, i) => (
-          <section key={p.title} className="flex w-full shrink-0 snap-center snap-always flex-col" aria-hidden={i !== page}>
-            {/* La ilustración se vuelve a montar al llegar a su página, para que su animación empiece entonces */}
-            <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-3" key={i === page ? 'on' : 'off'}>
-              {visuals[i]}
-            </div>
-            <div className="shrink-0 px-6 text-center">
-              <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
-                {i + 1} / {pages.length}
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4">
+        <div className="my-auto pt-12 pb-3 [@media(max-height:700px)]:pt-11">
+          {/* Tarjeta blanca, como las del mazo */}
+          <div className="origin-top animate-unfold rounded-[36px] bg-white px-7 pt-7 pb-6 text-ink [@media(max-height:700px)]:px-6 [@media(max-height:700px)]:pt-5 [@media(max-height:700px)]:pb-5">
+            <span className="flex size-[88px] items-center justify-center rounded-full bg-ink [@media(max-height:700px)]:size-[68px]">
+              <RobotFace size={64} />
+            </span>
+            <h2 id="mimic-title" className="mt-5 text-[34px] leading-[1.04] font-black tracking-[-0.035em] [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-[30px]">
+              {m.title}
+            </h2>
+            <p className="mt-2.5 text-[18px] leading-snug font-semibold text-neutral-500 [@media(max-height:700px)]:text-[16px]">{m.body}</p>
+
+            {/* El aviso: su respuesta, votada, y el −100 */}
+            <div className="mt-5 rounded-[24px] bg-neutral-100 p-4 [@media(max-height:700px)]:mt-4">
+              <div className="flex items-center gap-3">
+                <span className="flex min-w-0 animate-pop items-center gap-2 rounded-[18px] bg-white px-3.5 py-2.5 text-[16px] font-semibold outline-[3px] outline-ink outline-solid" style={{ animationDelay: '0.5s' }}>
+                  <Icon name="check" size={16} />
+                  <span className="truncate">{m.demoFake}</span>
+                </span>
+                <span className="shrink-0 animate-pop text-[30px] leading-none font-black tracking-[-0.03em] text-brand" style={{ animationDelay: '0.9s' }}>
+                  −100
+                </span>
               </div>
-              <h2 id={i === page ? 'mimic-title' : undefined} className="mt-1 text-[32px] leading-[1.05] font-black tracking-[-0.03em] [@media(max-height:700px)]:text-[27px]">
-                {p.title}
-              </h2>
-              <p className="mx-auto mt-2 min-h-[48px] max-w-[330px] text-[17px] leading-snug font-semibold text-white/75 [@media(max-height:700px)]:text-[15px]">
-                {p.body}
-              </p>
+              <p className="mt-3 text-[17px] leading-snug font-extrabold">{m.avoid}</p>
             </div>
-          </section>
-        ))}
+          </div>
+        </div>
       </div>
 
-      <div className="shrink-0 px-5 pt-3 pb-6">
-        <button
-          onClick={next}
-          className={`flex h-[66px] w-full items-center justify-center gap-3 rounded-full text-[21px] font-extrabold transition active:scale-[0.97] ${
-            last ? 'bg-brand text-white' : 'bg-white text-ink'
-          }`}
-        >
-          {last ? m.cta : t.howNext}
-          {!last && <Icon name="arrowRight" size={22} />}
-        </button>
-        {/* Detalle legal (AI Act), discreto y solo al final */}
-        <div className={`flex h-[34px] items-end justify-center ${last && moreHref ? '' : 'invisible'}`}>
-          <a href={moreHref} target="_blank" rel="noopener" tabIndex={last ? 0 : -1} className="text-[13px] font-bold text-white/45 underline underline-offset-4">
+      <div className="flex shrink-0 flex-col items-center px-5 pt-2 pb-4">
+        <Button onClick={close}>{m.cta}</Button>
+        {moreHref && (
+          <a href={moreHref} target="_blank" rel="noopener" className="flex h-[40px] items-center px-2 text-[14px] font-bold text-white/70 underline underline-offset-4">
             {m.more}
           </a>
-        </div>
+        )}
       </div>
     </div>
   )
 }
 
-/* ── Ilustraciones (grandes, una idea por página) ──────────────────────────── */
-
 /** Cabeza de robot con disfraz (gafas, nariz y bigote): la IA que se hace pasar por alguien. */
-function RobotFace({ size = 120, disguise = true }: { size?: number; disguise?: boolean }) {
+function RobotFace({ size = 120 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 120 120" aria-hidden="true">
       <line x1="60" y1="10" x2="60" y2="26" stroke="#fff" strokeWidth="5" strokeLinecap="round" />
@@ -140,76 +106,11 @@ function RobotFace({ size = 120, disguise = true }: { size?: number; disguise?: 
         <circle cx="46" cy="60" r="6" fill="#fff" />
         <circle cx="74" cy="60" r="6" fill="#fff" />
       </g>
-      {disguise && (
-        <g>
-          <circle cx="46" cy="60" r="11" fill="none" stroke="#EE2B2B" strokeWidth="4" />
-          <circle cx="74" cy="60" r="11" fill="none" stroke="#EE2B2B" strokeWidth="4" />
-          <line x1="57" y1="60" x2="63" y2="60" stroke="#EE2B2B" strokeWidth="4" />
-          <ellipse cx="60" cy="72" rx="6" ry="5" fill="#F5B700" />
-          <path className="mimic-stache" d="M42 82c6-6 12-6 18-2 6-4 12-4 18 2-6 4-12 3-18-1-6 4-12 5-18 1z" fill="#fff" />
-        </g>
-      )}
+      <circle cx="46" cy="60" r="11" fill="none" stroke="#EE2B2B" strokeWidth="4" />
+      <circle cx="74" cy="60" r="11" fill="none" stroke="#EE2B2B" strokeWidth="4" />
+      <line x1="57" y1="60" x2="63" y2="60" stroke="#EE2B2B" strokeWidth="4" />
+      <ellipse cx="60" cy="72" rx="6" ry="5" fill="#F5B700" />
+      <path className="mimic-stache" d="M42 82c6-6 12-6 18-2 6-4 12-4 18 2-6 4-12 3-18-1-6 4-12 5-18 1z" fill="#fff" />
     </svg>
-  )
-}
-
-/** Avatar del bot (círculo blanco con la cara del robot). */
-const BotAvatar = ({ size = 40 }: { size?: number }) => (
-  <span className="flex shrink-0 items-center justify-center rounded-full bg-white" style={{ width: size, height: size }}>
-    <RobotFace size={size * 0.9} />
-  </span>
-)
-
-const Avatar = ({ letter, color, size = 40 }: { letter: string; color: string; size?: number }) => (
-  <span className="flex shrink-0 items-center justify-center rounded-full font-extrabold text-white" style={{ background: color, width: size, height: size, fontSize: size * 0.45 }}>
-    {letter}
-  </span>
-)
-
-/** 1 · Mimic es una IA: el robot disfrazado, grande, con su "escribiendo…". */
-function SceneAI() {
-  return (
-    <div className="relative flex animate-pop flex-col items-center">
-      <div className="flex size-[min(230px,34vh)] items-center justify-center rounded-full bg-brand mimic-bob">
-        <RobotFace size={170} />
-      </div>
-      <div className="absolute -right-3 bottom-2 flex h-[46px] animate-pop items-center rounded-full rounded-br-[8px] bg-white px-4" style={{ animationDelay: '0.5s' }}>
-        <TypingDots />
-      </div>
-    </div>
-  )
-}
-
-/** 2 · Escribe como tu amigo: dos burbujas casi iguales, una de verdad y otra de Mimic. */
-function SceneCopy() {
-  const m = useT().mimicInfo
-  return (
-    <div className="flex w-full max-w-[320px] flex-col gap-4">
-      <div className="flex animate-rise items-end gap-2.5" style={{ animationDelay: '0.1s' }}>
-        <Avatar letter="P" color="#2563EB" />
-        <div className="rounded-[22px] rounded-bl-[6px] bg-white px-4 py-3 text-[19px] font-semibold text-ink">{m.demoReal}</div>
-      </div>
-      <div className="flex animate-rise items-end justify-end gap-2.5" style={{ animationDelay: '0.55s' }}>
-        <div className="rounded-[22px] rounded-br-[6px] bg-white px-4 py-3 text-[19px] font-semibold text-ink">{m.demoFake}</div>
-        <BotAvatar />
-      </div>
-    </div>
-  )
-}
-
-/** 3 · ¡No la votes!: votas la de Mimic y salta el −100. */
-function ScenePenalty() {
-  const m = useT().mimicInfo
-  return (
-    <div className="flex w-full max-w-[320px] flex-col items-center gap-5">
-      <div className="flex animate-pop items-center gap-2.5 rounded-[22px] bg-white px-4 py-3 text-[19px] font-semibold text-ink outline-[4px] outline-brand outline-solid" style={{ animationDelay: '0.1s' }}>
-        <Icon name="check" size={20} />
-        {m.demoFake}
-        <BotAvatar size={34} />
-      </div>
-      <div className="animate-pop text-[64px] leading-none font-black tracking-[-0.04em] text-brand" style={{ animationDelay: '0.6s' }}>
-        −100
-      </div>
-    </div>
   )
 }
