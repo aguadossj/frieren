@@ -72,6 +72,16 @@ idiomas que no sean inglés · historial de partidas · pantalla grande tipo TV 
   `serverNow`). `useGame.ts` usa Supabase si hay env vars; si no, o con **`?mock=1`** en la URL, el mock con bots (plan B).
   **Env vars (también en Vercel):** `VITE_SUPABASE_URL=https://xociawfbjmccevhjcfiu.supabase.co` y
   `VITE_SUPABASE_PUBLISHABLE_KEY=<clave publicable sb_publishable_…>` (pública por diseño; nunca la service_role).
+- **Bot "Mimic" (migración `mimic_bot`, aplicada):** IA impostora independiente del generador. El host lo activa con
+  `updateSettings({ mimic: true })`. Su respuesta es una opción extra y anónima en la votación; quien la vota pierde 100
+  (suelo 0); se descubre en la revelación (`isBot`, `authorId: "mimic"`) y puede ganar el premio. Si no llega, la ronda
+  sigue sin él (la escritura espera como mucho `mimic_wait_seconds` = 10 s si todos han contestado).
+  **API para las Edge Functions (solo service_role):** `ai_round_context(round_id)` (historial completo de la sala para
+  aprender a imitar a cada jugador), `submit_bot_answer(round_id, text)`, `log_ai_generation(...)`, `update_room_memory`.
+  **Pendiente (Nico):** Edge Function `mimic` + disparo al empezar cada `writing` si `settings.mimic` (mismo patrón
+  `pg_net` + Vault que `request_generation`). Nota: `game.ai_round_input` debería filtrar `not a.is_bot` en `fakes`.
+  **Pendiente (Pau):** interruptor de Mimic para el host, aviso "🤖 An AI is hiding among the answers" (`room.mimic`)
+  y "🤖 Mimic" en la revelación.
 - **IA (ronda a ronda):** Supabase **Edge Function** `generate-round` con adaptador **compatible con OpenAI**
   (proveedor probable: **Grok/xAI**; URL base, modelo y clave por secretos). Ronda 1 al pulsar Start; ronda N+1 se genera
   en segundo plano al empezar la votación de la N (lanzada desde la base con `pg_net`). Recibe contexto actual, rondas

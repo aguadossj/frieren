@@ -12,7 +12,8 @@ export const MAX_PLAYERS = 8
 export const MAX_ROUNDS = 5
 export const MAX_ANSWER_LENGTH = 80
 export const MAX_NAME_LENGTH = 16
-export const MAX_VOTE_OPTIONS = 5
+export const MAX_VOTE_OPTIONS = 6 // real + hasta 4 impostores + el bot Mimic si está activado
+export const MIMIC_AUTHOR_ID = 'mimic'
 
 export const POINTS = {
   foundReal: 200, // votar la respuesta real
@@ -54,6 +55,7 @@ export interface AnswerResult {
   text: string
   authorId: string
   isReal: boolean
+  isBot?: boolean // respuesta del bot "Mimic" (authorId = 'mimic'); quien la votó pierde puntos
   voterIds: string[]
   laughs: number
 }
@@ -82,6 +84,7 @@ export interface Room {
   result: RoundResult | null // reveal/leaderboard
   setup?: Setup // contexto para la IA (preguntas iniciales); lo edita el host
   settings?: RoomSettings
+  mimic?: boolean // hay un bot IA escondido entre las respuestas (avisar en lobby y votación)
 }
 
 /** Respuestas a las preguntas iniciales: { who: 'students', age: '18_24', vibes: ['spicy'], topic: '...' }. */
@@ -94,6 +97,7 @@ export interface RoomSettings {
   reveal_seconds: number
   leaderboard_seconds: number
   max_players: number
+  mimic?: boolean // el host activa el bot "Mimic" con updateSettings({ mimic: true })
 }
 
 /** Pregunta inicial del catálogo (tabla game.setup_questions). */
