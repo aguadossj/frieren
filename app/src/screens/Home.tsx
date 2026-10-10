@@ -365,12 +365,13 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
 
 /** 4 casillas para el código. Un input invisible encima recoge lo que escribes (y lo pegado). */
 function CodeTiles({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const [focused, setFocused] = useState(true)
+  const [focused, setFocused] = useState(false) // sin autoFocus: el teclado solo se abre al tocar
   return (
     <div className="relative flex animate-rise justify-center gap-3" style={{ animationDelay: '0.1s' }}>
       {Array.from({ length: CODE_LENGTH }, (_, i) => {
         const letter = value[i]
-        const active = focused && i === Math.min(value.length, CODE_LENGTH - 1) && value.length < CODE_LENGTH
+        // La casilla que toca se ve resaltada siempre; el cursor solo aparece con el teclado abierto
+        const active = i === value.length
         return (
           <span
             key={i}
@@ -382,7 +383,7 @@ function CodeTiles({ label, value, onChange }: { label: string; value: string; o
               <span key={letter + i} className="animate-pop">
                 {letter}
               </span>
-            ) : active ? (
+            ) : active && focused ? (
               <span className="h-[44px] w-[4px] animate-pulse rounded-full bg-brand" />
             ) : null}
           </span>
