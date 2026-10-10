@@ -102,12 +102,13 @@ export const TopNote = ({ children }: { children: ReactNode }) => (
   <span className="shrink-0 text-[15px] font-bold text-brand">{children}</span>
 )
 
-export function TimerPill({ seconds }: { seconds: number }) {
+export function TimerPill({ seconds, className = '' }: { seconds: number; className?: string }) {
   return (
     <span
       className={cx(
         'shrink-0 rounded-full bg-ink px-4 py-1.5 text-[17px] font-extrabold tabular-nums text-white',
         seconds <= 5 && 'animate-pulse',
+        className,
       )}
     >
       0:{String(seconds).padStart(2, '0')}

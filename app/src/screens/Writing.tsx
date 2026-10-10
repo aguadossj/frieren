@@ -51,12 +51,12 @@ export default function Writing() {
       <div aria-hidden className="fixed inset-x-0 top-0 z-[60] h-[6px] bg-white sm:hidden" />
       <div aria-hidden className="fixed inset-x-0 bottom-0 z-[60] h-[6px] bg-white sm:hidden" />
     <Screen className="bg-white!">
-      <header className="flex min-h-[60px] shrink-0 items-center gap-3 bg-white px-4 py-2.5 text-ink">
-        <span className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-brand text-[16px] font-extrabold text-white">
+      <header className="flex min-h-[48px] shrink-0 items-center gap-2.5 bg-white px-3 py-2 text-ink">
+        <span className="flex size-[32px] shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-extrabold text-white">
           {groupInitials(room.chat.title)}
         </span>
-        <div className="min-w-0 flex-1 truncate text-[18px] leading-tight font-extrabold">{room.chat.title}</div>
-        <TimerPill seconds={seconds} />
+        <div className="min-w-0 flex-1 truncate text-[16px] leading-tight font-extrabold">{room.chat.title}</div>
+        <TimerPill seconds={seconds} className="px-3 py-1 text-[14px]" />
       </header>
 
       <div ref={list} className="mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-[28px] bg-brand px-3 pt-3 pb-3">
