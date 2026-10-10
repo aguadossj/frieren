@@ -14,6 +14,7 @@
 
 import { AiError, generateRound, parseInput } from './core.ts'
 import { MIMIC_PROMPT_VERSION, generateMimic } from './mimic.ts'
+import { generateDrafts } from './drafts.ts'
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -72,6 +73,29 @@ Deno.serve(async (request: Request) => {
 
   const body = await request.json().catch(() => null)
   const roundId = typeof body?.round_id === 'string' ? body.round_id : null
+
+  // ── Borradores de la ronda 1 (mientras la gente entra en la sala) ──
+  if (body?.mode === 'drafts') {
+    const roomId = typeof body?.room_id === 'string' ? body.room_id : null
+    try {
+      if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
+      const output = await generateDrafts(body.input, { ...config, timeoutMs: 30000 }, Number(body.count) || 3)
+      if (!roomId) return json(200, output)
+      const saved = output.drafts.length
+        ? await rpc('ai_save_drafts', { p_room_id: roomId, p_setup_hash: String(body.setup_hash ?? ''), p_drafts: output.drafts })
+        : 0
+      await rpc('log_ai_generation', {
+        p_room_id: roomId, p_round_id: null, p_provider: 'openai-compatible', p_model: output.model,
+        p_prompt_version: output.prompt_version, p_status: output.drafts.length ? 'ok' : 'error',
+        p_input_tokens: output.input_tokens, p_output_tokens: output.output_tokens, p_latency_ms: output.latency_ms,
+        p_error: output.errors.length ? output.errors.join(' | ').slice(0, 900) : null,
+      }).catch((e) => console.error('drafts log', e))
+      return json(200, { saved })
+    } catch (error) {
+      console.error('drafts', roomId, error)
+      return json(roomId ? 200 : 500, { outcome: 'failed', error: error instanceof AiError ? error.code : 'internal' })
+    }
+  }
 
   // ── Bot Mimic ──
   if (body?.mode === 'mimic') {

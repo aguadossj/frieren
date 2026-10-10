@@ -31,6 +31,7 @@ export interface Setup {
   /** Lugar real si el host dijo que están juntos y compartió la ubicación (nombres de OpenStreetMap, sin coordenadas). */
   right_now?: { place: string | null; nearby: string[]; local_time: string | null; together: boolean } | null
   lang?: 'en' | 'es' // idioma del host (selector EN · ES); por defecto inglés
+  spicy?: 'yes' | 'no' | null // tarjeta del host: "¿picante?" (con menores el backend ya pone age = mixed)
   extra?: Record<string, string> // otras claves libres de save_setup (solo contexto)
 }
 
@@ -96,7 +97,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v6'
+export const PROMPT_VERSION = 'round-v7'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -262,10 +263,14 @@ export const THEMES: Theme[] = [
   { id: 'ex', en: 'an ex just showed up again (a like, a story, a text)', es: 'un ex ha vuelto a aparecer (un like, una story, un mensaje)', adult: true },
 ]
 
-export function pickTheme(input: GenerateRoundInput): Theme {
-  const clean = Boolean(input.setup.age && CLEAN_AGES.has(input.setup.age))
-  const used = new Set(input.memory?.used_themes ?? [])
-  const allowed = THEMES.filter((t) => !(clean && t.adult))
+/** Con menores: todo limpio. */
+export const isClean = (setup: Setup) => Boolean(setup.age && CLEAN_AGES.has(setup.age))
+/** Sin temas de ligar ni fiesta: con menores o si el host dijo "nada picante". */
+export const noSpicy = (setup: Setup) => isClean(setup) || setup.spicy === 'no'
+
+export function pickTheme(input: Pick<GenerateRoundInput, 'setup' | 'memory'>, exclude: string[] = []): Theme {
+  const used = new Set([...(input.memory?.used_themes ?? []), ...exclude])
+  const allowed = THEMES.filter((t) => !(noSpicy(input.setup) && t.adult))
   const fresh = allowed.filter((t) => !used.has(t.id))
   const pool = fresh.length > 0 ? fresh : allowed
   return pool[Math.floor(Math.random() * pool.length)]
@@ -314,7 +319,7 @@ const SITUATIONS: Record<string, string> = {
   trip: 'on a trip together right now',
   break: 'on a class or work break right now',
 }
-const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang', 'place', 'nearby', 'local_time', 'together'])
+const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang', 'place', 'nearby', 'local_time', 'together', 'spicy', 'adults'])
 const ADULT_VIBES = new Set(['spicy', 'exes'])
 const CLEAN_AGES = new Set(['under_18', 'mixed'])
 
@@ -353,32 +358,7 @@ export function parseInput(body: unknown): GenerateRoundInput {
   if (!Number.isInteger(round) || round < 1 || round > 10) fail('round')
   if (!Number.isInteger(total_rounds) || total_rounds < round || total_rounds > 10) fail('total_rounds')
 
-  const s = (b.setup ?? {}) as Record<string, unknown>
-  const setup: Setup = {
-    who: clip(s.who, 20) || null,
-    age: clip(s.age, 20) || null,
-    vibes: (Array.isArray(s.vibes) ? s.vibes : []).map((v) => clip(v, 20)).filter((v) => v in VIBES),
-    topic: clip(s.topic, 120) || null,
-    situation: clip(s.situation, 120) || null,
-    know: clip(s.know, 10) || null,
-    lang: s.lang === 'es' ? 'es' : 'en',
-    right_now:
-      s.place || s.nearby || s.local_time
-        ? {
-            place: clip(s.place, 120) || null,
-            nearby: (Array.isArray(s.nearby) ? s.nearby : []).map((v) => clip(v, 40)).filter(Boolean).slice(0, 8),
-            local_time: clip(s.local_time, 40) || null,
-            together: s.together === 'yes',
-          }
-        : null,
-    extra: Object.fromEntries(
-      Object.entries(s)
-        .filter(([key]) => !SETUP_KEYS.has(key) && /^[a-z][a-z0-9_]{0,31}$/.test(key))
-        .map(([key, value]) => [key, Array.isArray(value) ? value.map((v) => clip(v, 40)).join(', ') : clip(String(value ?? ''), 120)] as const)
-        .filter(([, value]) => value)
-        .slice(0, 10),
-    ),
-  }
+  const setup = parseSetup(b.setup)
 
   const history: PastRound[] = (Array.isArray(b.history) ? b.history : []).slice(-10).map((h) => ({
     round: Number(h?.round) || 0,
@@ -401,14 +381,49 @@ export function parseInput(body: unknown): GenerateRoundInput {
 
   const memory = b.memory && typeof b.memory === 'object' ? (b.memory as Partial<Memory>) : null
   const style_examples = parseExamples(b.style_examples, 5)
-  const house_examples: HouseExample[] = (Array.isArray(b.house_examples) ? b.house_examples : [])
+  const house_examples = parseHouseExamples(b.house_examples)
+  return { round, total_rounds, setup, players, writer_id, history, memory, style_examples, house_examples }
+}
+
+export function parseHouseExamples(value: unknown): HouseExample[] {
+  return (Array.isArray(value) ? value : [])
     .slice(0, 4)
     .map((ex: { title?: unknown; lines?: unknown }) => ({
       title: clip(ex?.title, 40),
       lines: parseExamples([ex?.lines], 1)[0] ?? [],
     }))
     .filter((ex) => ex.lines.length >= 2)
-  return { round, total_rounds, setup, players, writer_id, history, memory, style_examples, house_examples }
+}
+
+/** El setup de la sala (save_setup): preguntas del catálogo, tarjetas del host y contexto libre. */
+export function parseSetup(value: unknown): Setup {
+  const s = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+  return {
+    who: clip(s.who, 20) || null,
+    age: clip(s.age, 20) || null,
+    vibes: (Array.isArray(s.vibes) ? s.vibes : []).map((v) => clip(v, 20)).filter((v) => v in VIBES),
+    topic: clip(s.topic, 120) || null,
+    situation: clip(s.situation, 120) || null,
+    know: clip(s.know, 10) || null,
+    lang: s.lang === 'es' ? 'es' : 'en',
+    spicy: s.spicy === 'no' ? 'no' : s.spicy === 'yes' ? 'yes' : null,
+    right_now:
+      s.place || s.nearby || s.local_time
+        ? {
+            place: clip(s.place, 120) || null,
+            nearby: (Array.isArray(s.nearby) ? s.nearby : []).map((v) => clip(v, 40)).filter(Boolean).slice(0, 8),
+            local_time: clip(s.local_time, 40) || null,
+            together: s.together === 'yes',
+          }
+        : null,
+    extra: Object.fromEntries(
+      Object.entries(s)
+        .filter(([key]) => !SETUP_KEYS.has(key) && /^[a-z][a-z0-9_]{0,31}$/.test(key))
+        .map(([key, value]) => [key, Array.isArray(value) ? value.map((v) => clip(v, 40)).join(', ') : clip(String(value ?? ''), 120)] as const)
+        .filter(([, value]) => value)
+        .slice(0, 10),
+    ),
+  }
 }
 
 /** Ejemplos de estilo: como mucho `max` fragmentos de 2–6 líneas cortas. */
@@ -556,13 +571,13 @@ FIELDS:
 - "lines": 3 to 6 short messages. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
   "text" is only what they type: never start it with the sender's name or "name:". Max 60 characters each.
-- The LAST message is the question to the writer, using their name.
+- The LAST message is addressed to the writer by name: a question or a direct demand ("Laura explain", "Laura what did you do").
 - Follow the audience (group, know_each_other, content, vibes, topic, extra_context). From round 2 on, call back a
   running joke or something a player said when it fits, and follow the steer. If the writer has been easy to spot
   (stats.spotted_by), ask something more open-ended.
 
-CONTENT: the humour comes from the situation, never from attacking someone. No insults about looks, body,
-race, religion, sexuality or health. Nothing sexually explicit.`
+CONTENT: the humour comes from the situation, never from attacking someone. Religion, politics, health, sexuality,
+race and looks are never the topic or the secret, and never the target of a joke. Nothing sexually explicit.`
 
 interface ModelOutput {
   memory_update: {
@@ -602,9 +617,33 @@ function buildSchema(allHandles: string[]) {
   })
 }
 
+/** Para quién se escribe: grupo, si se conocen, dónde están, tono y contexto libre del host. */
+export function buildAudience(setup: Setup) {
+  const clean = isClean(setup)
+  const vibes = (setup.vibes ?? []).filter((v) => !(noSpicy(setup) && ADULT_VIBES.has(v)))
+  return {
+    group: AUDIENCE[setup.who ?? ''] ?? (setup.know === 'no' ? 'people who mostly just met' : 'friends'),
+    know_each_other:
+      setup.know === 'no'
+        ? 'no: they barely know each other, so ask things anyone can answer about themselves or the moment, not shared history'
+        : setup.know === 'yes'
+          ? 'yes: close friends, shared history and inside jokes are fair game'
+          : null,
+    // Botón antiguo (drinks, party…) o el texto libre que escribe el host
+    where_they_are: SITUATIONS[setup.situation ?? ''] ?? setup.situation ?? null,
+    right_now: setup.right_now ?? null,
+    content: clean
+      ? 'the group may include minors: keep it completely clean, no dating, drinking or flirting'
+      : setup.spicy === 'no'
+        ? 'adults, but keep it light: no flirting, dating, hookups or drinking jokes'
+        : 'adults: cheeky is fine, never explicit',
+    vibes: vibes.length > 0 ? vibes.map((v) => VIBES[v]) : ['everyday group chat chaos'],
+    topic: setup.topic ?? null,
+    extra_context: setup.extra && Object.keys(setup.extra).length > 0 ? setup.extra : null,
+  }
+}
+
 function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme) {
-  const clean = Boolean(input.setup.age && CLEAN_AGES.has(input.setup.age))
-  const vibes = (input.setup.vibes ?? []).filter((v) => !(clean && ADULT_VIBES.has(v)))
   const memory = input.memory ?? {}
   const evidence = computeEvidence(input.players, input.history)
   const lang = input.setup.lang === 'es' ? 'es' : 'en'
@@ -622,24 +661,7 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, 
       name: input.players.find((p) => p.id === input.writer_id)?.name,
       note: 'the last message must be a question to THIS player (not to a previous writer)',
     },
-    audience: {
-      group: AUDIENCE[input.setup.who ?? ''] ?? (input.setup.know === 'no' ? 'people who mostly just met' : 'friends'),
-      know_each_other:
-        input.setup.know === 'no'
-          ? 'no: they barely know each other, so ask things anyone can answer about themselves or the moment, not shared history'
-          : input.setup.know === 'yes'
-            ? 'yes: close friends, shared history and inside jokes are fair game'
-            : null,
-      // Botón antiguo (drinks, party…) o el texto libre que escribe el host
-      where_they_are: SITUATIONS[input.setup.situation ?? ''] ?? input.setup.situation ?? null,
-      right_now: input.setup.right_now ?? null,
-      content: clean
-        ? 'the group may include minors: keep it completely clean, no dating, drinking or flirting'
-        : 'adults: cheeky is fine, never explicit',
-      vibes: vibes.length > 0 ? vibes.map((v) => VIBES[v]) : ['everyday group chat chaos'],
-      topic: input.setup.topic ?? null,
-      extra_context: input.setup.extra && Object.keys(input.setup.extra).length > 0 ? input.setup.extra : null,
-    },
+    audience: buildAudience(input.setup),
     players: input.players.map((p) => ({
       handle: handleOf(p.id),
       name: p.name,
@@ -709,7 +731,7 @@ function repairChat(output: ModelOutput, writerName: string, otherHandles: strin
     }
   })
   const last = lines[lines.length - 1]
-  if (typeof last?.text === 'string' && last.text.includes('?') && !mentions(last.text, writerName)) {
+  if (typeof last?.text === 'string' && !mentions(last.text, writerName)) {
     // Si la pregunta va a otro jugador (p. ej. al writer de la ronda anterior), se cambia ese nombre por el del writer.
     const other = Object.values(nameOf).find((name) => name !== writerName && mentions(last.text, name))
     const word =
@@ -732,7 +754,7 @@ function validateChat(output: ModelOutput, writerName: string, otherHandles: Set
     if (typeof line.text !== 'string' || !line.text.trim() || line.text.length > 120) return 'text'
   }
   const last = chat.lines[chat.lines.length - 1].text
-  if (!last.includes('?')) return 'last_not_question'
+  // Pregunta ("Laura qué hiciste?") u orden directa ("Laura explícate"): las dos valen, como en los chats del equipo.
   if (!mentions(last, writerName)) return 'last_not_to_writer'
   return null
 }
@@ -868,7 +890,11 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
   repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
   if (Array.isArray(output?.chat?.lines)) {
     output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()), lang)
-    output.chat.title = String(output.chat.title ?? '').replace(/[¿¡]/g, '').trim()
+    const nameOf = Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name]))
+    output.chat.title = String(output.chat.title ?? '')
+      .replace(/[¿¡]/g, '')
+      .replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
+      .trim()
   }
   const texts = output?.chat?.lines?.map((l) => l.text) ?? []
   const problem =
