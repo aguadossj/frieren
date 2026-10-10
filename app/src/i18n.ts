@@ -51,7 +51,6 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 const en = {
   // Portada
-  tagline: 'Live bluffing party game',
   pitch1: 'Your friends fake your replies.',
   pitch2: 'Spot the real one.',
   steps: [
@@ -170,7 +169,6 @@ const en = {
 }
 
 const es: typeof en = {
-  tagline: 'Juego de faroles en grupo',
   pitch1: 'Tus amigos imitan tus respuestas.',
   pitch2: 'Adivina cuál es la de verdad.',
   steps: [

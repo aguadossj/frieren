@@ -19,6 +19,7 @@ const ICONS = {
   crown: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z',
   share: 'M12 3v12M7 8l5-5 5 5M5 14v6h14v-6',
   replay: 'M4 4v6h6M4.6 15a8 8 0 1 0 1.8-8.3L4 10',
+  code: 'M9 4L7 20M17 4l-2 16M4 9h16M3 15h16',
 } as const
 
 export function Icon({ name, size = 20, className = '' }: { name: keyof typeof ICONS; size?: number; className?: string }) {

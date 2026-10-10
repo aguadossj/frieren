@@ -22,17 +22,15 @@ export default function Home() {
 function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void }) {
   const t = useT()
   return (
-    <Screen>
-      <div className="flex shrink-0 justify-end px-5 pt-3">
-        <LangToggle />
-      </div>
-      <Body className="justify-center gap-7 pt-2">
+    <Screen className="relative">
+      {/* EN · ES flotando sobre el fondo, sin barra ni hueco propio */}
+      <LangToggle className="absolute top-2 right-3 z-10" />
+      <Body className="justify-center gap-7 pt-8">
         <div className="text-center">
           <div className="mx-auto mb-6 flex h-[52px] w-[70px] animate-pop items-center justify-center rounded-full bg-white">
             <TypingDots />
           </div>
-          <Eyebrow>{t.tagline}</Eyebrow>
-          <h1 className="mt-2 text-[60px] leading-none font-black tracking-[-0.04em]">Typing…</h1>
+          <h1 className="text-[60px] leading-none font-black tracking-[-0.04em]">Typing…</h1>
           <p className="mt-4 text-[19px] leading-snug font-semibold">
             {t.pitch1}
             <br />
@@ -62,16 +60,12 @@ function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void 
           <Icon name="arrowRight" size={22} />
         </Button>
 
-        <Button variant="ink" onClick={onJoin} className={`flex items-center px-7 ${t.joinWithCode.length <= 14 ? 'justify-between' : 'justify-center'}`}>
-          <span className="whitespace-nowrap">{t.joinWithCode}</span>
-          {/* Fichas decorativas solo si el texto es corto (en castellano no caben) */}
-          <span className={`gap-1 ${t.joinWithCode.length <= 14 ? 'flex' : 'hidden'}`} aria-hidden="true">
-            {'ABCD'.split('').map((l) => (
-              <span key={l} className="flex size-6 items-center justify-center rounded-[7px] bg-white/12 text-[13px] text-white/60">
-                {l}
-              </span>
-            ))}
+        <Button variant="ink" onClick={onJoin} className="flex items-center justify-between px-7">
+          <span className="flex items-center gap-3 whitespace-nowrap">
+            <Icon name="code" size={22} />
+            {t.joinWithCode}
           </span>
+          <Icon name="arrowRight" size={22} />
         </Button>
 
       </Footer>
