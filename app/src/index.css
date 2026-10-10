@@ -47,6 +47,15 @@
   to { transform: translateY(0); }
 }
 /* Amago de la primera tarjeta del setup: enseña que se desliza */
+/* "Cómo se juega": el móvil entra por la derecha (siguiente) o por la izquierda (anterior) */
+@keyframes howto-in-right {
+  from { transform: translateX(70px) scale(0.92); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+@keyframes howto-in-left {
+  from { transform: translateX(-70px) scale(0.92); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
 @keyframes swipe-hint {
   0%, 100% { transform: translateX(0) rotate(0); }
   25% { transform: translateX(-26px) rotate(-2deg); }
