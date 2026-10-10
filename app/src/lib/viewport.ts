@@ -50,3 +50,24 @@ export function focusWithoutScroll(e: { currentTarget: HTMLInputElement | HTMLTe
   e.preventDefault() // evita el foco "nativo" que hace scroll
   el.focus({ preventScroll: true })
 }
+
+/**
+ * Safari (iOS 26) solo recalcula el color de sus barras cuando la página hace scroll. En una SPA el cambio de
+ * pantalla no hace scroll, así que la barra se queda con el color de la pantalla anterior (rojo de Home) hasta
+ * que el usuario desliza. Esto simula ese scroll: alarga la página 2px un instante, baja 2px y vuelve arriba.
+ * Invisible para el usuario. Llamar al entrar/salir de una pantalla con otros colores en los bordes.
+ */
+export function retintSafariBars() {
+  const spacer = document.createElement('div')
+  spacer.setAttribute('aria-hidden', 'true')
+  spacer.dataset.retint = ''
+  spacer.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:calc(100vh + 4px);pointer-events:none;visibility:hidden'
+  document.body.appendChild(spacer)
+  void spacer.offsetHeight // forzar layout para que la página sea "scrolleable" ya
+  window.scrollTo(0, 2)
+  // Timers y no requestAnimationFrame: rAF se pausa en pestañas ocultas y dejaría el espaciador puesto
+  setTimeout(() => {
+    window.scrollTo(0, 0)
+    spacer.remove()
+  }, 60)
+}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bubble, Icon, Screen, TimeBar, TypingDots, groupInitials } from '../components/ui'
 import { useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH, PHASE_SECONDS } from '../game/types'
-import { focusWithoutScroll } from '../lib/viewport'
+import { focusWithoutScroll, retintSafariBars } from '../lib/viewport'
 
 export default function Writing() {
   const { room, me, game } = useGame()
@@ -10,6 +10,16 @@ export default function Writing() {
   const [mine, setMine] = useState<string | null>(null)
   const [typing, setTyping] = useState(false) // input con foco ⇒ teclado abierto
   const list = useRef<HTMLDivElement>(null)
+
+  // Que Safari repinte sus barras con los colores del chat al entrar (y con los de la siguiente pantalla al salir)
+  useEffect(() => {
+    retintSafariBars()
+    const t = setTimeout(retintSafariBars, 400) // por si la primera llega antes de pintar
+    return () => {
+      clearTimeout(t)
+      setTimeout(retintSafariBars, 50)
+    }
+  }, [])
 
   // Bajar al último mensaje dentro de la lista (no scrollIntoView: en iOS desplaza toda la página)
   const toBottom = (smooth = true) => {
