@@ -72,7 +72,7 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
   const go = (to: number) => {
     const el = pager.current
     if (!el || to < 0 || to >= pages.length) return
-    el.scrollTo({ left: to * el.clientWidth, behavior: 'smooth' })
+    el.scrollTo({ left: -to * el.clientWidth, behavior: 'smooth' }) // rtl: hacia la izquierda es negativo
   }
   const next = () => (last ? close() : go(page + 1))
 
@@ -118,19 +118,30 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
       {/* Páginas en fila: se pasan deslizando el dedo a un lado u otro, como pestañas (scroll-snap nativo) */}
       <div
         ref={pager}
+        dir="rtl" // se avanza deslizando hacia la derecha: la página siguiente entra por la izquierda
         className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onScroll={(e) => {
           const el = e.currentTarget
-          const i = Math.round(el.scrollLeft / el.clientWidth)
+          const i = Math.round(Math.abs(el.scrollLeft) / el.clientWidth)
           if (i !== page) setPage(Math.max(0, Math.min(pages.length - 1, i)))
         }}
       >
         {pages.map((p, i) => (
-          <section key={p.title} className="flex w-full shrink-0 snap-center snap-always flex-col" aria-hidden={i !== page}>
-            <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-3">
-              <Phone src={`/howto/${lang}-${SHOTS[i]}.webp`} style={{ rotate: i % 2 ? '2deg' : '-2deg' }} />
+          <section key={p.title} dir="ltr" className="flex w-full shrink-0 snap-center snap-always flex-col" aria-hidden={i !== page}>
+            {/* Móvil grande "con zoom": se ve la parte de arriba de la pantalla y el resto se funde con el fondo */}
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <div className="flex justify-center px-8 pt-5">
+                <div
+                  key={i === page ? 'on' : 'off'}
+                  className="w-[min(78vw,330px)]"
+                  style={i === page ? { animation: 'howto-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.15) both' } : undefined}
+                >
+                  <Phone src={`/howto/${lang}-${SHOTS[i]}.webp`} style={{ rotate: i % 2 ? '2.5deg' : '-2.5deg' }} />
+                </div>
+              </div>
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-ink via-ink/80 to-transparent" />
             </div>
-            <div className="shrink-0 px-6 text-center">
+            <div className="shrink-0 px-6 pt-2 text-center">
               <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
                 {i + 1} / {pages.length}
               </div>
@@ -164,7 +175,7 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
 function Phone({ src, className = '', style }: { src: string; className?: string; style?: CSSProperties }) {
   return (
     <div
-      className={`relative h-full max-h-[480px] overflow-hidden rounded-[34px] border-[7px] border-[#2B2B2B] bg-brand shadow-[0_24px_60px_rgba(0,0,0,0.55)] ${className}`}
+      className={`relative w-full overflow-hidden rounded-[38px] border-[8px] border-[#2B2B2B] bg-brand shadow-[0_24px_60px_rgba(0,0,0,0.55)] ${className}`}
       style={{ aspectRatio: '450 / 975', ...style }}
     >
       <img src={src} alt="" draggable={false} className="pointer-events-none size-full object-cover object-top" />
