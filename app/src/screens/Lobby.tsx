@@ -4,23 +4,13 @@ import QR, { joinUrl } from '../components/QR'
 import { useGame } from '../game/useGame'
 import { MIN_PLAYERS } from '../game/types'
 
-const SITUATION_LABEL: Record<string, string> = {
-  drinks: 'Drinks out',
-  party: 'Party',
-  dinner: 'Dinner',
-  home: 'Chilling at home',
-  trip: 'On a trip',
-  break: 'Class or work break',
-}
-
 export default function Lobby() {
   const { room, me, game, error } = useGame()
   const [copied, setCopied] = useState(false)
   if (!room || !me) return null
   const missing = MIN_PLAYERS - room.players.length
   const host = room.players.find((p) => p.isHost)
-  const situation = SITUATION_LABEL[String(room.setup?.situation)]
-  const know = room.setup?.know === 'yes' ? 'Close friends' : room.setup?.know === 'no' ? 'Just met' : null
+  const situation = typeof room.setup?.situation === 'string' ? room.setup.situation : null
 
   const copy = () => {
     const url = joinUrl(room.code)
@@ -35,6 +25,15 @@ export default function Lobby() {
   return (
     <Screen>
       <TopBar
+        avatar={
+          <button
+            onClick={() => void game.leave()}
+            aria-label="Leave room"
+            className="-ml-2 flex size-[44px] shrink-0 items-center justify-center rounded-full text-ink active:scale-90 active:bg-neutral-100"
+          >
+            <Icon name="arrowLeft" size={24} />
+          </button>
+        }
         title={
           <span className="flex items-center gap-2">
             Room
@@ -51,8 +50,11 @@ export default function Lobby() {
         <div className="flex shrink-0 flex-col items-center gap-2">
           <QR code={room.code} size={150} />
           <p className="text-[15px] font-semibold text-white/85">Scan to join · tap the code to copy</p>
-          {(situation || know) && (
-            <p className="rounded-full bg-white/15 px-4 py-1.5 text-[14px] font-bold">{[situation, know].filter(Boolean).join(' · ')}</p>
+          {situation && (
+            <p className="line-clamp-2 max-w-full rounded-[18px] bg-white/15 px-4 py-1.5 text-center text-[14px] font-bold">“{situation}”</p>
+          )}
+          {room.mimic && (
+            <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">An AI is hiding among the answers</p>
           )}
         </div>
 

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import SwipeDeck from '../components/SwipeDeck'
+import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, Screen, TextInput, TypingDots } from '../components/ui'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
@@ -109,127 +110,142 @@ function Start({ code, setCode, onCreate, onJoin }: { code: string; setCode: (c:
   )
 }
 
-const SITUATIONS = [
-  { value: 'drinks', label: 'Drinks out', emoji: '🍻' },
-  { value: 'party', label: 'Party', emoji: '🎉' },
-  { value: 'dinner', label: 'Dinner', emoji: '🍕' },
-  { value: 'home', label: 'Chilling at home', emoji: '🛋️' },
-  { value: 'trip', label: 'On a trip', emoji: '🚐' },
-  { value: 'break', label: 'Class or work break', emoji: '☕' },
-] as const
+// Preguntas sí/no del setup (mazo tipo Tinder). Van a `setup` como contexto libre para la IA;
+// `mimic` activa el bot impostor en `settings`.
+const CARDS: SwipeCard[] = [
+  { id: 'know', question: 'Do you all know each other well?', no: 'Not really', yes: 'Besties' },
+  { id: 'adults', question: 'Is everyone over 18?', no: 'No', yes: 'Yes' },
+  { id: 'spicy', question: 'Can the chats get spicy?', no: 'Keep it clean', yes: 'Spicy' },
+  { id: 'mimic', question: 'Let an AI hide among your answers?', hint: 'Vote for it and you lose points.', no: 'No AI', yes: 'Bring it' },
+]
 
-const KNOW = [
-  { value: 'yes', label: 'Yes, we’re close' },
-  { value: 'no', label: 'Not really' },
-] as const
+const MAX_SITUATION = 120
 
 function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?: string; onBack: () => void }) {
   const { game, error } = useGame()
   const [name, setName] = useState('')
-  const [step, setStep] = useState<'name' | 'setup'>('name')
-  const [situation, setSituation] = useState<string | null>(null)
-  const [know, setKnow] = useState<string | null>(null)
+  const [situation, setSituation] = useState('')
+  const [step, setStep] = useState<'name' | 'swipe'>('name')
   const [busy, setBusy] = useState(false)
-  const [nudge, setNudge] = useState<'situation' | 'know' | null>(null)
-  const situationRef = useRef<HTMLDivElement>(null)
-  const knowRef = useRef<HTMLDivElement>(null)
+  const answers = useRef<Record<string, boolean>>({})
   const join = mode === 'join'
 
-  /** Falta una respuesta: llevar a esa pregunta y resaltarla (en móvil puede quedar fuera de pantalla). */
-  const point = (which: 'situation' | 'know') => {
-    setNudge(which)
-    ;(which === 'situation' ? situationRef : knowRef).current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setTimeout(() => setNudge(null), 900)
-  }
-
-  const submit = async () => {
-    if (!name.trim() || busy) return
-    if (join) {
-      setBusy(true)
-      return void game.joinRoom(code, name).finally(() => setBusy(false))
-    }
-    if (step === 'name') return setStep('setup')
-    if (!situation) return point('situation')
-    if (!know) return point('know')
+  const create = async () => {
     setBusy(true)
+    const a = answers.current
     try {
       await game.createRoom(name)
-      await game.saveSetup({ situation, know })
+      await game.saveSetup({
+        ...(situation.trim() && { situation: situation.trim() }),
+        know: a.know ? 'yes' : 'no',
+        adults: a.adults ? 'yes' : 'no',
+        spicy: a.spicy ? 'yes' : 'no',
+        // Con menores, el backend apaga el contenido picante
+        ...(!a.adults && { age: 'mixed' }),
+      })
+      if (a.mimic) await game.updateSettings({ mimic: true })
     } finally {
       setBusy(false)
     }
   }
 
+  const submit = () => {
+    if (!name.trim() || busy) return
+    if (join) {
+      setBusy(true)
+      return void game.joinRoom(code, name).finally(() => setBusy(false))
+    }
+    answers.current = {}
+    setStep('swipe')
+  }
+
+  const back = (
+    <button
+      type="button"
+      onClick={step === 'swipe' ? () => setStep('name') : onBack}
+      className="-ml-2 flex h-[44px] items-center gap-2 px-2 text-[17px] font-extrabold active:scale-95"
+    >
+      <Icon name="arrowLeft" size={20} />
+      Back
+    </button>
+  )
+
+  if (step === 'swipe') {
+    return (
+      <Screen>
+        <AppHeader left={back} />
+        <Body className="gap-6 overflow-x-hidden pt-4">
+          <div className="animate-rise">
+            <Eyebrow>New room · 2/2</Eyebrow>
+            <h1 className="mt-2 text-[36px] leading-[1.05] font-black tracking-[-0.03em]">Quick questions</h1>
+            <p className="mt-2 text-[17px] font-semibold text-white/85">Swipe right for yes, left for no.</p>
+          </div>
+          {busy ? (
+            <div className="flex flex-1 animate-pop flex-col items-center justify-center gap-4">
+              <div className="flex h-[52px] w-[70px] items-center justify-center rounded-full bg-white">
+                <TypingDots />
+              </div>
+              <p className="text-[19px] font-extrabold">Opening your room…</p>
+            </div>
+          ) : (
+            <SwipeDeck
+              cards={CARDS}
+              onAnswer={(id, yes) => {
+                answers.current[id] = yes
+                if (id === CARDS[CARDS.length - 1].id) void create()
+              }}
+            />
+          )}
+          {error && <p className="text-center text-[16px] font-bold">{error}</p>}
+        </Body>
+      </Screen>
+    )
+  }
+
   return (
     <Screen>
-      <AppHeader
-        left={
-          <button
-            type="button"
-            onClick={step === 'setup' ? () => setStep('name') : onBack}
-            className="-ml-2 flex h-[44px] items-center gap-2 px-2 text-[17px] font-extrabold active:scale-95"
-          >
-            <Icon name="arrowLeft" size={20} />
-            Back
-          </button>
-        }
-      />
+      <AppHeader left={back} />
       <form
         className="flex min-h-0 flex-1 flex-col"
         onSubmit={(e) => {
           e.preventDefault()
-          void submit()
+          submit()
         }}
       >
-        {step === 'name' ? (
-          <Body className="gap-6 pt-6">
-            <div className="animate-rise">
-              <Eyebrow>{join ? `Room · ${code}` : 'New room · 1/2'}</Eyebrow>
-              <h1 className="mt-2 text-[40px] leading-[1.05] font-black tracking-[-0.03em]">{join ? 'Join the game' : 'Set up your game'}</h1>
-              <p className="mt-2 text-[18px] font-semibold text-white/85">{join ? 'Pick a name. You’re in.' : 'First, your name.'}</p>
-            </div>
-            <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.1s' }}>
-              <Eyebrow>Your name</Eyebrow>
-              <TextInput placeholder="e.g. Pol" maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <Body className="gap-5 pt-4">
+          <div className="animate-rise">
+            <Eyebrow>{join ? `Room · ${code}` : 'New room · 1/2'}</Eyebrow>
+            <h1 className="mt-2 text-[40px] leading-[1.05] font-black tracking-[-0.03em]">{join ? 'Join the game' : 'Set up your game'}</h1>
+            <p className="mt-2 text-[18px] font-semibold text-white/85">
+              {join ? 'Pick a name. You’re in.' : 'The AI writes your group chats from this.'}
+            </p>
+          </div>
+
+          <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.1s' }}>
+            <Eyebrow>Your name</Eyebrow>
+            <TextInput placeholder="e.g. Pol" maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          </label>
+
+          {!join && (
+            <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.2s' }}>
+              <span className="flex items-baseline justify-between">
+                <Eyebrow>What’s going on right now?</Eyebrow>
+                <span className="text-[13px] font-bold text-white/60 tabular-nums">
+                  {situation.length}/{MAX_SITUATION}
+                </span>
+              </span>
+              <textarea
+                rows={4}
+                maxLength={MAX_SITUATION}
+                value={situation}
+                onChange={(e) => setSituation(e.target.value)}
+                placeholder="Friday drinks at Pol’s flat. Someone just spilled wine on the sofa…"
+                className="w-full resize-none rounded-[28px] bg-white px-6 py-4 text-[17px] leading-snug font-semibold text-ink outline-none placeholder:font-medium placeholder:text-neutral-400"
+              />
+              <span className="text-[14px] font-semibold text-white/70">Where you are, who’s there, what just happened.</span>
             </label>
-          </Body>
-        ) : (
-          <Body className="gap-6 pt-4">
-            <div className="animate-rise">
-              <Eyebrow>New room · 2/2</Eyebrow>
-              <h1 className="mt-2 text-[36px] leading-[1.05] font-black tracking-[-0.03em]">What are you up to?</h1>
-              <p className="mt-2 text-[17px] font-semibold text-white/85">The chats will match the moment.</p>
-            </div>
-
-            <div
-              ref={situationRef}
-              className={`grid animate-rise grid-cols-2 gap-2.5 rounded-[26px] transition ${nudge === 'situation' ? 'animate-nudge ring-4 ring-white' : ''}`}
-              style={{ animationDelay: '0.05s' }}
-            >
-              {SITUATIONS.map((s) => (
-                <Choice key={s.value} selected={situation === s.value} onClick={() => setSituation(s.value)}>
-                  <span className="text-[26px] leading-none">{s.emoji}</span>
-                  <span className="text-[16px] leading-tight font-extrabold">{s.label}</span>
-                </Choice>
-              ))}
-            </div>
-
-            <div
-              ref={knowRef}
-              className={`flex animate-rise scroll-mb-32 flex-col gap-2.5 rounded-[26px] transition ${nudge === 'know' ? 'animate-nudge ring-4 ring-white ring-offset-4 ring-offset-brand' : ''}`}
-              style={{ animationDelay: '0.1s' }}
-            >
-              <Eyebrow>Do you know each other?</Eyebrow>
-              <div className="grid grid-cols-2 gap-2.5">
-                {KNOW.map((k) => (
-                  <Choice key={k.value} selected={know === k.value} onClick={() => setKnow(k.value)} className="min-h-[60px] items-center justify-center text-center">
-                    <span className="text-[17px] leading-tight font-extrabold">{k.label}</span>
-                  </Choice>
-                ))}
-              </div>
-            </div>
-          </Body>
-        )}
+          )}
+        </Body>
 
         <Footer>
           {error && <p className="text-center text-[16px] font-bold">{error}</p>}
@@ -237,41 +253,14 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
             <Button type="submit" variant="ink" disabled={!name.trim() || busy}>
               Join room
             </Button>
-          ) : step === 'name' ? (
+          ) : (
             <Button type="submit" disabled={!name.trim()} className="flex items-center justify-center gap-3">
               Next
               <Icon name="arrowRight" size={22} />
             </Button>
-          ) : (
-            <>
-              {(!situation || !know) && (
-                <p className="text-center text-[15px] font-semibold text-white/85">
-                  {!situation ? 'Pick what you’re up to' : 'One more: do you know each other?'}
-                </p>
-              )}
-              <Button type="submit" disabled={busy} className={!situation || !know ? 'opacity-70' : ''}>
-                {busy ? 'Creating…' : 'Create room'}
-              </Button>
-            </>
           )}
         </Footer>
       </form>
     </Screen>
-  )
-}
-
-/** Botón grande de opción: rojo claro sin elegir, blanco con texto rojo al elegirlo. */
-function Choice({ selected, onClick, children, className = '' }: { selected: boolean; onClick: () => void; children: ReactNode; className?: string }) {
-  return (
-    <button
-      type="button"
-      aria-pressed={selected}
-      onClick={onClick}
-      className={`flex min-h-[84px] flex-col items-start justify-between gap-2 rounded-[22px] p-4 text-left transition active:scale-[0.97] ${
-        selected ? 'bg-white text-brand shadow-[0_6px_0_rgba(0,0,0,0.18)]' : 'bg-white/15 text-white'
-      } ${className}`}
-    >
-      {children}
-    </button>
   )
 }

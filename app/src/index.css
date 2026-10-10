@@ -11,6 +11,9 @@
   --animate-pop: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   --animate-rise: rise 0.4s ease-out both;
   --animate-nudge: nudge 0.45s ease-in-out both;
+  --animate-unfold: unfold 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  --animate-flip: flip 0.55s cubic-bezier(0.3, 1.2, 0.5, 1) both;
+  --animate-panda: panda 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 
 @keyframes pop {
@@ -20,6 +23,30 @@
 @keyframes rise {
   from { transform: translateY(14px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+/* Papel doblado por la mitad que se despliega (tarjetas del setup) */
+@keyframes unfold {
+  0% { transform: perspective(900px) rotateX(-88deg) scale(0.92); opacity: 0; }
+  45% { opacity: 1; }
+  100% { transform: perspective(900px) rotateX(0) scale(1); opacity: 1; }
+}
+@keyframes crease {
+  0% { opacity: 0.55; }
+  100% { opacity: 0; }
+}
+/* Tarjeta que se gira para revelar (resultado) */
+@keyframes flip {
+  0% { transform: perspective(700px) rotateY(90deg); opacity: 0.2; }
+  100% { transform: perspective(700px) rotateY(0); opacity: 1; }
+}
+/* Panda que asoma desde abajo */
+@keyframes panda {
+  from { transform: translateY(120%); }
+  to { transform: translateY(0); }
+}
+@keyframes bob {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
 }
 @keyframes typing {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }

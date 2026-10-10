@@ -1,5 +1,11 @@
-import { Avatar, AwardCard, Body, Footer, Row, Screen, TopBar, TopNote } from '../components/ui'
+import { useEffect, useState } from 'react'
+import PandaHost from '../components/Panda'
+import { Avatar, AwardCard, Footer, Icon, Screen, TopBar, TopNote } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
+import { MIMIC_AUTHOR_ID } from '../game/types'
+import type { Player, Room } from '../game/types'
+
+const LETTERS = 'ABCDEF'
 
 export function Reveal() {
   const { room, me } = useGame()
@@ -8,98 +14,162 @@ export function Reveal() {
   const result = room.result
   const writer = room.players.find((p) => p.id === room.chat!.writerId)!
   const real = result.answers.find((a) => a.isReal)!
-  const fakes = result.answers.filter((a) => !a.isReal).sort((a, b) => b.voterIds.length - a.voterIds.length)
-  const fooled = fakes.reduce((n, a) => n + a.voterIds.length, 0)
-  const nameOf = (id: string) => (id === me.id ? 'you' : (room.players.find((p) => p.id === id)?.name ?? '?'))
+  const fooled = result.answers.filter((a) => !a.isReal).reduce((n, a) => n + a.voterIds.length, 0)
+  const playerOf = (id: string) => room.players.find((p) => p.id === id)
+  const nameOf = (id: string) => (id === me.id ? 'You' : (playerOf(id)?.name ?? '?'))
   const myPoints = result.points[me.id] ?? 0
 
   return (
     <Screen>
       <TopBar title={`The real ${writer.name} said…`} right={<TopNote>Round {room.roundIndex + 1}</TopNote>} />
-      <Body className="gap-3 pt-5">
-        <div className="animate-pop rounded-[28px] bg-ink px-6 py-5 text-white">
-          <div className="text-[14px] font-extrabold tracking-[0.14em] text-good">REAL · {writer.name.toUpperCase()}</div>
-          <p className="mt-1 text-[26px] leading-tight font-black">{real.text}</p>
-          <p className="mt-2 text-[15px] font-semibold text-white/60">
-            {real.voterIds.length ? `Spotted by ${real.voterIds.map(nameOf).join(', ')}` : 'Nobody spotted it'}
-          </p>
-        </div>
 
-        <div className="animate-pop py-2 text-center text-[40px] leading-none font-black tracking-[-0.03em]" style={{ animationDelay: '0.35s' }}>
-          {fooled === 0 ? 'Nobody fooled' : `${fooled} fooled!`}
-        </div>
-
-        {fakes.map((a, i) => (
-          <div
-            key={a.id}
-            className="flex animate-rise items-center gap-4 rounded-[24px] bg-white px-5 py-3.5 text-ink"
-            style={{ animationDelay: `${0.6 + i * 0.12}s` }}
-          >
-            <div className="min-w-0 flex-1">
-              <p className="text-[18px] leading-snug font-semibold">{a.text}</p>
-              <p className="text-[14px] font-bold text-neutral-400">by {nameOf(a.authorId)}</p>
-            </div>
-            <div className={`shrink-0 text-center leading-none ${a.voterIds.length ? 'text-ink' : 'text-neutral-300'}`}>
-              <div className="text-[26px] font-black tabular-nums">{a.voterIds.length}</div>
-              <div className="text-[12px] font-bold">{a.voterIds.length === 1 ? 'vote' : 'votes'}</div>
-            </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-3">
+        <div className="flex shrink-0 animate-pop items-center justify-between gap-3">
+          <div className="min-w-0 text-[32px] leading-none font-black tracking-[-0.03em] whitespace-nowrap">
+            {real.voterIds.length === 0 ? 'Nobody got it' : fooled === 0 ? 'Too easy' : `${fooled} fooled`}
           </div>
-        ))}
-      </Body>
-      <Footer>
-        <div className="flex animate-rise items-center justify-between rounded-full bg-white/15 px-6 py-3" style={{ animationDelay: '1s' }}>
-          <span className="text-[17px] font-extrabold">Your points</span>
-          <span className="text-[22px] font-black tabular-nums">+{myPoints}</span>
+          <div className={`shrink-0 rounded-full px-4 py-2 text-[18px] font-black tabular-nums ${myPoints ? 'bg-white text-good' : 'bg-white/15 text-white'}`}>
+            You +{myPoints}
+          </div>
         </div>
+
+        {/* Mismas tarjetas y mismo orden que en la votación; se giran para revelar */}
+        <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+          {result.answers.map((a, i) => {
+            const bot = a.isBot || a.authorId === MIMIC_AUTHOR_ID
+            const tone = a.isReal ? 'bg-good text-white' : bot ? 'bg-ink text-white' : 'bg-white text-ink'
+            const voters = a.voterIds.map(playerOf).filter(Boolean) as Player[]
+            return (
+              <div key={a.id} className="flex max-h-[96px] min-h-[58px] flex-1 basis-0 animate-flip" style={{ animationDelay: `${0.25 + i * 0.18}s` }}>
+                <div className={`flex w-full items-center gap-3.5 rounded-[22px] px-4 ${tone}`}>
+                  <span
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-full text-[14px] font-black ${
+                      a.isReal ? 'bg-white text-good' : bot ? 'bg-white text-ink' : 'bg-neutral-100 text-neutral-500'
+                    }`}
+                  >
+                    {a.isReal ? <Icon name="check" size={18} /> : bot ? 'AI' : LETTERS[i]}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-1 text-[17px] leading-snug font-semibold">{a.text}</p>
+                    <p className={`text-[13px] font-extrabold ${a.isReal || bot ? 'text-white/80' : 'text-neutral-400'}`}>
+                      {a.isReal ? `REAL · ${writer.name}` : bot ? 'MIMIC · the AI' : `by ${nameOf(a.authorId)}`}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center">
+                    {voters.length === 0 ? (
+                      <span className={`text-[13px] font-bold ${a.isReal || bot ? 'text-white/60' : 'text-neutral-300'}`}>no votes</span>
+                    ) : (
+                      <div className="flex -space-x-2">
+                        {voters.slice(0, 4).map((v) => (
+                          <Avatar key={v.id} player={v} size={26} ring />
+                        ))}
+                        {voters.length > 4 && (
+                          <span className="flex size-[26px] items-center justify-center rounded-full bg-neutral-200 text-[12px] font-black text-ink ring-[3px] ring-white">
+                            +{voters.length - 4}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      <Footer className="pt-1">
         <AwardCard>{result.award}</AwardCard>
       </Footer>
     </Screen>
   )
 }
 
+/** Frase del panda según cómo va la partida. */
+function pandaLine(room: Room, meId: string | undefined, leadChanged: boolean, now: Player[]): string {
+  const name = (p: Player) => (p.id === meId ? 'You' : p.name)
+  const obj = (p: Player) => (p.id === meId ? 'you' : p.name)
+  const result = room.result
+  const writer = room.players.find((p) => p.id === room.chat?.writerId)
+  const real = result?.answers.find((a) => a.isReal)
+  const voters = room.players.length - 1
+  const lastNext = room.roundIndex + 2 === room.totalRounds
+  const finished = room.roundIndex + 1 >= room.totalRounds
+
+  if (leadChanged) return `${name(now[0])} just stole first place!`
+  if (writer && real && real.voterIds.length === 0) return `Nobody recognised ${writer.name}. Do you even know each other?`
+  if (writer && real && voters > 1 && real.voterIds.length === voters) return `Too easy. ${writer.name}, be less predictable.`
+  const bot = result?.answers.find((a) => a.isBot)
+  if (bot && bot.voterIds.length > 0) return `The AI fooled ${bot.voterIds.length} of you. Embarrassing.`
+  const liar = result?.answers.filter((a) => !a.isReal && !a.isBot).sort((a, b) => b.voterIds.length - a.voterIds.length)[0]
+  const liarPlayer = liar && room.players.find((p) => p.id === liar.authorId)
+  if (liar && liarPlayer && liar.voterIds.length >= 2) return `${name(liarPlayer)} fooled ${liar.voterIds.length} people. Should we be worried?`
+  if (finished) return `That’s it. ${name(now[0])} takes the crown.`
+  if (lastNext) return 'Last round. Everything can still change.'
+  if (now[1] && now[0].score - now[1].score <= 200) return `Only ${now[0].score - now[1].score} points between ${name(now[0])} and ${obj(now[1])}.`
+  return `${name(now[0])} is running away with it.`
+}
+
+const ROW = 72 // alto de fila + hueco, para recolocar con animación
+
 export function Leaderboard() {
   const { room, me } = useGame()
   const seconds = useCountdown(room?.phaseEndsAt ?? null)
+  // Primero se pintan en el orden de antes de la ronda; luego se recolocan y las barras crecen.
+  const [settled, setSettled] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => setSettled(true), 350)
+    return () => clearTimeout(id)
+  }, [])
   if (!room) return null
 
-  const ranking = [...room.players].sort((a, b) => b.score - a.score)
-  const top = Math.max(1, ranking[0]?.score ?? 1)
-  // Posición antes de esta ronda, para las flechas ▲/▼
   const earned = room.result?.points ?? {}
-  const before = Object.fromEntries(
-    [...room.players].sort((a, b) => b.score - (earned[b.id] ?? 0) - (a.score - (earned[a.id] ?? 0))).map((p, i) => [p.id, i]),
-  )
+  const prevScore = (p: Player) => p.score - (earned[p.id] ?? 0)
+  const now = [...room.players].sort((a, b) => b.score - a.score)
+  const before = [...room.players].sort((a, b) => prevScore(b) - prevScore(a))
+  const top = Math.max(1, now[0]?.score ?? 1)
+  const order = settled ? now : before
 
   return (
     <Screen>
-      <TopBar title="Leaderboard" right={<TopNote>after round {room.roundIndex + 1}</TopNote>} />
-      <Body className="gap-3 pt-5">
-        {ranking.map((p, i) => {
-          const moved = before[p.id] - i
+      <TopBar
+        title="Standings"
+        subtitle={`After round ${room.roundIndex + 1} of ${room.totalRounds}`}
+        right={<TopNote>{room.roundIndex + 1 >= room.totalRounds ? 'Final' : `Next in ${seconds}`}</TopNote>}
+      />
+
+      <div className="relative mx-5 mt-5 shrink-0" style={{ height: now.length * ROW }}>
+        {now.map((p) => {
+          const pos = order.findIndex((x) => x.id === p.id)
+          const rank = now.findIndex((x) => x.id === p.id)
+          const score = settled ? p.score : prevScore(p)
+          const gained = earned[p.id] ?? 0
           return (
-            <Row key={p.id} className="min-h-[76px] animate-rise" style={{ animationDelay: `${i * 0.1}s` }}>
-              <b className="w-5 text-center text-[20px]">{i + 1}</b>
-              <Avatar player={p} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[20px] leading-tight font-extrabold">{p.id === me?.id ? 'You' : p.name}</div>
-                <div className="mt-1 h-[7px] rounded-full bg-neutral-100">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-1000 ease-out"
-                    style={{ background: p.color, width: `${Math.max(6, (p.score / top) * 100)}%` }}
-                  />
+            <div
+              key={p.id}
+              className="absolute inset-x-0 flex h-[60px] items-center gap-3 transition-[top] duration-700 ease-[cubic-bezier(0.3,1.3,0.5,1)]"
+              style={{ top: pos * ROW }}
+            >
+              <span className="w-6 shrink-0 text-center text-[24px] font-black tabular-nums">{rank + 1}</span>
+              <div className="relative h-full min-w-0 flex-1 overflow-hidden rounded-full bg-white/15">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-1000 ease-out"
+                  style={{ background: p.color, width: `${Math.max(16, (score / top) * 100)}%` }}
+                />
+                <div className="relative flex h-full items-center gap-2.5 pr-4 pl-1.5 [text-shadow:0_1px_2px_rgba(0,0,0,0.25)]">
+                  <Avatar player={p} size={46} ring />
+                  <span className="min-w-0 flex-1 truncate text-[18px] font-extrabold">{p.id === me?.id ? 'You' : p.name}</span>
+                  {settled && gained > 0 && <span className="animate-pop text-[14px] font-extrabold text-white/85">+{gained}</span>}
+                  <span className="text-[19px] font-black tabular-nums">{score.toLocaleString('en')}</span>
                 </div>
               </div>
-              <b className="text-[20px] tabular-nums">{p.score.toLocaleString('en')}</b>
-              <span className={`w-7 text-[15px] font-bold ${moved > 0 ? 'text-good' : moved < 0 ? 'text-brand' : 'text-neutral-400'}`}>
-                {moved > 0 ? `▲${moved}` : moved < 0 ? `▼${-moved}` : '—'}
-              </span>
-            </Row>
+            </div>
           )
         })}
-      </Body>
-      <p className="shrink-0 pb-8 text-center text-[18px] font-bold">
-        {room.roundIndex + 1 >= room.totalRounds ? 'Final results' : 'Next round'} in {seconds}…
-      </p>
+      </div>
+
+      <div className="flex-1" />
+      <PandaHost text={pandaLine(room, me?.id, before[0] && prevScore(before[0]) > 0 && before[0].id !== now[0]?.id, now)} />
     </Screen>
   )
 }
