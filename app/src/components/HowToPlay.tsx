@@ -6,12 +6,25 @@
  * desde el botón "Cómo jugar" de la portada. Se recuerda en localStorage y en una cookie.
  */
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { useLang, useT } from '../i18n'
 import { Icon } from './ui'
 
 const SEEN_KEY = 'typing.howto.seen'
 const SHOTS = ['chat', 'vote', 'reveal', 'standings'] as const
+
+/**
+ * Encuadre de cada página según lo que explica:
+ * - full: el iPhone entero (se ve la pantalla completa).
+ * - zoom: el iPhone muy grande, centrado en una zona (focus = fracción del alto del móvil) y fundido arriba y abajo.
+ */
+type Frame = { mode: 'full'; tilt: number } | { mode: 'zoom'; focus: number; tilt: number }
+const FRAMES: Frame[] = [
+  { mode: 'full', tilt: -3 }, // chat: todo el chat y la respuesta a medio escribir
+  { mode: 'zoom', focus: 0.3, tilt: 2 }, // votación: las opciones
+  { mode: 'zoom', focus: 0.27, tilt: -2 }, // revelación: titular y resultados
+  { mode: 'full', tilt: 3 }, // clasificación: barras y panda
+]
+const PHONE_RATIO = 2.2 // alto / ancho del iPhone dibujado (marco + barra de estado + captura)
 const SWIPE = 50 // px de deslizamiento para cambiar de página
 
 const COOKIE = 'typing_seen=1'
@@ -139,14 +152,24 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
           className="flex min-h-0 flex-1 flex-col"
           style={{ animation: `${dir === 1 ? 'howto-in-right' : 'howto-in-left'} 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both` }}
         >
-          {/* Móvil grande "con zoom": se ve la parte de arriba de la pantalla y el resto se funde con el fondo */}
           <div className="relative min-h-0 flex-1 overflow-hidden">
-            <div className="flex justify-center px-8 pt-5">
-              <div className="w-[min(78vw,330px)]">
-                <Phone src={`/howto/${lang}-${SHOTS[page]}.webp`} style={{ rotate: page % 2 ? '2.5deg' : '-2.5deg' }} />
+            {FRAMES[page].mode === 'full' ? (
+              <div className="flex h-full items-center justify-center px-8 py-4">
+                <IPhone src={`/howto/${lang}-${SHOTS[page]}.webp`} tilt={FRAMES[page].tilt} className="h-full max-h-[540px]" />
               </div>
-            </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-ink via-ink/80 to-transparent" />
+            ) : (
+              <>
+                {/* Zoom: el móvil más ancho que la pantalla, desplazado para que la zona clave quede en el centro */}
+                <div
+                  className="absolute left-1/2 w-[min(108vw,430px)] -translate-x-1/2"
+                  style={{ top: `calc(50% - ${(FRAMES[page] as { focus: number }).focus * PHONE_RATIO} * min(108vw, 430px))` }}
+                >
+                  <IPhone src={`/howto/${lang}-${SHOTS[page]}.webp`} tilt={FRAMES[page].tilt} className="w-full" />
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-ink to-transparent" />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink via-ink/80 to-transparent" />
+              </>
+            )}
           </div>
           <div className="shrink-0 px-6 pt-2 text-center">
             <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
@@ -177,14 +200,47 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
   )
 }
 
-/** Captura del juego dentro de un marco de móvil. */
-function Phone({ src, className = '', style }: { src: string; className?: string; style?: CSSProperties }) {
+/**
+ * iPhone dibujado alrededor de la captura: marco negro, Dynamic Island, barra de estado (9:41, cobertura, wifi, batería)
+ * y botones laterales. Todo escala con el ancho del móvil (unidades cqw).
+ */
+function IPhone({ src, tilt = 0, className = '' }: { src: string; tilt?: number; className?: string }) {
   return (
-    <div
-      className={`relative w-full overflow-hidden rounded-[38px] border-[8px] border-[#2B2B2B] bg-brand shadow-[0_24px_60px_rgba(0,0,0,0.55)] ${className}`}
-      style={{ aspectRatio: '450 / 975', ...style }}
-    >
-      <img src={src} alt="" draggable={false} className="pointer-events-none size-full object-cover object-top" />
+    <div className={`@container relative ${className}`} style={{ aspectRatio: `1 / ${PHONE_RATIO}`, rotate: `${tilt}deg` }}>
+      {/* Botones laterales */}
+      <span className="absolute top-[17%] -left-[1.1cqw] h-[6%] w-[1.6cqw] rounded-l-[1cqw] bg-[#2A2A2A]" />
+      <span className="absolute top-[25%] -left-[1.1cqw] h-[9%] w-[1.6cqw] rounded-l-[1cqw] bg-[#2A2A2A]" />
+      <span className="absolute top-[35%] -left-[1.1cqw] h-[9%] w-[1.6cqw] rounded-l-[1cqw] bg-[#2A2A2A]" />
+      <span className="absolute top-[28%] -right-[1.1cqw] h-[14%] w-[1.6cqw] rounded-r-[1cqw] bg-[#2A2A2A]" />
+      {/* Marco */}
+      <div className="absolute inset-0 rounded-[15cqw] bg-[#0B0B0B] p-[3.4cqw] shadow-[0_30px_70px_rgba(0,0,0,0.6)] ring-1 ring-white/10">
+        <div className="relative flex h-full flex-col overflow-hidden rounded-[11.6cqw] bg-white">
+          {/* Barra de estado + Dynamic Island */}
+          <div className="relative flex h-[12cqw] shrink-0 items-center justify-between px-[7cqw] text-[4.2cqw] font-bold text-black">
+            <span className="tabular-nums">9:41</span>
+            <span className="absolute top-[2.6cqw] left-1/2 h-[7.6cqw] w-[28cqw] -translate-x-1/2 rounded-full bg-black" />
+            <span className="flex items-center gap-[1.3cqw]">
+              <svg viewBox="0 0 18 12" className="h-[3.3cqw]" aria-hidden="true">
+                <rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor" />
+                <rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor" />
+                <rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor" />
+                <rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor" />
+              </svg>
+              <svg viewBox="0 0 16 12" className="h-[3.3cqw]" aria-hidden="true">
+                <path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0L8 11.5ZM3.4 6.8a6.5 6.5 0 0 1 9.2 0l-1.4 1.4a4.5 4.5 0 0 0-6.4 0L3.4 6.8ZM1 4.4a9.9 9.9 0 0 1 14 0l-1.4 1.4a7.9 7.9 0 0 0-11.2 0L1 4.4Z" fill="currentColor" />
+              </svg>
+              <svg viewBox="0 0 27 13" className="h-[3.5cqw]" aria-hidden="true">
+                <rect x="0.5" y="0.5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" strokeOpacity="0.4" />
+                <rect x="2.5" y="2.5" width="17" height="8" rx="2" fill="currentColor" />
+                <path d="M25 4.5v4a2 2 0 0 0 0-4Z" fill="currentColor" fillOpacity="0.4" />
+              </svg>
+            </span>
+          </div>
+          <img src={src} alt="" draggable={false} className="pointer-events-none min-h-0 w-full flex-1 object-cover object-top" />
+          {/* Barra de inicio */}
+          <span className="absolute bottom-[1.6cqw] left-1/2 h-[1.3cqw] w-[34cqw] -translate-x-1/2 rounded-full bg-black/80" />
+        </div>
+      </div>
     </div>
   )
 }
