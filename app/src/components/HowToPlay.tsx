@@ -1,5 +1,5 @@
 /**
- * "Cómo se juega": pantalla completa con 4 páginas que se pasan una a una (botón, deslizar o ← →).
+ * "Cómo se juega": pantalla completa con 4 páginas en fila que se pasan deslizando a los lados (o botón / ← →).
  * Cada página enseña una captura REAL del juego (app/public/howto/{es|en}-*.webp, sacadas de una partida de verdad)
  * dentro de un móvil, con un título y una frase.
  * Sale solo la primera vez que alguien entra en la web, por donde entre (portada o enlace/QR de una sala), y luego
@@ -12,8 +12,6 @@ import { Icon } from './ui'
 
 const SEEN_KEY = 'typing.howto.seen'
 const SHOTS = ['chat', 'vote', 'reveal', 'standings'] as const
-const SWIPE = 70 // px para que la carta salga volando
-const FLY_MS = 300
 
 const COOKIE = 'typing_seen=1'
 
@@ -59,54 +57,24 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
   const lang = useLang()
   const pages = t.howPages
   const [page, setPage] = useState(0)
-  const [dir, setDir] = useState<1 | -1>(1)
   const [leaving, setLeaving] = useState(false)
-  const startX = useRef<number | null>(null)
-  const [dx, setDx] = useState(0)
-  const [dragging, setDragging] = useState(false)
-  const [flying, setFlying] = useState<0 | 1 | -1>(0)
+  const pager = useRef<HTMLDivElement>(null)
   const last = page === pages.length - 1
-  const offset = flying ? flying * 640 : dx
-
-  /** La carta sale volando hacia ese lado y entra la siguiente (en la última, se cierra y a jugar). */
-  const fly = (side: 1 | -1) => {
-    setFlying(side)
-    navigator.vibrate?.(12)
-    setTimeout(() => {
-      setFlying(0)
-      setDx(0)
-      if (last) close()
-      else {
-        setDir(1)
-        setPage((p) => p + 1)
-      }
-    }, FLY_MS)
-  }
 
   useEffect(markSeen, [])
 
-  // Precargar las 4 capturas para que el paso de página sea instantáneo
-  useEffect(() => {
-    SHOTS.forEach((s) => {
-      const img = new Image()
-      img.src = `/howto/${lang}-${s}.webp`
-    })
-  }, [lang])
-
   const close = () => {
     if (leaving) return
-    markSeen()
     setLeaving(true)
     setTimeout(onClose, 250)
   }
+  /** Ir a una página: el carrusel se desplaza solo (el dedo hace lo mismo deslizando). */
   const go = (to: number) => {
-    if (to < 0 || to >= pages.length || to === page) return
-    setDir(to > page ? 1 : -1)
-    setPage(to)
+    const el = pager.current
+    if (!el || to < 0 || to >= pages.length) return
+    el.scrollTo({ left: to * el.clientWidth, behavior: 'smooth' })
   }
-  const next = () => {
-    if (!flying) fly(-1) // el botón y → también tiran la carta
-  }
+  const next = () => (last ? close() : go(page + 1))
 
   // Teclado: ← → para pasar, Esc para cerrar
   const keys = useRef({ next, prev: () => go(page - 1), close })
@@ -147,71 +115,34 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      {/* Capturas como cartas de Tinder: la de arriba sigue al dedo y, si la sueltas lejos, sale volando y entra la siguiente,
-          que ya asoma detrás. La primera hace un amago para enseñar el gesto. */}
-      <div className="relative min-h-0 flex-1 px-6 py-3 select-none">
-        {page + 1 < pages.length && (
-          <div className="absolute inset-0 flex items-center justify-center px-6 py-3" aria-hidden="true">
-            <Phone src={`/howto/${lang}-${SHOTS[page + 1]}.webp`} className="scale-[0.9] opacity-50" style={{ rotate: page % 2 ? '-3deg' : '3deg' }} />
-          </div>
-        )}
-        <div
-          className="absolute inset-0 flex touch-none items-center justify-center px-6 py-3"
-          onPointerDown={(e) => {
-            if (flying) return
-            startX.current = e.clientX
-            setDragging(true)
-            e.currentTarget.setPointerCapture(e.pointerId)
-          }}
-          onPointerMove={(e) => {
-            if (startX.current !== null) setDx(e.clientX - startX.current)
-          }}
-          onPointerUp={() => {
-            if (startX.current === null) return
-            startX.current = null
-            setDragging(false)
-            if (Math.abs(dx) > SWIPE) fly(dx > 0 ? 1 : -1)
-            else setDx(0)
-          }}
-          onPointerCancel={() => {
-            startX.current = null
-            setDragging(false)
-            setDx(0)
-          }}
-        >
-          <div
-            key={page}
-            className="h-full max-h-[480px]"
-            style={{
-              transform: `translateX(${offset}px) rotate(${offset / 18}deg)`,
-              transition: dragging ? 'none' : `transform ${FLY_MS}ms cubic-bezier(0.3, 0.8, 0.4, 1)`,
-            }}
-          >
-            <div
-              className="h-full"
-              style={{
-                animation: `${dir === 1 ? 'howto-in-right' : 'howto-in-left'} 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both${
-                  page === 0 && !dragging && !dx ? ', swipe-hint 1.4s ease-in-out 1.6s 2' : ''
-                }`,
-              }}
-            >
-              <Phone src={`/howto/${lang}-${SHOTS[page]}.webp`} style={{ rotate: page % 2 ? '2deg' : '-2deg' }} />
+      {/* Páginas en fila: se pasan deslizando el dedo a un lado u otro, como pestañas (scroll-snap nativo) */}
+      <div
+        ref={pager}
+        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={(e) => {
+          const el = e.currentTarget
+          const i = Math.round(el.scrollLeft / el.clientWidth)
+          if (i !== page) setPage(Math.max(0, Math.min(pages.length - 1, i)))
+        }}
+      >
+        {pages.map((p, i) => (
+          <section key={p.title} className="flex w-full shrink-0 snap-center snap-always flex-col" aria-hidden={i !== page}>
+            <div className="flex min-h-0 flex-1 items-center justify-center px-6 py-3">
+              <Phone src={`/howto/${lang}-${SHOTS[i]}.webp`} style={{ rotate: i % 2 ? '2deg' : '-2deg' }} />
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Texto de la página */}
-      <div key={`text-${page}`} className="shrink-0 animate-rise px-6 text-center">
-        <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
-          {page + 1} / {pages.length}
-        </div>
-        <h2 id="howto-title" className="mt-1 text-[32px] leading-[1.05] font-black tracking-[-0.03em] [@media(max-height:700px)]:text-[27px]">
-          {pages[page].title}
-        </h2>
-        <p className="mx-auto mt-2 min-h-[48px] max-w-[330px] text-[17px] leading-snug font-semibold text-white/75 [@media(max-height:700px)]:text-[15px]">
-          {pages[page].body}
-        </p>
+            <div className="shrink-0 px-6 text-center">
+              <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
+                {i + 1} / {pages.length}
+              </div>
+              <h2 id={i === page ? 'howto-title' : undefined} className="mt-1 text-[32px] leading-[1.05] font-black tracking-[-0.03em] [@media(max-height:700px)]:text-[27px]">
+                {p.title}
+              </h2>
+              <p className="mx-auto mt-2 min-h-[48px] max-w-[330px] text-[17px] leading-snug font-semibold text-white/75 [@media(max-height:700px)]:text-[15px]">
+                {p.body}
+              </p>
+            </div>
+          </section>
+        ))}
       </div>
 
       <div className="shrink-0 px-5 pt-3 pb-6">
