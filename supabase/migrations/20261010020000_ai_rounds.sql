@@ -8,6 +8,7 @@
 -- Cualquier problema al pedir la generación (vault sin configurar, pg_net…) => respaldo, nunca rompe la partida.
 -- Si nada contesta, el temporizador de `generating` (12 s) ya ponía el respaldo (migración 2).
 --
+-- Idempotente (create or replace): se aplicó con `supabase db query` y se puede volver a ejecutar.
 -- Configuración fuera de la migración (no es código y el secreto no se versiona), en Vault:
 --   generate_round_url    = https://<ref>.supabase.co/functions/v1/generate-round
 --   generate_round_secret = el mismo valor que el secreto GENERATE_ROUND_SECRET de la función
@@ -18,7 +19,7 @@ create extension if not exists pg_net;
 
 -- GenerateRoundInput (ver core.ts) para una ronda. Historial: rondas anteriores con respuestas;
 -- votos y 😂 solo de las ya puntuadas (la N+1 se pide al empezar la votación de la N).
-create function game.ai_round_input(p_round_id uuid) returns jsonb
+create or replace function game.ai_round_input(p_round_id uuid) returns jsonb
 language plpgsql stable set search_path = ''
 as $$
 declare
@@ -110,7 +111,7 @@ end $$;
 -- ───────────────────────── Respuesta de la función ─────────────────────────
 
 -- Respaldo inmediato si la ronda sigue esperando; si la sala está parada en `generating` por ella, arranca.
-create function game.ai_fallback_now(p_room game.rooms, p_round game.rounds) returns void
+create or replace function game.ai_fallback_now(p_room game.rooms, p_round game.rounds) returns void
 language plpgsql set search_path = ''
 as $$
 begin
@@ -121,7 +122,7 @@ begin
   end if;
 end $$;
 
-create function public.ai_complete_round(p_round_id uuid, p_result jsonb) returns text
+create or replace function public.ai_complete_round(p_round_id uuid, p_result jsonb) returns text
 language plpgsql security definer set search_path = ''
 as $$
 declare
@@ -160,11 +161,16 @@ begin
     return 'invalid';
   end if;
 
-  -- La memoria se aprende aunque la ronda llegue tarde; nunca se sustituye por una más antigua.
+  -- La memoria se aprende aunque la ronda llegue tarde y nunca se sustituye por una más antigua de la misma
+  -- partida. Con play_again la sala conserva la memoria (mismos jugadores) pero la numeración vuelve a 1:
+  -- `game_started_at` distingue la partida.
   if jsonb_typeof(p_result -> 'memory') = 'object'
-     and coalesce((p_result -> 'memory' ->> 'updated_round')::int, 0)
-         >= coalesce((v_room.memory ->> 'updated_round')::int, 0) then
-    update game.rooms set memory = p_result -> 'memory' where id = v_room_id;
+     and (coalesce(v_room.memory ->> 'game_started_at', '') is distinct from coalesce(v_room.started_at::text, '')
+          or coalesce((p_result -> 'memory' ->> 'updated_round')::int, 0)
+             >= coalesce((v_room.memory ->> 'updated_round')::int, 0)) then
+    update game.rooms
+       set memory = (p_result -> 'memory') || jsonb_build_object('game_started_at', coalesce(v_room.started_at::text, ''))
+     where id = v_room_id;
   end if;
 
   if v_round.status <> 'generating' then return 'late'; end if; -- ya se usó el respaldo
@@ -183,7 +189,7 @@ begin
   return 'ok';
 end $$;
 
-create function public.ai_fail_round(p_round_id uuid, p_status text, p_error text) returns text
+create or replace function public.ai_fail_round(p_round_id uuid, p_status text, p_error text) returns text
 language plpgsql security definer set search_path = ''
 as $$
 declare

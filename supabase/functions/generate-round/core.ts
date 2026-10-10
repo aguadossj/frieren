@@ -23,6 +23,9 @@ export interface Setup {
   age?: string | null // under_18 | 18_24 | 25_34 | 35_plus | mixed
   vibes?: string[] | null // spicy | exes | ethics | uni | work | chaos
   topic?: string | null // texto libre ≤ 120
+  situation?: string | null // pantalla de crear sala: drinks | party | dinner | home | trip | break
+  know?: string | null // "¿os conocéis?": yes | no
+  extra?: Record<string, string> // otras claves libres de save_setup (solo contexto)
 }
 
 export interface RoundPlayer {
@@ -79,7 +82,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v1'
+export const PROMPT_VERSION = 'round-v2'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -104,6 +107,15 @@ const AUDIENCE: Record<string, string> = {
   family: 'a family (keep it family-friendly)',
   couples: 'couples and their friends',
 }
+const SITUATIONS: Record<string, string> = {
+  drinks: 'out for drinks together right now',
+  party: 'at a party right now',
+  dinner: 'having dinner together right now',
+  home: 'chilling at home together right now',
+  trip: 'on a trip together right now',
+  break: 'on a class or work break right now',
+}
+const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know'])
 const ADULT_VIBES = new Set(['spicy', 'exes'])
 const CLEAN_AGES = new Set(['under_18', 'mixed'])
 
@@ -148,6 +160,15 @@ export function parseInput(body: unknown): GenerateRoundInput {
     age: clip(s.age, 20) || null,
     vibes: (Array.isArray(s.vibes) ? s.vibes : []).map((v) => clip(v, 20)).filter((v) => v in VIBES),
     topic: clip(s.topic, 120) || null,
+    situation: clip(s.situation, 20) || null,
+    know: clip(s.know, 10) || null,
+    extra: Object.fromEntries(
+      Object.entries(s)
+        .filter(([key]) => !SETUP_KEYS.has(key) && /^[a-z][a-z0-9_]{0,31}$/.test(key))
+        .map(([key, value]) => [key, Array.isArray(value) ? value.map((v) => clip(v, 40)).join(', ') : clip(String(value ?? ''), 120)] as const)
+        .filter(([, value]) => value)
+        .slice(0, 10),
+    ),
   }
 
   const history: PastRound[] = (Array.isArray(b.history) ? b.history : []).slice(-10).map((h) => ({
@@ -273,10 +294,12 @@ STEP 2, WRITE THE CHAT ("chat"), using what you just learned:
 - "situation": a few words naming the situation. It must differ from everything in memory.used_situations.
 - "title": a group chat name, max 24 characters, may include one emoji.
 - "lines": 2 to 4 messages. "from" is the handle of the sender. The writer NEVER sends a message.
+  Handles (P0, P1…) are only for "from": inside message text always use the player's name.
 - Messages are short, casual texting: max 70 characters, lowercase is fine, emojis welcome.
 - You may mention players by name. The LAST message must be a direct question to the writer, using their name,
   that invites a funny or revealing reply that friends could plausibly fake.
-- Follow the audience, vibes and topic. From round 2 on, call back a running joke or something a player said
+- Follow the audience: group, know_each_other, where_they_are (the chat can be about that moment), vibes, topic
+  and extra_context. From round 2 on, call back a running joke or something a player said
   when it fits, and follow the steer. If the writer has been easy to spot (stats.spotted_by), ask something more open-ended.
 
 CONTENT: English only. The humour comes from the situation, never from attacking someone. No insults about looks, body,
@@ -291,7 +314,7 @@ interface ModelOutput {
   chat: { situation: string; title: string; lines: { from: string; text: string }[] }
 }
 
-function buildSchema(otherHandles: string[], allHandles: string[]) {
+function buildSchema(allHandles: string[]) {
   const str = { type: 'string' }
   const strList = { type: 'array', items: str }
   const object = (properties: Record<string, unknown>) => ({
@@ -313,7 +336,9 @@ function buildSchema(otherHandles: string[], allHandles: string[]) {
     chat: object({
       situation: str,
       title: str,
-      lines: { type: 'array', items: object({ from: { type: 'string', enum: otherHandles }, text: str }) },
+      // Todos los handles: si el enum excluye al writer y el modelo lo usa, Groq rechaza la respuesta entera.
+      // repairChat reasigna esas líneas.
+      lines: { type: 'array', items: object({ from: { type: 'string', enum: allHandles }, text: str }) },
     }),
   })
 }
@@ -327,12 +352,20 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string) 
     round: input.round,
     total_rounds: input.total_rounds,
     audience: {
-      group: AUDIENCE[input.setup.who ?? ''] ?? 'friends',
+      group: AUDIENCE[input.setup.who ?? ''] ?? (input.setup.know === 'no' ? 'people who mostly just met' : 'friends'),
+      know_each_other:
+        input.setup.know === 'no'
+          ? 'no: they barely know each other, so ask things anyone can answer about themselves or the moment, not shared history'
+          : input.setup.know === 'yes'
+            ? 'yes: close friends, shared history and inside jokes are fair game'
+            : null,
+      where_they_are: SITUATIONS[input.setup.situation ?? ''] ?? null,
       content: clean
         ? 'the group may include minors: keep it completely clean, no dating, drinking or flirting'
         : 'adults: cheeky is fine, never explicit',
       vibes: vibes.length > 0 ? vibes.map((v) => VIBES[v]) : ['everyday group chat chaos'],
       topic: input.setup.topic ?? null,
+      extra_context: input.setup.extra && Object.keys(input.setup.extra).length > 0 ? input.setup.extra : null,
     },
     players: input.players.map((p) => ({
       handle: handleOf(p.id),
@@ -366,6 +399,34 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string) 
 
 // ───────────────────────── Validación de la salida ─────────────────────────
 
+// ¿Menciona al writer? Vale el nombre entero o cualquier palabra suya de 2+ letras ("Ana" en "E2E Ana").
+function mentions(text: string, name: string): boolean {
+  const lower = text.toLowerCase()
+  if (lower.includes(name.toLowerCase())) return true
+  return name
+    .toLowerCase()
+    .split(/\s+/)
+    .some((word) => word.length >= 2 && new RegExp(`(^|[^\\p{L}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}])`, 'u').test(lower))
+}
+
+// Arreglos baratos antes de validar, para no tirar una ronda buena por un detalle (visto en pruebas reales):
+// - el modelo a veces hace hablar al writer: esa línea pasa a otro jugador;
+// - a veces escribe los handles internos ("P2") en el texto: se cambian por el nombre;
+// - a veces la pregunta final no nombra al writer: se le antepone el nombre.
+function repairChat(output: ModelOutput, writerName: string, otherHandles: string[], nameOf: Record<string, string>): void {
+  const lines = output?.chat?.lines
+  if (!Array.isArray(lines) || lines.length === 0) return
+  lines.forEach((line, i) => {
+    if (!line) return
+    if (!otherHandles.includes(line.from)) line.from = otherHandles[i % otherHandles.length]
+    if (typeof line.text === 'string') line.text = line.text.replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
+  })
+  const last = lines[lines.length - 1]
+  if (typeof last?.text === 'string' && last.text.includes('?') && !mentions(last.text, writerName)) {
+    last.text = `${writerName} ${last.text.replace(/^[^\p{L}\p{N}]*/u, '')}`
+  }
+}
+
 function validateChat(output: ModelOutput, writerName: string, otherHandles: Set<string>): string | null {
   const chat = output?.chat
   if (!chat || typeof chat.title !== 'string' || !chat.title.trim() || chat.title.length > 40) return 'title'
@@ -376,7 +437,7 @@ function validateChat(output: ModelOutput, writerName: string, otherHandles: Set
   }
   const last = chat.lines[chat.lines.length - 1].text
   if (!last.includes('?')) return 'last_not_question'
-  if (!last.toLowerCase().includes(writerName.toLowerCase())) return 'last_not_to_writer'
+  if (!mentions(last, writerName)) return 'last_not_to_writer'
   return null
 }
 
@@ -427,7 +488,7 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig): Promis
         max_completion_tokens: 4000,
         response_format: {
           type: 'json_schema',
-          json_schema: { name: 'round', strict: true, schema: buildSchema(otherHandles, [...handles.values()]) },
+          json_schema: { name: 'round', strict: true, schema: buildSchema([...handles.values()]) },
         },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -450,6 +511,7 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig): Promis
   } catch {
     throw new AiError('invalid_output', 'not_json')
   }
+  repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
   const problem = validateChat(output, writer.name, new Set(otherHandles))
   if (problem) throw new AiError('invalid_output', problem)
 
