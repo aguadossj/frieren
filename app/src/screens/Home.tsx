@@ -416,9 +416,9 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
           {/* Tu panda (el que tendrás en la sala), encima de la caja del nombre. Sin animación. */}
           <div className="flex flex-col items-center gap-5">
             {myColor ? (
-              <Avatar player={{ name: name.trim() || '?', color: myColor }} roomCode={code} size={96} ring />
+              <Avatar player={{ name: name.trim() || '?', color: myColor }} roomCode={code} size={160} ring />
             ) : (
-              <span className="size-[96px] rounded-full bg-white/20 ring-[3px] ring-white" />
+              <span className="size-[160px] rounded-full bg-white/20 ring-[3px] ring-white" />
             )}
             <TextInput
               className={`animate-rise ${shake ? 'animate-nudge' : ''}`}
