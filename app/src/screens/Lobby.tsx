@@ -93,7 +93,7 @@ export default function Lobby() {
               ))}
             </div>
           </div>
-          <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pb-2">
+          <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain pb-2">
             {room.players.map((p) => (
               <li key={p.id} className="animate-rise">
                 <Row className={`min-h-[60px] ${p.id === me.id && !me.isHost ? 'outline-[3px] outline-ink outline-solid' : ''}`}>

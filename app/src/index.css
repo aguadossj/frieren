@@ -74,6 +74,9 @@ html, body, #root { height: 100%; }
 /* Fondo de la PÁGINA rojo en todas las pantallas (también bajo el notch y la barra de inicio del iPhone);
    Safari tiñe sus barras con este color. */
 html { background-color: var(--color-brand); }
+/* La PÁGINA no hace scroll ni rebota (en iOS el rebote movía toda la pantalla y peleaba con el ajuste del teclado).
+   Solo hacen scroll las zonas de cada pantalla que lo necesitan. El scroll por código (retintSafariBars) sigue funcionando. */
+html { overflow: hidden; overscroll-behavior: none; }
 body {
   margin: 0;
   background: var(--color-brand);

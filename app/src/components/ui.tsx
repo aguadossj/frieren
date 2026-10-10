@@ -78,7 +78,7 @@ export function Screen({ children, dark = false, className = '' }: { children: R
 
 /** Zona con scroll entre la cabecera y el pie. */
 export function Body({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={cx('flex flex-1 flex-col overflow-y-auto px-5 pb-5', className)}>{children}</div>
+  return <div className={cx('flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5 pb-5', className)}>{children}</div>
 }
 
 /** Pie fijo (botones). */
