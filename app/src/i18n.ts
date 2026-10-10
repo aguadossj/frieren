@@ -62,7 +62,7 @@ const en = {
   steps: [
     ['Get a message', 'The group chat asks you something.'],
     ['Everyone fakes it', 'Friends copy how you text.'],
-    ['Spot the real one', 'Vote. Fool them. Score.'],
+    ['Spot the real one', 'Vote fast. Faster = more points.'],
   ] as [string, string][],
   createRoom: 'Create room',
   joinWithCode: 'Join with code',
@@ -73,7 +73,7 @@ const en = {
   howSteps: [
     ['A message drops', 'The AI writes your group chat. One of you answers for real.'],
     ['Everyone fakes it', 'The rest write what that person would say.'],
-    ['Spot the real one', 'Vote for the real one. Guessing and fooling both score.'],
+    ['Spot the real one', 'Vote for the real one. The faster you get it, the more points.'],
   ] as [string, string][],
   howDemoMessage: 'who ate my pizza?? 🍕',
   howDemoFake: 'not me',
@@ -217,7 +217,7 @@ const es: typeof en = {
   steps: [
     ['Te llega un mensaje', 'El chat del grupo te pregunta algo.'],
     ['Todos lo imitan', 'Tus amigos copian cómo escribes.'],
-    ['Pilla la de verdad', 'Vota. Engaña. Suma puntos.'],
+    ['Pilla la de verdad', 'Vota rápido: cuanto antes, más puntos.'],
   ],
   createRoom: 'Crear sala',
   joinWithCode: 'Unirme con código',
@@ -227,7 +227,7 @@ const es: typeof en = {
   howSteps: [
     ['Llega un mensaje', 'La IA crea vuestro chat de grupo. A uno le toca contestar de verdad.'],
     ['Los demás le imitan', 'El resto escribe lo que diría esa persona.'],
-    ['Pilla la de verdad', 'Vota la real. Acertar y engañar dan puntos.'],
+    ['Pilla la de verdad', 'Vota la real. Cuanto antes aciertes, más puntos.'],
   ],
   howDemoMessage: '¿quién se comió mi pizza? 🍕',
   howDemoFake: 'no fui yo',

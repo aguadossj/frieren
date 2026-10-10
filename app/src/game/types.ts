@@ -15,12 +15,24 @@ export const MAX_NAME_LENGTH = 16
 export const MAX_VOTE_OPTIONS = 6 // real + hasta 4 impostores + el bot Mimic si está activado
 export const MIMIC_AUTHOR_ID = 'mimic'
 
+/**
+ * Puntuación (estilo Kahoot): solo puntúa acertar la respuesta real, y cuanto antes votes, más.
+ * Votar al instante = 200, en el último segundo = 100, de 10 en 10. Fallar = 0. Votar al bot Mimic = −100.
+ * Engañar, ser reconocido o recibir 😂 ya NO dan puntos (se siguen mostrando, pero no suman).
+ * Misma fórmula en SQL: game.speed_points (migración speed_scoring).
+ */
 export const POINTS = {
-  foundReal: 200, // votar la respuesta real
-  writerPerFinder: 100, // Pol, por cada amigo que le reconoce
-  impostorPerFooled: 150, // impostor, por cada voto que engañó
-  perLaugh: 50, // por cada 😂 recibido
+  realMax: 200, // acertar votando al instante
+  realMin: 100, // acertar en el último segundo
+  step: 10, // se redondea de 10 en 10 (190, 170…)
+  mimicPenalty: 100, // votar al bot Mimic
 } as const
+
+/** Puntos por acertar según lo rápido que se votó (ms desde que empezó la votación sobre la duración total). */
+export function speedPoints(elapsedMs: number, totalMs: number): number {
+  const left = 1 - Math.min(1, Math.max(0, elapsedMs / Math.max(1, totalMs)))
+  return POINTS.realMin + Math.round(((POINTS.realMax - POINTS.realMin) * left) / POINTS.step) * POINTS.step
+}
 
 export interface Player {
   id: string

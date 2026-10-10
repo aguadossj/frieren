@@ -2,7 +2,7 @@
 // el mock la usa tal cual y T1 la replica en SQL (advance_phase).
 
 import { pickAward, IMPOSTOR_AWARDS, WRITER_AWARDS } from '../content/awards'
-import { POINTS } from './types'
+import { speedPoints } from './types'
 import type { AnswerResult, Player, RoundResult } from './types'
 
 export interface ScoreInput {
@@ -11,9 +11,11 @@ export interface ScoreInput {
   options: { id: string; text: string; authorId: string; isReal: boolean }[]
   votes: Record<string, string> // voterId -> answerId
   laughs: Record<string, string[]> // answerId -> voterIds
+  voteMs?: Record<string, number> // voterId -> ms desde que empezó la votación
+  votingMs?: number // duración total de la votación (ms)
 }
 
-export function scoreRound({ writer, players, options, votes, laughs }: ScoreInput): RoundResult {
+export function scoreRound({ writer, players, options, votes, laughs, voteMs = {}, votingMs = 1 }: ScoreInput): RoundResult {
   const points: Record<string, number> = Object.fromEntries(players.map((p) => [p.id, 0]))
   const fooled: Record<string, number> = {}
 
@@ -25,15 +27,10 @@ export function scoreRound({ writer, players, options, votes, laughs }: ScoreInp
 
   for (const answer of answers) {
     for (const voterId of answer.voterIds) {
-      if (answer.isReal) {
-        points[voterId] += POINTS.foundReal
-        points[writer.id] += POINTS.writerPerFinder
-      } else {
-        points[answer.authorId] += POINTS.impostorPerFooled
-        fooled[answer.authorId] = (fooled[answer.authorId] ?? 0) + 1
-      }
+      // Solo puntúa acertar (más cuanto antes). Engañar no da puntos, pero cuenta para el premio de la ronda.
+      if (answer.isReal) points[voterId] += speedPoints(voteMs[voterId] ?? votingMs, votingMs)
+      else fooled[answer.authorId] = (fooled[answer.authorId] ?? 0) + 1
     }
-    points[answer.authorId] += answer.laughs * POINTS.perLaugh
   }
 
   const best = Object.entries(fooled).sort((a, b) => b[1] - a[1])[0]

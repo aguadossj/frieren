@@ -95,6 +95,8 @@ export function createMockClient(): GameClient {
   let options: Option[] = []
   let votes: Record<string, string> = {}
   let laughs: Record<string, string[]> = {}
+  let voteMs: Record<string, number> = {} // cuándo votó cada uno (ms desde que empezó la votación)
+  let votingStartedAt = 0
   let result: RoundResult | null = null
   let error: string | null = null
   let setup: Setup = {}
@@ -160,6 +162,7 @@ export function createMockClient(): GameClient {
   function startWriting() {
     submissions = {}
     votes = {}
+    voteMs = {}
     laughs = {}
     options = []
     result = null
@@ -189,6 +192,7 @@ export function createMockClient(): GameClient {
     ]).map((o, i) => ({ ...o, id: `opt-${i}` }))
     recordRoundForAi()
 
+    votingStartedAt = Date.now()
     setPhase('voting', PHASE_SECONDS.voting, startReveal)
     for (const bot of bots().filter((b) => b.id !== writer)) {
       later(1500 + Math.random() * 6000, () => {
@@ -202,7 +206,9 @@ export function createMockClient(): GameClient {
   function vote(voterId: string, answerId: string) {
     const option = options.find((o) => o.id === answerId)
     if (phase !== 'voting' || !option || option.authorId === voterId || voterId === writerId()) return
+    if (votes[voterId] !== undefined) return // como en el servidor: un voto por persona
     votes = { ...votes, [voterId]: answerId }
+    voteMs = { ...voteMs, [voterId]: Date.now() - votingStartedAt }
     if (Object.keys(votes).length === players.length - 1) startReveal()
     else emit()
   }
@@ -217,7 +223,7 @@ export function createMockClient(): GameClient {
 
   function startReveal() {
     const writer = players.find((p) => p.id === writerId())!
-    result = scoreRound({ writer, players, options, votes, laughs })
+    result = scoreRound({ writer, players, options, votes, laughs, voteMs, votingMs: PHASE_SECONDS.voting * 1000 })
     recordVotesForAi(result)
     players = players.map((p) => ({ ...p, score: p.score + (result!.points[p.id] ?? 0) }))
     setPhase('reveal', PHASE_SECONDS.reveal, () => {
