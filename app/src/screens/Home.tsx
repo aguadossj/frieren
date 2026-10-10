@@ -104,7 +104,6 @@ function Start({ code, setCode, onCreate, onJoin }: { code: string; setCode: (c:
           </Button>
         )}
 
-        <p className="text-center text-[16px] font-semibold">No account. Just a name.</p>
       </Footer>
     </Screen>
   )
