@@ -109,11 +109,12 @@ export default function Writing() {
           const author = playerOf(m.playerId)
           const msgs = room.chat!.messages
           const firstOfRun = i === 0 || msgs[i - 1].playerId !== m.playerId
+          const lastOfRun = i === shown - 1 || msgs[i + 1]?.playerId !== m.playerId
           return (
-            <div key={i} className={`flex animate-rise items-start gap-2 ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
-              {/* Foto de perfil en el primer mensaje de cada tanda; en los siguientes, hueco para que queden alineados */}
-              {firstOfRun && author ? <Avatar player={author} size={32} /> : <span className="w-[32px] shrink-0" />}
-              <Bubble className={`max-w-[78%] rounded-[20px] px-4 py-2 text-[17px] ${firstOfRun ? 'rounded-tl-[6px]' : ''}`}>
+            <div key={i} className={`flex animate-rise items-end gap-2 ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
+              {/* Foto de perfil abajo, en el último mensaje de cada tanda (como WhatsApp); en los demás, hueco para alinear */}
+              {lastOfRun && author ? <Avatar player={author} size={32} /> : <span className="w-[32px] shrink-0" />}
+              <Bubble className={`max-w-[78%] rounded-[20px] px-4 py-2 text-[17px] ${lastOfRun ? 'rounded-bl-[6px]' : ''}`}>
                 {firstOfRun && (
                   <div className="text-[13px] leading-tight font-extrabold" style={{ color: author ? readableOnWhite(avatarFor(room.code, author).color) : undefined }}>
                     {author?.name ?? '?'}

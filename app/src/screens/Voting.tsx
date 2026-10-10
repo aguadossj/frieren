@@ -20,10 +20,9 @@ export default function Voting() {
 
   return (
     <Screen>
-      {/* Título claro: solo una es de verdad; el resto son amigos haciéndose pasar */}
+      {/* Una sola instrucción: ¿quién es el de verdad? */}
       <TopBar
         title={t.voteTitle(writer.name)}
-        subtitle={t.voteSub}
         right={<TimeBar endsAt={room.phaseEndsAt} totalSeconds={room.settings?.voting_seconds ?? PHASE_SECONDS.voting} className="w-[30%] shrink-0" />}
       />
 
@@ -38,14 +37,17 @@ export default function Voting() {
             </div>
           </div>
         )}
-        {/* Separador que une la pregunta con las respuestas */}
-        <div className="flex shrink-0 items-center gap-3 px-1 text-[14px] font-extrabold text-white/85">
-          <span className="h-px flex-1 bg-white/35" />
-          <span className="text-center">{t.voteSeparator(writer.name)}</span>
-          <span className="h-px flex-1 bg-white/35" />
-        </div>
-        {room.mimic && (
-          <p className="shrink-0 self-center rounded-full bg-ink px-4 py-1 text-[13px] font-bold">{t.aiAmongThese}</p>
+        {/* Pista animada hasta que eliges: la flecha rebota hacia las opciones */}
+        {!isWriter && !locked && (
+          <div
+            className={`flex shrink-0 items-center justify-center gap-2 text-[17px] font-extrabold transition-opacity duration-300 ${picked ? 'opacity-0' : 'opacity-100'}`}
+            aria-hidden={picked ? true : undefined}
+          >
+            {t.voteHint(writer.name)}
+            <span className="vote-hint-arrow flex size-[30px] items-center justify-center rounded-full bg-white text-brand">
+              <Icon name="arrowRight" size={17} className="rotate-90" />
+            </span>
+          </div>
         )}
 
         {/* Opciones: todas del mismo tamaño (alto fijo). Si no caben, solo esta lista hace scroll;
@@ -73,7 +75,8 @@ export default function Voting() {
                   <span
                     className={`flex size-[30px] shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
                       selected ? 'scale-110 bg-white text-good' : 'border-[2.5px] border-neutral-200'
-                    }`}
+                    } ${!picked && !locked && !isWriter ? 'vote-ping' : ''}`}
+                    style={{ animationDelay: `${0.6 + i * 0.18}s` }}
                   >
                     {selected && <Icon name="check" size={17} />}
                   </span>
@@ -94,7 +97,7 @@ export default function Voting() {
           ) : picked ? (
             t.lockVote
           ) : (
-            t.tapWhatSaid(writer.name)
+            t.pickOne
           )}
         </Button>
       </Footer>

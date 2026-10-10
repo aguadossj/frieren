@@ -10,7 +10,6 @@ import { avatarFor, textOn } from '../lib/avatars'
 
 type Strings = ReturnType<typeof useT>
 
-const LETTERS = 'ABCDEF'
 
 export function Reveal() {
   const { room, me } = useGame()
@@ -50,40 +49,36 @@ export function Reveal() {
             return (
               <div key={a.id} className="flex h-[84px] shrink-0 animate-flip" style={{ animationDelay: `${0.25 + i * 0.18}s` }}>
                 <div className={`flex w-full items-center gap-3.5 rounded-[22px] px-4 ${tone}`}>
-                  <span
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-full text-[14px] font-black ${
-                      a.isReal ? 'bg-white text-good' : bot ? 'bg-white text-ink' : 'bg-neutral-100 text-neutral-500'
-                    }`}
-                  >
-                    {a.isReal ? <Icon name="check" size={18} /> : bot ? 'AI' : LETTERS[i]}
-                  </span>
+                  {/* Quién la escribió: el panda del autor (la real, del writer, con su check); la de Mimic, "AI" */}
+                  {bot ? (
+                    <span className="flex size-[40px] shrink-0 items-center justify-center rounded-full bg-white text-[14px] font-black text-ink">AI</span>
+                  ) : (
+                    <span className="relative shrink-0">
+                      <Avatar player={playerOf(a.authorId) ?? writer} size={40} />
+                      {a.isReal && (
+                        <span className="absolute -right-1 -bottom-1 flex size-[20px] items-center justify-center rounded-full bg-white text-good">
+                          <Icon name="check" size={12} />
+                        </span>
+                      )}
+                    </span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-1 text-[17px] leading-snug font-semibold">{a.text}</p>
                     <p className={`text-[13px] font-extrabold ${a.isReal || bot ? 'text-white/80' : 'text-neutral-400'}`}>
-                      {a.isReal ? t.realBy(writer.name) : bot ? t.mimicTag : t.by(nameOf(a.authorId))}
+                      {a.isReal ? t.realBy(writer.name) : bot ? t.mimicTag : a.authorId === me.id ? t.byYou : t.by(nameOf(a.authorId))}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center">
                     {voters.length === 0 ? (
                       <span className={`text-[13px] font-bold ${a.isReal || bot ? 'text-white/60' : 'text-neutral-300'}`}>{t.noVotes}</span>
-                    ) : a.isReal ? (
-                      // Respuesta real: los puntos de cada uno (cuanto antes votó, más)
-                      <div className="flex max-w-[150px] flex-wrap justify-end gap-1">
-                        {voters.slice(0, 3).map((v) => (
-                          <span key={v.id} className="flex items-center gap-0.5 rounded-full bg-white/25 py-0.5 pr-2 pl-0.5 text-[12px] font-black tabular-nums">
-                            <Avatar player={v} size={22} />⚡{result.points[v.id] ?? 0}
-                          </span>
-                        ))}
-                        {voters.length > 3 && <span className="text-[12px] font-black">+{voters.length - 3}</span>}
-                      </div>
                     ) : (
-                      <div className="flex items-center -space-x-2">
+                      <div className="flex items-center -space-x-1.5 pl-1">
                         {bot && <span className="mr-3 text-[13px] font-black text-[#FF8A8A]">−100</span>}
                         {voters.slice(0, 4).map((v) => (
-                          <Avatar key={v.id} player={v} size={26} ring />
+                          <Avatar key={v.id} player={v} size={30} ring />
                         ))}
                         {voters.length > 4 && (
-                          <span className="flex size-[26px] items-center justify-center rounded-full bg-neutral-200 text-[12px] font-black text-ink ring-[3px] ring-white">
+                          <span className="flex size-[30px] items-center justify-center rounded-full bg-neutral-200 text-[12px] font-black text-ink ring-[3px] ring-white">
                             +{voters.length - 4}
                           </span>
                         )}

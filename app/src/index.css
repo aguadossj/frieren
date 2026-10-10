@@ -87,6 +87,17 @@
 .mimic-blink { animation: mimic-blink 1.6s ease-in-out infinite; }
 .mimic-voted { animation-name: pop, mimic-shake; animation-duration: 0.35s, 0.4s; animation-delay: 0.5s, 1.25s; animation-fill-mode: both, none; }
 .mimic-minus { animation: pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) 1.2s both; }
+/* Votación: la flecha de la pista rebota y los círculos vacíos "llaman" en ola hasta que eliges */
+.vote-hint-arrow { animation: vote-hint-bob 1s ease-in-out infinite; }
+@keyframes vote-hint-bob {
+  0%, 100% { transform: translateY(-2px); }
+  50% { transform: translateY(4px); }
+}
+.vote-ping { animation: vote-ping 2.2s ease-in-out infinite; }
+@keyframes vote-ping {
+  0%, 30%, 100% { transform: scale(1); border-color: #e5e5e5; }
+  12% { transform: scale(1.18); border-color: #EE2B2B; }
+}
 @keyframes swipe-hint {
   0%, 100% { transform: translateX(0) rotate(0); }
   25% { transform: translateX(-26px) rotate(-2deg); }
