@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Avatar, Button, Eyebrow, Footer, Icon, LangToggle, Row, Screen } from '../components/ui'
-import PandaHost from '../components/Panda'
 import QR, { joinUrl } from '../components/QR'
 import { useGame } from '../game/useGame'
 import { MIN_PLAYERS } from '../game/types'
@@ -118,7 +117,12 @@ export default function Lobby() {
           </Button>
         </Footer>
       ) : (
-        <PandaHost text={missing > 0 ? t.needMorePanda(missing) : t.waitingPanda(host?.name ?? t.theHost)} />
+        // El panda solo habla entre rondas (Leaderboard); aquí solo el mensaje de espera
+        <Footer>
+          <p className="rounded-[22px] bg-ink px-5 py-3.5 text-center text-[16px] leading-snug font-extrabold text-white">
+            {missing > 0 ? t.needMorePanda(missing) : t.waitingPanda(host?.name ?? t.theHost)}
+          </p>
+        </Footer>
       )}
     </Screen>
   )
