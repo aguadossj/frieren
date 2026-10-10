@@ -1,4 +1,4 @@
-import { AppHeader, Avatar, Body, Button, Eyebrow, Footer, Icon, Row, Screen } from '../components/ui'
+import { Avatar, Body, Button, Footer, Icon, Row, Screen, TopBar, TopNote } from '../components/ui'
 import { useGame } from '../game/useGame'
 import type { Player } from '../game/types'
 
@@ -25,13 +25,10 @@ export default function Final() {
 
   return (
     <Screen>
-      <header className="shrink-0 bg-white text-ink">
-        <AppHeader code={room.code} />
-      </header>
+      <TopBar title="Game over" right={<TopNote>{room.totalRounds} rounds</TopNote>} />
       <Body className="gap-3 pt-5">
         <div className="text-center">
-          <Eyebrow>Game over</Eyebrow>
-          <h1 className="mt-1 animate-pop text-[44px] leading-none font-black tracking-[-0.03em]">{label(winner)} {winner.id === me?.id ? 'win' : 'wins'}! 👑</h1>
+          <h1 className="animate-pop text-[44px] leading-none font-black tracking-[-0.03em]">{label(winner)} {winner.id === me?.id ? 'win' : 'wins'}! 👑</h1>
         </div>
 
         <div className="flex items-end justify-center gap-2.5 pt-8">
@@ -62,14 +59,17 @@ export default function Final() {
         ))}
       </Body>
       <Footer>
-        <Button onClick={() => void game.leave()} className="flex items-center justify-center gap-3">
+        <Button onClick={() => void game.playAgain()} className="flex items-center justify-center gap-3">
           <Icon name="replay" size={22} />
           Play again
         </Button>
-        <Button variant="ink" onClick={share} className="flex items-center justify-center gap-3">
-          <Icon name="share" size={22} />
-          Share
+        <Button variant="ink" onClick={() => void game.leave()}>
+          Menu
         </Button>
+        <button onClick={share} className="flex h-[44px] items-center justify-center gap-2 text-[16px] font-bold active:scale-95">
+          <Icon name="share" size={18} />
+          Share the result
+        </button>
       </Footer>
     </Screen>
   )

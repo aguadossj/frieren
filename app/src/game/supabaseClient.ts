@@ -266,6 +266,17 @@ export function createSupabaseClient(): GameClient {
     submitAnswer: (text) => act(() => rpc('submit_answer', { ...roomArgs(), p_text: text })),
     castVote: (answerId) => act(() => rpc('cast_vote', { ...roomArgs(), p_answer_id: answerId })),
     react: (answerId) => act(() => rpc('react', { ...roomArgs(), p_answer_id: answerId })),
+    // Pendiente en backend (T1): RPC `play_again(p_room_id)` → final → lobby, puntos a 0.
+    // Mientras no exista, se sale al menú para que el botón no quede muerto.
+    async playAgain() {
+      try {
+        await rpc('play_again', roomArgs())
+        await refresh()
+      } catch {
+        if (roomId) await rpc('leave_room', roomArgs()).catch(() => {})
+        leaveLocally()
+      }
+    },
     async leave() {
       if (roomId) await rpc('leave_room', { p_room_id: roomId }).catch(() => {})
       leaveLocally()

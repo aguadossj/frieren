@@ -1,87 +1,56 @@
-import { AppHeader, Avatar, AwardCard, Body, Bubble, Eyebrow, Footer, Icon, Row, RoundHeader, Screen } from '../components/ui'
+import { Avatar, AwardCard, Body, Footer, Row, Screen, TopBar, TopNote } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
-import { POINTS } from '../game/types'
 
 export function Reveal() {
   const { room, me } = useGame()
-  const seconds = useCountdown(room?.phaseEndsAt ?? null)
   if (!room?.result || !room.chat || !me) return null
 
   const result = room.result
   const writer = room.players.find((p) => p.id === room.chat!.writerId)!
   const real = result.answers.find((a) => a.isReal)!
-  const fooled = result.answers.filter((a) => !a.isReal).reduce((n, a) => n + a.voterIds.length, 0)
-  const nameOf = (id: string) => (id === me.id ? 'You' : (room.players.find((p) => p.id === id)?.name ?? '?'))
-  // La real primero, después los fakes por votos
-  const answers = [...result.answers].sort((a, b) => Number(b.isReal) - Number(a.isReal) || b.voterIds.length - a.voterIds.length)
-
-  // Desglose de mis puntos de esta ronda (mismas reglas que scoring.ts)
-  const mine: string[] = []
-  if (real.voterIds.includes(me.id)) mine.push(`Spotted ${writer.name} +${POINTS.foundReal}`)
-  if (writer.id === me.id && real.voterIds.length)
-    mine.push(`Recognised by ${real.voterIds.length} +${real.voterIds.length * POINTS.writerPerFinder}`)
-  for (const a of result.answers.filter((a) => a.authorId === me.id)) {
-    if (!a.isReal && a.voterIds.length) mine.push(`Fooled ${a.voterIds.length} +${a.voterIds.length * POINTS.impostorPerFooled}`)
-    if (a.laughs) mine.push(`${a.laughs} 😂 +${a.laughs * POINTS.perLaugh}`)
-  }
+  const fakes = result.answers.filter((a) => !a.isReal).sort((a, b) => b.voterIds.length - a.voterIds.length)
+  const fooled = fakes.reduce((n, a) => n + a.voterIds.length, 0)
+  const nameOf = (id: string) => (id === me.id ? 'you' : (room.players.find((p) => p.id === id)?.name ?? '?'))
   const myPoints = result.points[me.id] ?? 0
 
   return (
     <Screen>
-      <RoundHeader code={room.code} step="reveal" round={room.roundIndex + 1} total={room.totalRounds} seconds={seconds} />
+      <TopBar title={`The real ${writer.name} said…`} right={<TopNote>Round {room.roundIndex + 1}</TopNote>} />
       <Body className="gap-3 pt-5">
-        <Eyebrow className="text-center">The real {writer.name} said…</Eyebrow>
-        <div className="flex animate-pop items-center justify-center gap-3">
-          <Avatar player={writer} size={48} ring />
-          <Bubble className="text-[22px] font-extrabold">{real.text}</Bubble>
-        </div>
-        <div className="animate-pop py-2 text-center text-[44px] leading-none font-black tracking-[-0.03em]" style={{ animationDelay: '0.4s' }}>
-          {fooled > 0 ? `Fooled ${fooled}! 🎭` : 'Nobody fooled! 🔍'}
-        </div>
-
-        <div className="animate-rise rounded-[24px] bg-ink px-5 py-4 text-white" style={{ animationDelay: '0.6s' }}>
-          <div className="flex items-baseline justify-between">
-            <span className="text-[17px] font-extrabold">Your round</span>
-            <span className={`text-[22px] font-black tabular-nums ${myPoints ? 'text-good' : 'text-white/50'}`}>+{myPoints}</span>
-          </div>
-          {mine.length > 0 ? (
-            <ul className="mt-1 text-[15px] font-medium text-white/75">
-              {mine.map((line) => (
-                <li key={line}>· {line}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-1 text-[15px] font-medium text-white/75">No points this time. Next one.</p>
-          )}
+        <div className="animate-pop rounded-[28px] bg-ink px-6 py-5 text-white">
+          <div className="text-[14px] font-extrabold tracking-[0.14em] text-good">REAL · {writer.name.toUpperCase()}</div>
+          <p className="mt-1 text-[26px] leading-tight font-black">{real.text}</p>
+          <p className="mt-2 text-[15px] font-semibold text-white/60">
+            {real.voterIds.length ? `Spotted by ${real.voterIds.map(nameOf).join(', ')}` : 'Nobody spotted it'}
+          </p>
         </div>
 
-        {answers.map((a, i) => (
+        <div className="animate-pop py-2 text-center text-[40px] leading-none font-black tracking-[-0.03em]" style={{ animationDelay: '0.35s' }}>
+          {fooled === 0 ? 'Nobody fooled' : `${fooled} fooled!`}
+        </div>
+
+        {fakes.map((a, i) => (
           <div
             key={a.id}
-            className={`animate-rise rounded-[24px] bg-white p-4 text-ink ${a.isReal ? 'outline-[4px] outline-ink outline-solid' : ''}`}
-            style={{ animationDelay: `${0.8 + i * 0.12}s` }}
+            className="flex animate-rise items-center gap-4 rounded-[24px] bg-white px-5 py-3.5 text-ink"
+            style={{ animationDelay: `${0.6 + i * 0.12}s` }}
           >
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              {a.isReal ? (
-                <span className="flex items-center gap-1 rounded-full bg-good px-2.5 py-0.5 text-[13px] font-extrabold text-white">
-                  <Icon name="check" size={13} />
-                  REAL · {writer.name}
-                </span>
-              ) : (
-                <span className="text-[14px] font-extrabold text-neutral-500">Fake by {nameOf(a.authorId)}</span>
-              )}
-              <span className="text-[14px] font-bold text-neutral-500 tabular-nums">
-                {a.voterIds.length} vote{a.voterIds.length === 1 ? '' : 's'}
-                {a.laughs > 0 && ` · ${a.laughs} 😂`}
-              </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[18px] leading-snug font-semibold">{a.text}</p>
+              <p className="text-[14px] font-bold text-neutral-400">by {nameOf(a.authorId)}</p>
             </div>
-            <p className="text-[18px] leading-snug font-semibold">{a.text}</p>
-            {a.voterIds.length > 0 && <p className="mt-1 text-[14px] font-medium text-neutral-500">Voted by {a.voterIds.map(nameOf).join(', ')}</p>}
+            <div className={`shrink-0 text-center leading-none ${a.voterIds.length ? 'text-ink' : 'text-neutral-300'}`}>
+              <div className="text-[26px] font-black tabular-nums">{a.voterIds.length}</div>
+              <div className="text-[12px] font-bold">{a.voterIds.length === 1 ? 'vote' : 'votes'}</div>
+            </div>
           </div>
         ))}
-
       </Body>
       <Footer>
+        <div className="flex animate-rise items-center justify-between rounded-full bg-white/15 px-6 py-3" style={{ animationDelay: '1s' }}>
+          <span className="text-[17px] font-extrabold">Your points</span>
+          <span className="text-[22px] font-black tabular-nums">+{myPoints}</span>
+        </div>
         <AwardCard>{result.award}</AwardCard>
       </Footer>
     </Screen>
@@ -103,14 +72,8 @@ export function Leaderboard() {
 
   return (
     <Screen>
-      <header className="shrink-0 bg-white text-ink">
-        <AppHeader code={room.code} />
-      </header>
+      <TopBar title="Leaderboard" right={<TopNote>after round {room.roundIndex + 1}</TopNote>} />
       <Body className="gap-3 pt-5">
-        <div className="pb-2">
-          <Eyebrow>After round {room.roundIndex + 1} of {room.totalRounds}</Eyebrow>
-          <h1 className="mt-1 text-[40px] leading-none font-black tracking-[-0.03em]">Leaderboard</h1>
-        </div>
         {ranking.map((p, i) => {
           const moved = before[p.id] - i
           return (

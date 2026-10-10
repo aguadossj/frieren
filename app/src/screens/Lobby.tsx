@@ -1,16 +1,17 @@
 import { useState } from 'react'
-import { AppHeader, Avatar, Body, Button, Card, Eyebrow, Footer, Icon, Row, Screen } from '../components/ui'
+import { Avatar, Button, Footer, Icon, Row, Screen, TopBar, TopNote } from '../components/ui'
 import QR, { joinUrl } from '../components/QR'
 import { useGame } from '../game/useGame'
-import { MAX_PLAYERS, MIN_PLAYERS } from '../game/types'
-import type { Pack } from '../game/types'
+import { MIN_PLAYERS } from '../game/types'
 
-const PACKS: { id: Pack; label: string }[] = [
-  { id: 'uni', label: 'Uni' },
-  { id: 'spicy', label: 'Spicy' },
-  { id: 'dating', label: 'Dating' },
-  { id: 'moral', label: 'Moral' },
-]
+const SITUATION_LABEL: Record<string, string> = {
+  drinks: 'Drinks out',
+  party: 'Party',
+  dinner: 'Dinner',
+  home: 'Chilling at home',
+  trip: 'On a trip',
+  break: 'Class or work break',
+}
 
 export default function Lobby() {
   const { room, me, game, error } = useGame()
@@ -18,6 +19,8 @@ export default function Lobby() {
   if (!room || !me) return null
   const missing = MIN_PLAYERS - room.players.length
   const host = room.players.find((p) => p.isHost)
+  const situation = SITUATION_LABEL[String(room.setup?.situation)]
+  const know = room.setup?.know === 'yes' ? 'Close friends' : room.setup?.know === 'no' ? 'Just met' : null
 
   const copy = () => {
     const url = joinUrl(room.code)
@@ -31,75 +34,43 @@ export default function Lobby() {
 
   return (
     <Screen>
-      <header className="shrink-0 bg-white text-ink">
-        <AppHeader />
-      </header>
-
-      <Body className="gap-5 pt-5">
-        <Card className="animate-pop">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <Eyebrow className="text-neutral-500">Room code</Eyebrow>
-              <div className="text-[38px] leading-none font-black tracking-[0.16em]">{room.code}</div>
-            </div>
-            <button
-              onClick={copy}
-              className="flex h-[44px] shrink-0 items-center gap-2 rounded-full bg-ink px-4 text-[15px] font-extrabold text-white active:scale-95"
-            >
-              <Icon name={copied ? 'check' : 'copy'} size={16} />
-              {copied ? 'Copied' : 'Copy link'}
+      <TopBar
+        title={
+          <span className="flex items-center gap-2">
+            Room
+            <button onClick={copy} aria-label="Copy invite link" className="flex items-center gap-1.5 rounded-full bg-brand px-3 py-0.5 tracking-[0.18em] text-white active:scale-95">
+              {room.code}
+              <Icon name={copied ? 'check' : 'copy'} size={14} className="opacity-80" />
             </button>
-          </div>
-          <div className="-mx-5 -mb-2">
-            <QR code={room.code} size={144} />
-          </div>
-          <p className="text-center text-[15px] font-semibold text-neutral-500">Point a camera here to join</p>
-        </Card>
+          </span>
+        }
+        right={<TopNote>{copied ? 'Link copied' : `${room.players.length} joined`}</TopNote>}
+      />
 
-        <section className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between px-1">
-            <Eyebrow>Players ({room.players.length})</Eyebrow>
-            <span className="text-[14px] font-bold text-white/75">
-              {missing > 0 ? `Min ${MIN_PLAYERS}` : `Max ${MAX_PLAYERS}`}
-            </span>
-          </div>
-          <ul className="flex flex-col gap-2.5">
-            {room.players.map((p) => (
-              <li key={p.id} className="animate-rise">
-                <Row className="min-h-[60px]">
-                  <Avatar player={p} />
-                  <span className="flex-1 truncate text-[19px] font-semibold">
-                    {p.name}
-                    {p.id === me.id && <span className="text-neutral-400"> (you)</span>}
-                  </span>
-                  {p.isHost && (
-                    <span className="flex items-center gap-1 rounded-full bg-neutral-100 px-3 py-1 text-[14px] font-extrabold">
-                      <Icon name="crown" size={14} className="text-[#F5B700]" />
-                      Host
-                    </span>
-                  )}
-                </Row>
-              </li>
-            ))}
-          </ul>
-        </section>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pt-5">
+        <div className="flex shrink-0 flex-col items-center gap-2">
+          <QR code={room.code} size={150} />
+          <p className="text-[15px] font-semibold text-white/85">Scan to join · tap the code to copy</p>
+          {(situation || know) && (
+            <p className="rounded-full bg-white/15 px-4 py-1.5 text-[14px] font-bold">{[situation, know].filter(Boolean).join(' · ')}</p>
+          )}
+        </div>
 
-        <section className="flex flex-col gap-3">
-          <Eyebrow className="px-1">Chat pack</Eyebrow>
-          <div className="flex flex-wrap gap-2">
-            {PACKS.map((p) => (
-              <button
-                key={p.id}
-                disabled={!me.isHost}
-                onClick={() => void game.setOptions({ pack: p.id })}
-                className={`min-h-[44px] rounded-full px-5 text-[17px] font-extrabold transition active:scale-95 ${room.pack === p.id ? 'bg-ink text-white' : 'bg-brand-soft text-white/90'}`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </section>
-      </Body>
+        <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pb-2">
+          {room.players.map((p) => (
+            <li key={p.id} className="animate-rise">
+              <Row className="min-h-[60px]">
+                <Avatar player={p} />
+                <span className="flex-1 truncate text-[19px] font-semibold">
+                  {p.name}
+                  {p.id === me.id && <span className="text-neutral-400"> (you)</span>}
+                </span>
+                {p.isHost && <span className="text-[15px] text-neutral-400">host</span>}
+              </Row>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <Footer>
         {error && <p className="text-center text-[15px] font-bold">{error}</p>}

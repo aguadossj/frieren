@@ -28,6 +28,16 @@ const BOT_REPLIES = [
   'I was sleepwalking',
 ]
 
+// Sin IA, el contexto elige el pack de chats de respaldo más parecido.
+const PACK_BY_SITUATION: Record<string, Pack> = {
+  party: 'spicy',
+  drinks: 'spicy',
+  dinner: 'moral',
+  home: 'dating',
+  trip: 'moral',
+  break: 'uni',
+}
+
 const pick = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)]
 const shuffle = <T,>(items: T[]) => [...items].sort(() => Math.random() - 0.5)
 const randomCode = () => Array.from({ length: 4 }, () => pick('ABCDEFGHJKLMNPQRSTUVWXYZ'.split(''))).join('')
@@ -172,7 +182,6 @@ export function createMockClient(): GameClient {
       later(1500 + Math.random() * 6000, () => {
         const choices = options.filter((o) => o.authorId !== bot.id)
         vote(bot.id, pick(choices).id)
-        if (Math.random() < 0.3) laugh(bot.id, pick(options).id)
       })
     }
     emit()
@@ -239,6 +248,8 @@ export function createMockClient(): GameClient {
     roundIndex = 0
     result = null
     error = null
+    setup = {}
+    pack = 'uni'
   }
 
   return {
@@ -270,12 +281,24 @@ export function createMockClient(): GameClient {
       groupType = options.groupType ?? groupType
       emit()
     },
-    async startGame() {
-      if (phase === 'lobby') begin()
-    },
     async saveSetup(answers) {
       setup = { ...setup, ...answers }
+      const situation = setup.situation
+      if (typeof situation === 'string' && PACK_BY_SITUATION[situation]) pack = PACK_BY_SITUATION[situation]
       emit()
+    },
+    async playAgain() {
+      if (phase !== 'final') return
+      players = players.map((p) => ({ ...p, score: 0 }))
+      roundIndex = 0
+      result = null
+      setPhase('lobby', null)
+      emit()
+      // Si el host es un bot (entraste con código), vuelve a empezar solo
+      if (!players.find((p) => p.id === meId)?.isHost) later(4000, begin)
+    },
+    async startGame() {
+      if (phase === 'lobby') begin()
     },
     async updateSettings() {},
     async getSetupQuestions() {

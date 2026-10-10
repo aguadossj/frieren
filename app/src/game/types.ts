@@ -127,6 +127,7 @@ export interface GameClient {
   submitAnswer(text: string): Promise<void>
   castVote(answerId: string): Promise<void>
   react(answerId: string): Promise<void> // 😂
+  playAgain(): Promise<void> // en `final`: la sala vuelve a `lobby` con los mismos jugadores y puntos a 0
   leave(): Promise<void>
   subscribe(listener: (state: GameState) => void): () => void
   getState(): GameState

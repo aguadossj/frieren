@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, Screen, TextInput, TypingDots } from '../components/ui'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
@@ -109,57 +110,143 @@ function Start({ code, setCode, onCreate, onJoin }: { code: string; setCode: (c:
   )
 }
 
+const SITUATIONS = [
+  { value: 'drinks', label: 'Drinks out', emoji: '🍻' },
+  { value: 'party', label: 'Party', emoji: '🎉' },
+  { value: 'dinner', label: 'Dinner', emoji: '🍕' },
+  { value: 'home', label: 'Chilling at home', emoji: '🛋️' },
+  { value: 'trip', label: 'On a trip', emoji: '🚐' },
+  { value: 'break', label: 'Class or work break', emoji: '☕' },
+] as const
+
+const KNOW = [
+  { value: 'yes', label: 'Yes, we’re close' },
+  { value: 'no', label: 'Not really' },
+] as const
+
 function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?: string; onBack: () => void }) {
   const { game, error } = useGame()
   const [name, setName] = useState('')
+  const [step, setStep] = useState<'name' | 'setup'>('name')
+  const [situation, setSituation] = useState<string | null>(null)
+  const [know, setKnow] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const join = mode === 'join'
 
-  const submit = () => {
+  const submit = async () => {
     if (!name.trim() || busy) return
+    if (join) {
+      setBusy(true)
+      return void game.joinRoom(code, name).finally(() => setBusy(false))
+    }
+    if (step === 'name') return setStep('setup')
+    if (!situation || !know) return
     setBusy(true)
-    void (join ? game.joinRoom(code, name) : game.createRoom(name)).finally(() => setBusy(false))
+    try {
+      await game.createRoom(name)
+      await game.saveSetup({ situation, know })
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
     <Screen>
       <AppHeader
         left={
-          <button onClick={onBack} className="-ml-2 flex h-[44px] items-center gap-2 px-2 text-[17px] font-extrabold active:scale-95">
+          <button
+            type="button"
+            onClick={step === 'setup' ? () => setStep('name') : onBack}
+            className="-ml-2 flex h-[44px] items-center gap-2 px-2 text-[17px] font-extrabold active:scale-95"
+          >
             <Icon name="arrowLeft" size={20} />
             Back
           </button>
         }
       />
       <form
-        className="flex flex-1 flex-col"
+        className="flex min-h-0 flex-1 flex-col"
         onSubmit={(e) => {
           e.preventDefault()
-          submit()
+          void submit()
         }}
       >
-        <Body className="gap-6 pt-6">
-          <div className="animate-rise">
-            <Eyebrow>{join ? `Room · ${code}` : 'New room'}</Eyebrow>
-            <h1 className="mt-2 text-[40px] leading-[1.05] font-black tracking-[-0.03em]">{join ? 'Join the game' : 'Set up your game'}</h1>
-            <p className="mt-2 text-[18px] font-semibold text-white/85">
-              {join ? 'Pick a name. You’re in.' : 'Friends join by scanning your QR.'}
-            </p>
-          </div>
+        {step === 'name' ? (
+          <Body className="gap-6 pt-6">
+            <div className="animate-rise">
+              <Eyebrow>{join ? `Room · ${code}` : 'New room · 1/2'}</Eyebrow>
+              <h1 className="mt-2 text-[40px] leading-[1.05] font-black tracking-[-0.03em]">{join ? 'Join the game' : 'Set up your game'}</h1>
+              <p className="mt-2 text-[18px] font-semibold text-white/85">{join ? 'Pick a name. You’re in.' : 'First, your name.'}</p>
+            </div>
+            <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.1s' }}>
+              <Eyebrow>Your name</Eyebrow>
+              <TextInput placeholder="e.g. Pol" maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            </label>
+          </Body>
+        ) : (
+          <Body className="gap-6 pt-4">
+            <div className="animate-rise">
+              <Eyebrow>New room · 2/2</Eyebrow>
+              <h1 className="mt-2 text-[36px] leading-[1.05] font-black tracking-[-0.03em]">What are you up to?</h1>
+              <p className="mt-2 text-[17px] font-semibold text-white/85">The chats will match the moment.</p>
+            </div>
 
-          <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.1s' }}>
-            <Eyebrow>Your name</Eyebrow>
-            <TextInput placeholder="e.g. Pol" maxLength={MAX_NAME_LENGTH} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-          </label>
-        </Body>
+            <div className="grid animate-rise grid-cols-2 gap-2.5" style={{ animationDelay: '0.05s' }}>
+              {SITUATIONS.map((s) => (
+                <Choice key={s.value} selected={situation === s.value} onClick={() => setSituation(s.value)}>
+                  <span className="text-[26px] leading-none">{s.emoji}</span>
+                  <span className="text-[16px] leading-tight font-extrabold">{s.label}</span>
+                </Choice>
+              ))}
+            </div>
+
+            <div className="flex animate-rise flex-col gap-2.5" style={{ animationDelay: '0.1s' }}>
+              <Eyebrow>Do you know each other?</Eyebrow>
+              <div className="grid grid-cols-2 gap-2.5">
+                {KNOW.map((k) => (
+                  <Choice key={k.value} selected={know === k.value} onClick={() => setKnow(k.value)} className="min-h-[60px] items-center justify-center text-center">
+                    <span className="text-[17px] leading-tight font-extrabold">{k.label}</span>
+                  </Choice>
+                ))}
+              </div>
+            </div>
+          </Body>
+        )}
 
         <Footer>
           {error && <p className="text-center text-[16px] font-bold">{error}</p>}
-          <Button type="submit" variant={join ? 'ink' : 'white'} disabled={!name.trim() || busy}>
-            {join ? 'Join room' : 'Create room'}
-          </Button>
+          {join ? (
+            <Button type="submit" variant="ink" disabled={!name.trim() || busy}>
+              Join room
+            </Button>
+          ) : step === 'name' ? (
+            <Button type="submit" disabled={!name.trim()} className="flex items-center justify-center gap-3">
+              Next
+              <Icon name="arrowRight" size={22} />
+            </Button>
+          ) : (
+            <Button type="submit" disabled={!situation || !know || busy}>
+              {!situation ? 'Pick what you’re up to' : !know ? 'Do you know each other?' : 'Create room'}
+            </Button>
+          )}
         </Footer>
       </form>
     </Screen>
+  )
+}
+
+/** Botón grande de opción: rojo claro sin elegir, blanco con texto rojo al elegirlo. */
+function Choice({ selected, onClick, children, className = '' }: { selected: boolean; onClick: () => void; children: ReactNode; className?: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onClick}
+      className={`flex min-h-[84px] flex-col items-start justify-between gap-2 rounded-[22px] p-4 text-left transition active:scale-[0.97] ${
+        selected ? 'bg-white text-brand shadow-[0_6px_0_rgba(0,0,0,0.18)]' : 'bg-white/15 text-white'
+      } ${className}`}
+    >
+      {children}
+    </button>
   )
 }
