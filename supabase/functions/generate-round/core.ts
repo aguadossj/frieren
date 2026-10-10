@@ -96,7 +96,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v5'
+export const PROMPT_VERSION = 'round-v6'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -148,31 +148,89 @@ export const TEXTING = {
   },
 } as const
 
-const MAX_LINES = 6
+const MAX_LINES = 6 // game.ai_complete_round acepta 2–6 mensajes
 const words = (text: string) => text.trim().split(/\s+/).filter(Boolean).length
+
+// Medido en los fragmentos reales (game.style_examples). Las reacciones y emojis salen de los más frecuentes.
+const CALIBRATION = {
+  es: {
+    capitalRate: 0.56,
+    reactionRate: 0.4, // chats con un mensaje que es solo una reacción
+    emojiRate: 0.15, // mensajes (no finales) que acaban con un emoji
+    reactions: ['JAJAJAJ', 'jajajaja', 'BAJAJAJAJ', '🤣🤣🤣', '😂😂', '💀💀', 'nooo', 'no puede ser', 'que dices', '?'],
+    emoji: ['😂', '🤣', '💀', '😳'],
+  },
+  en: {
+    capitalRate: 0.43,
+    reactionRate: 0.3,
+    emojiRate: 0.07,
+    reactions: ['LMAO', 'lol', 'haha', '💀', '😂😂', 'wha', 'nooo', 'wait what', 'nah', '?'],
+    emoji: ['😂', '💀', '😳', '🙏'],
+  },
+} as const
+
+const pickOne = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)]
+const startsWithCapsWord = (text: string) => /^[A-ZÁÉÍÓÚÑ]{2,}\b/.test(text)
 
 /**
  * Lo que el modelo sigue haciendo mal por mucho que se le pida, corregido en código con los datos reales:
- * sin ¿ ¡ iniciales, sin punto final, y las frases con comas se parten en mensajes seguidos de la misma persona
- * (así escribe la gente). En la pregunta final las comas se quitan sin partir.
+ * - sin ¿ ¡ iniciales ni punto final;
+ * - varias frases o frases con comas en un mensaje -> mensajes seguidos de la misma persona (ráfagas);
+ * - mayúscula inicial en la proporción real (los móviles ponen mayúscula la mitad de las veces);
+ * - a veces una reacción suelta ("JAJAJAJ", "💀💀", "nooo") y algún emoji, en la proporción real.
+ * `random` se puede inyectar para pruebas.
  */
-export function naturalize(lines: { from: string; text: string }[]): { from: string; text: string }[] {
+export function naturalize(
+  lines: { from: string; text: string }[],
+  lang: 'en' | 'es' = 'en',
+  random: () => number = Math.random,
+): { from: string; text: string }[] {
+  const cal = CALIBRATION[lang]
   const clean = (text: string) =>
     text.replace(/[¿¡]/g, '').replace(/\s+/g, ' ').trim().replace(/(?<![.])\.$/, '').trim()
   const out: { from: string; text: string }[] = []
+
   lines.forEach((line, i) => {
-    const text = clean(line.text)
     const last = i === lines.length - 1
-    if (last) {
-      out.push({ from: line.from, text: text.replace(/\s*,\s*/g, ' ') })
-      return
-    }
-    const parts = text.split(/\s*[,;]\s+|\s+-\s+/).map(clean).filter(Boolean)
-    const canSplit = parts.length > 1 && parts.every((p) => words(p) >= 2)
+    const text = clean(line.text)
+    // Frases separadas por . ! ? y por comas. La pregunta final no se parte: tiene que nombrar al writer.
+    const sentences = last ? [text] : text.split(/(?<=[.!?])\s+(?=\S)/).map(clean).filter(Boolean)
+    let parts = last ? sentences : sentences.flatMap((s) => s.split(/\s*[,;]\s+|\s+-\s+/).map(clean).filter(Boolean))
+    if (parts.some((p) => words(p) < 2) && parts.length > 1) parts = sentences
     const room = MAX_LINES - (lines.length - i - 1) - out.length // deja sitio para las líneas que faltan
-    if (canSplit && parts.length <= room) parts.forEach((p) => out.push({ from: line.from, text: p }))
-    else out.push({ from: line.from, text: text.replace(/\s*,\s*/g, ' ') })
+    if (parts.length > 1 && parts.length <= room) parts.forEach((p) => out.push({ from: line.from, text: p }))
+    else out.push({ from: line.from, text })
   })
+
+  // En la pregunta final no quedan comas (en mensajes reales casi no hay).
+  const final = out[out.length - 1]
+  final.text = final.text.replace(/\s*,\s*/g, ' ')
+
+  // Mayúscula inicial como en los mensajes reales; las palabras en MAYÚSCULAS se respetan.
+  for (const line of out) {
+    const first = line.text.split(/\s/)[0]
+    // Nombres como E2E o McKenzie (cifras o mayúsculas dentro) no se tocan.
+    if (!/^[a-zA-ZÁÉÍÓÚÑáéíóúñ]/.test(line.text) || startsWithCapsWord(line.text) || /\d/.test(first) || /[A-ZÁÉÍÓÚÑ]/.test(first.slice(1))) continue
+    line.text = random() < cal.capitalRate
+      ? line.text.charAt(0).toUpperCase() + line.text.slice(1)
+      : line.text.charAt(0).toLowerCase() + line.text.slice(1)
+  }
+
+  // Algún emoji al final de un mensaje (nunca en la pregunta final, ni si ya tiene).
+  for (const line of out.slice(0, -1)) {
+    if (!/[\u{1F300}-\u{1FAFF}☀-➿]/u.test(line.text) && random() < cal.emojiRate) {
+      line.text = `${line.text} ${pickOne(cal.emoji)}`
+    }
+  }
+
+  // Una reacción suelta de otra persona antes de la pregunta final.
+  const hasReaction = out.some((l) => /(ja){2,}|(ha){2,}|\blol\b|\blmao\b/i.test(l.text) || words(l.text) === 1)
+  if (!hasReaction && out.length >= 2 && out.length < MAX_LINES && random() < cal.reactionRate) {
+    const senders = [...new Set(out.map((l) => l.from))]
+    const asker = out[out.length - 1].from
+    const from = senders.find((s) => s !== asker) ?? asker
+    out.splice(out.length - 1, 0, { from, text: pickOne(cal.reactions) })
+  }
   return out
 }
 
@@ -668,7 +726,7 @@ function repairChat(output: ModelOutput, writerName: string, otherHandles: strin
 function validateChat(output: ModelOutput, writerName: string, otherHandles: Set<string>): string | null {
   const chat = output?.chat
   if (!chat || typeof chat.title !== 'string' || !chat.title.trim() || chat.title.length > 40) return 'title'
-  if (!Array.isArray(chat.lines) || chat.lines.length < 2 || chat.lines.length > 7) return 'lines'
+  if (!Array.isArray(chat.lines) || chat.lines.length < 2 || chat.lines.length > 6) return 'lines'
   for (const line of chat.lines) {
     if (!otherHandles.has(line?.from)) return 'from'
     if (typeof line.text !== 'string' || !line.text.trim() || line.text.length > 120) return 'text'
@@ -809,7 +867,7 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
   const output = json
   repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
   if (Array.isArray(output?.chat?.lines)) {
-    output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()))
+    output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()), lang)
     output.chat.title = String(output.chat.title ?? '').replace(/[¿¡]/g, '').trim()
   }
   const texts = output?.chat?.lines?.map((l) => l.text) ?? []

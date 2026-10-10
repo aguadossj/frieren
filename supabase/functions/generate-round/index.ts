@@ -63,7 +63,9 @@ Deno.serve(async (request: Request) => {
     apiKey: apiKey ?? '',
     baseUrl: Deno.env.get('AI_BASE_URL') ?? 'https://api.groq.com/openai/v1',
     model: Deno.env.get('AI_MODEL') ?? 'openai/gpt-oss-120b',
-    timeoutMs: 12000, // la sala espera como mucho 12 s en `generating`
+    // Ronda 1: la sala espera en `generating` (game.config generation_timeout_seconds = 20).
+    // Rondas 2+: se piden al empezar la votación anterior, hay ~25 s de margen. Ajustado a Hermes 3 70B (~10–13 s).
+    timeoutMs: 18000,
     // json_schema (por defecto) | json_object | none: para modelos sin salida estructurada, como Hermes 3 en algunos hosts
     jsonMode: (Deno.env.get('AI_JSON_MODE') ?? 'json_schema') as 'json_schema' | 'json_object' | 'none',
   }
@@ -78,7 +80,7 @@ Deno.serve(async (request: Request) => {
     try {
       if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
       // La escritura dura ~25 s y espera al bot como mucho 10 s tras contestar todos: tiene que ser rápido.
-      const output = await generateMimic(body.context, body.examples, { ...config, timeoutMs: 8000 })
+      const output = await generateMimic(body.context, body.examples, { ...config, timeoutMs: 15000 })
       if (!roundId) return json(200, output)
       const accepted = await rpc('submit_bot_answer', { p_round_id: roundId, p_text: output.answer })
       await rpc('log_ai_generation', {
@@ -106,7 +108,8 @@ Deno.serve(async (request: Request) => {
   if (roundId) {
     try {
       if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
-      const output = await generateRound(parseInput(body.input), config)
+      const input = parseInput(body.input)
+      const output = await generateRound(input, { ...config, timeoutMs: input.round === 1 ? 18000 : 28000 })
       const outcome = await rpc('ai_complete_round', { p_round_id: roundId, p_result: output })
       return json(200, { outcome })
     } catch (error) {

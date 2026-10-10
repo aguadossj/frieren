@@ -5,7 +5,7 @@
 
 import { AiError, LANGUAGES, callModel, copiedFrom, languageProblem, parseExamples, type AiConfig, type Memory } from './core.ts'
 
-export const MIMIC_PROMPT_VERSION = 'mimic-v2'
+export const MIMIC_PROMPT_VERSION = 'mimic-v3'
 
 interface ContextAnswer {
   player_id: string | null
@@ -78,6 +78,10 @@ const EMOJI_ALL = /[\u{1F300}-\u{1FAFF}☀-➿]️?/gu
  */
 export function matchWriter(answer: string, real: string[]): string {
   let out = answer.replace(/\s+/g, ' ').trim()
+  // Las respuestas reales son de una frase: si el writer contesta corto (o aún no sabemos), solo la primera.
+  const avgReal = real.length ? real.reduce((n, t) => n + t.length, 0) / real.length : 0
+  const sentences = out.split(/(?<=[.!?])\s+(?=\S)/)
+  if (sentences.length > 1 && (avgReal === 0 || avgReal <= 35)) out = sentences[0]
   const some = (re: RegExp) => real.some((t) => re.test(t))
   const every = (re: RegExp) => real.length > 0 && real.every((t) => re.test(t))
   const tidy = () => (out = out.replace(/\s+/g, ' ').replace(/\s+([.!?,])/g, '$1').trim())
