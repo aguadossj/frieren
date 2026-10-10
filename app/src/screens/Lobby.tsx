@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Avatar, Button, Eyebrow, Footer, Icon, LangToggle, Row, Screen } from '../components/ui'
-import QR, { joinUrl } from '../components/QR'
+import QR, { shareInvite } from '../components/QR'
 import { useGame } from '../game/useGame'
 import { MIN_PLAYERS } from '../game/types'
 import { useT } from '../i18n'
@@ -14,26 +14,24 @@ export default function Lobby() {
   const host = room.players.find((p) => p.isHost)
   const situation = typeof room.setup?.situation === 'string' ? room.setup.situation : null
 
-  const copy = () => {
-    const url = joinUrl(room.code)
-    if (navigator.clipboard) {
-      void navigator.clipboard.writeText(url).then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
-      })
-    } else if (navigator.share) void navigator.share({ title: 'Typing…', url }).catch(() => {})
+  // Tocar el código abre el menú de compartir del móvil con la invitación (texto + código + enlace)
+  const copy = async () => {
+    if ((await shareInvite(room.code, t.inviteText(room.code))) === 'copied') {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
   }
 
-  /** Código en fichas grandes: tocarlo copia el enlace de invitación. */
+  /** Código en fichas grandes: tocarlo comparte la invitación. */
   const codeButton = (
-    <button onClick={copy} aria-label={t.copyLink} className="flex items-center gap-2 active:scale-95">
+    <button onClick={() => void copy()} aria-label={t.copyLink} className="flex items-center gap-2 active:scale-95">
       {room.code.split('').map((l, i) => (
         <span key={i} className="flex h-[52px] w-[44px] items-center justify-center rounded-[14px] bg-white text-[28px] font-black text-ink">
           {l}
         </span>
       ))}
       <span className={`flex size-[44px] items-center justify-center rounded-full transition-colors ${copied ? 'bg-good' : 'bg-white/18'}`}>
-        <Icon name={copied ? 'check' : 'copy'} size={20} />
+        <Icon name={copied ? 'check' : 'share'} size={20} />
       </span>
     </button>
   )

@@ -4,8 +4,8 @@
 import { useEffect, useState } from 'react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import type { Player } from '../game/types'
-import { joinUrl } from './QR'
-import { setLang, useLang } from '../i18n'
+import { shareInvite } from './QR'
+import { setLang, useLang, useT } from '../i18n'
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
 
@@ -30,26 +30,24 @@ export function Icon({ name, size = 20, className = '' }: { name: keyof typeof I
   )
 }
 
-/** Cabecera de la app: marca a la izquierda y, dentro de una sala, el código (tocar = copiar el enlace). */
+/** Cabecera de la app: marca a la izquierda y, dentro de una sala, el código (tocar = compartir la invitación). */
 export function AppHeader({ code, left }: { code?: string; left?: ReactNode }) {
   const [copied, setCopied] = useState(false)
-  const copy = () => {
+  const t = useT()
+  const copy = async () => {
     if (!code) return
-    const url = joinUrl(code)
-    if (navigator.clipboard) {
-      void navigator.clipboard.writeText(url).then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 1500)
-      })
-    } else if (navigator.share) void navigator.share({ title: 'Typing…', url }).catch(() => {})
+    if ((await shareInvite(code, t.inviteText(code))) === 'copied') {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }
   }
   return (
     <div className="flex h-[56px] shrink-0 items-center justify-between gap-3 px-5">
       {left ?? <span className="text-[22px] font-black tracking-[-0.03em] text-brand">Typing…</span>}
       {code && (
-        <button onClick={copy} aria-label="Copy invite link" className="flex h-[38px] items-center gap-2 rounded-full bg-neutral-100 px-4 text-ink active:scale-95">
+        <button onClick={() => void copy()} aria-label={t.copyLink} className="flex h-[38px] items-center gap-2 rounded-full bg-neutral-100 px-4 text-ink active:scale-95">
           <span className="text-[16px] font-extrabold tracking-[0.18em]">{code}</span>
-          <Icon name={copied ? 'check' : 'copy'} size={15} className={copied ? 'text-good' : 'text-neutral-400'} />
+          <Icon name={copied ? 'check' : 'share'} size={15} className={copied ? 'text-good' : 'text-neutral-400'} />
         </button>
       )}
     </div>
