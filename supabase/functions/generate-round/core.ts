@@ -68,6 +68,7 @@ export interface GenerateRoundInput {
   writer_id: string
   history: PastRound[]
   memory?: Partial<Memory> | null
+  style_examples?: { who: string; text: string }[][] // chats reales anonimizados (game.style_examples)
 }
 
 /** `chat` tiene la forma de `game.rounds.conversation`; el resto va a `rooms.memory` y `game.ai_generations`. */
@@ -82,7 +83,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v2'
+export const PROMPT_VERSION = 'round-v3'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -191,7 +192,21 @@ export function parseInput(body: unknown): GenerateRoundInput {
   }))
 
   const memory = b.memory && typeof b.memory === 'object' ? (b.memory as Partial<Memory>) : null
-  return { round, total_rounds, setup, players, writer_id, history, memory }
+  const style_examples = parseExamples(b.style_examples, 4)
+  return { round, total_rounds, setup, players, writer_id, history, memory, style_examples }
+}
+
+/** Ejemplos de estilo: como mucho `max` fragmentos de 2–6 líneas cortas. */
+export function parseExamples(value: unknown, max: number): { who: string; text: string }[][] {
+  return (Array.isArray(value) ? value : [])
+    .slice(0, max)
+    .map((example) =>
+      (Array.isArray(example) ? example : [])
+        .slice(0, 6)
+        .map((line) => ({ who: clip(line?.who, 2) || 'A', text: clip(line?.text, 120) }))
+        .filter((line) => line.text),
+    )
+    .filter((example) => example.length >= 2)
 }
 
 // ───────────────────────── Aprendizaje (capa determinista) ─────────────────────────
@@ -303,6 +318,15 @@ STEP 2, WRITE THE CHAT ("chat"), using what you just learned:
   and extra_context. From round 2 on, call back a running joke or something a player said
   when it fits, and follow the steer. If the writer has been easy to spot (stats.spotted_by), ask something more open-ended.
 
+STYLE: DATA.style_examples are real group chats between anonymous people (A, B, C), often in Spanish or Catalan.
+Your chat must read like those, not like a script. Copy how they text, not what they say:
+- most messages are 2 to 8 words, mostly lowercase, little punctuation, small typos are fine;
+- at least one message is just a reaction ("JAJAJA", "nooo", "wait what", "😭");
+- the same person may send two messages in a row; stretched words (siii, nooo) and caps for emphasis are welcome.
+Write everything in English. Never reuse their sentences, situations or details.
+The title is a real group chat name for these people, not a summary of the joke (no "Snack Heist" style titles).
+If audience.where_they_are is set, the chat happens right now at that place.
+
 CONTENT: English only. The humour comes from the situation, never from attacking someone. No insults about looks, body,
 race, religion, sexuality or health. Nothing sexually explicit.`
 
@@ -352,6 +376,7 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string) 
   return {
     round: input.round,
     total_rounds: input.total_rounds,
+    style_examples: input.style_examples ?? [],
     writer_this_round: {
       handle: handleOf(input.writer_id),
       name: input.players.find((p) => p.id === input.writer_id)?.name,
@@ -466,7 +491,67 @@ function validateChat(output: ModelOutput, writerName: string, otherHandles: Set
   return null
 }
 
+// Los ejemplos de estilo son chats reales: la IA puede imitar el tono, nunca copiar una línea.
+const normalize = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+export function copiedFrom(lines: string[], examples: { text: string }[][]): string | null {
+  const seen = new Set(examples.flat().map((l) => normalize(l.text)).filter((t) => t.length >= 8))
+  return lines.some((line) => seen.has(normalize(line))) ? 'copied_example' : null
+}
+
 // ───────────────────────── Llamada ─────────────────────────
+
+/** Una llamada a la API compatible con OpenAI con salida JSON estricta. */
+export async function callModel<T>(
+  config: AiConfig,
+  system: string,
+  user: string,
+  schemaName: string,
+  schema: unknown,
+): Promise<{ json: T; usage: { prompt_tokens?: number; completion_tokens?: number } }> {
+  const started = Date.now()
+  const budget = config.timeoutMs ?? 8000
+  let response = await send(config, system, user, schemaName, schema, budget)
+  // Límite de peticiones del proveedor (429): si dice que esperemos poco y queda tiempo, un reintento.
+  if (response.status === 429) {
+    const wait = Math.min(Number(response.headers.get('retry-after') ?? '1') * 1000 || 1000, 3000)
+    const left = budget - (Date.now() - started) - wait
+    if (left > 1500) {
+      await new Promise((ok) => setTimeout(ok, wait))
+      response = await send(config, system, user, schemaName, schema, left)
+    }
+  }
+  if (!response.ok) throw new AiError('provider_status', `${response.status} ${await response.text().catch(() => '')}`)
+  try {
+    const data = await response.json()
+    return { json: JSON.parse(data.choices?.[0]?.message?.content ?? 'null') as T, usage: data.usage ?? {} }
+  } catch {
+    throw new AiError('invalid_output', 'not_json')
+  }
+}
+
+async function send(config: AiConfig, system: string, user: string, schemaName: string, schema: unknown, timeoutMs: number) {
+  try {
+    return await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(timeoutMs),
+      body: JSON.stringify({
+        model: config.model,
+        ...(config.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
+        temperature: 1,
+        max_completion_tokens: 4000,
+        response_format: { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ],
+      }),
+    })
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === 'TimeoutError'
+    throw new AiError(timedOut ? 'timeout' : 'provider_failed', String(error))
+  }
+}
 
 /** Genera la ronda. Reintenta una vez si el modelo devuelve algo inválido (p. ej. hace hablar al writer). */
 export async function generateRound(input: GenerateRoundInput, config: AiConfig): Promise<GenerateRoundOutput> {
@@ -500,44 +585,18 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig): Promis
   const writer = input.players.find((p) => p.id === input.writer_id)!
   const otherHandles = input.players.filter((p) => p.id !== writer.id).map((p) => handleOf(p.id))
 
-  let response: Response
-  try {
-    response = await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${config.apiKey}`, 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(config.timeoutMs ?? 8000),
-      body: JSON.stringify({
-        model: config.model,
-        ...(config.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
-        temperature: 1,
-        max_completion_tokens: 4000,
-        response_format: {
-          type: 'json_schema',
-          json_schema: { name: 'round', strict: true, schema: buildSchema([...handles.values()]) },
-        },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `DATA:\n${JSON.stringify(buildData(input, handleOf))}` },
-        ],
-      }),
-    })
-  } catch (error) {
-    const timedOut = error instanceof Error && error.name === 'TimeoutError'
-    throw new AiError(timedOut ? 'timeout' : 'provider_failed', String(error))
-  }
-  if (!response.ok) throw new AiError('provider_status', `${response.status} ${await response.text().catch(() => '')}`)
-
-  let output: ModelOutput
-  let usage: { prompt_tokens?: number; completion_tokens?: number } = {}
-  try {
-    const data = await response.json()
-    usage = data.usage ?? {}
-    output = JSON.parse(data.choices?.[0]?.message?.content ?? 'null')
-  } catch {
-    throw new AiError('invalid_output', 'not_json')
-  }
+  const { json, usage } = await callModel<ModelOutput>(
+    config,
+    SYSTEM_PROMPT,
+    `DATA:\n${JSON.stringify(buildData(input, handleOf))}`,
+    'round',
+    buildSchema([...handles.values()]),
+  )
+  const output = json
   repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
-  const problem = validateChat(output, writer.name, new Set(otherHandles))
+  const problem =
+    validateChat(output, writer.name, new Set(otherHandles)) ??
+    copiedFrom(output.chat.lines.map((l) => l.text), input.style_examples ?? [])
   if (problem) throw new AiError('invalid_output', problem)
 
   return {
