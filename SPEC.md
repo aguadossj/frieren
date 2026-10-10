@@ -39,25 +39,40 @@ idiomas que no sean inglés · historial de partidas · pantalla grande tipo TV 
 ## Arquitectura
 - **Front:** Vite + React 19 + TS + Tailwind v4 en `app/`. La UI solo usa `useGame()` (`app/src/game/useGame.ts`),
   que expone un `GameClient` (contrato en `types.ts`). Hoy: `mockClient.ts` (memoria + 3 bots). Mañana: `supabaseClient.ts`.
-- **Tiempo real:** Supabase, **proyecto dedicado `frieren`** (ref `xociawfbjmccevhjcfiu`, ya en `.mcp.json`). Nunca usar otro proyecto.
-  - Tablas `rooms`, `players`, `answers`, `votes`, `reactions`. RLS activado, **solo `select`** por sala; **ninguna escritura directa**.
-  - Todas las escrituras por RPC `security definer`: `create_room`, `join_room`, `set_options`, `start_game`,
-    `submit_answer`, `cast_vote`, `react`, `advance_phase`.
-  - `advance_phase(room)` es idempotente y **la llama cualquier cliente** cuando vence `phase_ends_at` o todos han enviado.
-    Calcula la puntuación como `scoring.ts`. El juego no se para si el host bloquea el móvil.
-  - Clientes suscritos por Realtime a su sala. `client_id` en `localStorage` para reconectar tras recargar.
-  - Límites en la base: nombre ≤ 16, respuesta ≤ 80, máx. 8 jugadores, código de 4 letras sin I/O.
-  - Las respuestas no se exponen con autor hasta la fase `reveal`.
-- **IA (mejora, no bloqueante):** `app/api/generate-chats.ts` (función de Vercel, Anthropic, timeout 6 s) recibe
-  nombres + pack + tipo de grupo y devuelve N chats en JSON. Si no hay `ANTHROPIC_API_KEY`, falla o tarda →
-  `app/src/content/packs.ts`. Los chats se generan todos al empezar la partida.
+- **Backend:** Supabase, **proyecto dedicado `frieren`** (ref `xociawfbjmccevhjcfiu`, ya en `.mcp.json`). Nunca usar otro proyecto.
+  Migraciones versionadas en `supabase/migrations/` (aplicadas con el MCP). Detalle completo en esos ficheros.
+  - **Identidad:** Supabase **Anonymous Sign-In** (sin cuenta). Sesión en `sessionStorage` (muere al cerrar la pestaña,
+    sobrevive a recargar). Perfil: nombre ≤ 16 + emoji; `profiles.metadata` jsonb para avatar/foto/edad futuros.
+  - **Esquema privado `game`** (no expuesto por la Data API, RLS activado sin políticas): `profiles`, `rooms`,
+    `room_players`, `setup_questions` (catálogo editable sin desplegar), `events` (métricas). Pendiente (migración 2):
+    `rounds`, `answers`, `votes`, `reactions`, `round_scores`, `ai_generations`.
+  - **API = RPC en `public`** (security definer, `search_path` vacío, solo rol `authenticated`, cada una comprueba
+    `auth.uid()` y permisos). Hechas: `create_room`, `join_room`, `leave_room`, `kick_player`, `transfer_host`,
+    `save_setup`, `update_settings`, `get_setup_questions`, `get_my_active_room`, `get_room_state`.
+    Pendientes: `start_game`, `submit_answer`, `cast_vote`, `react`, `advance_phase`, `end_game`.
+  - **`get_room_state(room_id)`** devuelve solo lo que ese jugador puede ver (las autorías no salen hasta `reveal`).
+  - **Tiempo real:** cada cambio sube `rooms.version`; un trigger hace `realtime.send` al canal **privado** `room:<id>`
+    (solo jugadores activos pueden escucharlo). El cliente, al recibirlo, vuelve a pedir `get_room_state`.
+  - **Reglas de sala:** entrar solo en lobby (`game_in_progress` si ya empezó); echado = no puede volver; si el host se va,
+    pasa al jugador activo más antiguo; sala vacía = cerrada; códigos de 4 letras (sin I/O) únicos entre salas activas.
+  - **Configuración y contexto:** el host cambia `settings` (tiempos, rondas, máx. jugadores) y el contexto (`setup`:
+    who, age, vibes, topic libre ≤ 120) en el lobby y durante la partida; aplica desde la siguiente ronda.
+    Rondas por defecto = una por jugador.
+  - **Métricas:** `game.events` (room_created, player_joined, player_kicked, setup_saved, host_transferred…) escritas por
+    las RPC; duración de partida con `rooms.started_at/ended_at`.
+- **IA (ronda a ronda):** Supabase **Edge Function** `generate-round` con adaptador **compatible con OpenAI**
+  (proveedor probable: **Grok/xAI**; URL base, modelo y clave por secretos). Ronda 1 al pulsar Start; ronda N+1 se genera
+  en segundo plano al empezar la votación de la N (lanzada desde la base con `pg_net`). Recibe contexto actual, rondas
+  anteriores, respuestas reales y `rooms.memory` (preparado para "aprender" y redirigir el tema). Salida JSON validada.
+  Si falla o no está lista a tiempo → conversación de respaldo (`app/src/content/packs.ts`).
+  Si `age` es `under_18` o `mixed`, sin contenido picante.
 
 ## Riesgos y plan B
 | Riesgo | Plan B |
 |---|---|
 | Supabase/Realtime da guerra | El mock ya juega solo; para la demo se puede jugar en modo mock con bots en un móvil |
 | No conseguimos clave de IA | Packs precargados (≥ 30 chats). El juego no depende de la IA |
-| iPhone se desconecta al bloquear | `client_id` en `localStorage` + estado en servidor → al volver, sigue en la sala |
+| iPhone se desconecta al bloquear | Sesión anónima + estado en servidor → al volver, `get_my_active_room` le devuelve a su sala |
 | 60 personas a la vez | Todo por RPC con límites; sin LLM en el camino crítico de cada ronda |
 | Contenido ofensivo con nombres reales | Prompt: picante de situación, nunca contra una persona; filtro de palabras en respuestas |
 
