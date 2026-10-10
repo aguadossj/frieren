@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import PandaHost from '../components/Panda'
+import { RoundOutcome } from '../components/RoundOutcome'
 import { Avatar, AwardCard, Button, Footer, Icon, Screen, TimeBar, TopBar, TopNote } from '../components/ui'
 import { useGame } from '../game/useGame'
 import { MIMIC_AUTHOR_ID, PHASE_SECONDS } from '../game/types'
@@ -27,6 +28,7 @@ export function Reveal() {
 
   return (
     <Screen>
+      <RoundOutcome key={room.roundIndex} />
       <TopBar title={t.theRealSaid(writer.name)} right={<TopNote>{t.round(room.roundIndex + 1)}</TopNote>} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-3">
@@ -64,8 +66,19 @@ export function Reveal() {
                   <div className="flex shrink-0 items-center">
                     {voters.length === 0 ? (
                       <span className={`text-[13px] font-bold ${a.isReal || bot ? 'text-white/60' : 'text-neutral-300'}`}>{t.noVotes}</span>
+                    ) : a.isReal ? (
+                      // Respuesta real: los puntos de cada uno (cuanto antes votó, más)
+                      <div className="flex max-w-[150px] flex-wrap justify-end gap-1">
+                        {voters.slice(0, 3).map((v) => (
+                          <span key={v.id} className="flex items-center gap-0.5 rounded-full bg-white/25 py-0.5 pr-2 pl-0.5 text-[12px] font-black tabular-nums">
+                            <Avatar player={v} size={22} />⚡{result.points[v.id] ?? 0}
+                          </span>
+                        ))}
+                        {voters.length > 3 && <span className="text-[12px] font-black">+{voters.length - 3}</span>}
+                      </div>
                     ) : (
-                      <div className="flex -space-x-2">
+                      <div className="flex items-center -space-x-2">
+                        {bot && <span className="mr-3 text-[13px] font-black text-[#FF8A8A]">−100</span>}
                         {voters.slice(0, 4).map((v) => (
                           <Avatar key={v.id} player={v} size={26} ring />
                         ))}

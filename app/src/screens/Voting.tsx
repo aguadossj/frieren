@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Avatar, Button, Footer, Icon, Screen, TimeBar, TopBar } from '../components/ui'
-import { useGame } from '../game/useGame'
-import { PHASE_SECONDS } from '../game/types'
+import { useCountdown, useGame } from '../game/useGame'
+import { PHASE_SECONDS, speedPoints } from '../game/types'
 import { useT } from '../i18n'
 
 const LETTERS = 'ABCDEF'
@@ -10,7 +10,11 @@ export default function Voting() {
   const { room, me, game } = useGame()
   const t = useT()
   const [picked, setPicked] = useState<string | null>(null)
+  useCountdown(room?.phaseEndsAt ?? null) // repinta 4 veces por segundo: los puntos del botón bajan con el tiempo
   if (!room?.chat || !me) return null
+  // Puntos si aciertas ahora mismo (estilo Kahoot: 200 al instante → 100 al final). Los da el servidor; esto es la estimación.
+  const votingMs = (room.settings?.voting_seconds ?? PHASE_SECONDS.voting) * 1000
+  const potential = room.phaseEndsAt ? speedPoints(votingMs - Math.max(0, room.phaseEndsAt - Date.now()), votingMs) : 0
 
   const writer = room.players.find((p) => p.id === room.chat!.writerId)!
   const isWriter = writer.id === me.id
@@ -75,7 +79,17 @@ export default function Voting() {
 
       <Footer className="pt-1">
         <Button variant="ink" disabled={isWriter || locked || !picked} onClick={() => picked && void game.castVote(picked)}>
-          {isWriter ? t.huntingYou(room.votedIds.length, voters) : locked ? t.locked(room.votedIds.length, voters) : picked ? t.lockVote : t.tapTheReal}
+          {isWriter ? (
+            t.huntingYou(room.votedIds.length, voters)
+          ) : locked ? (
+            t.locked(room.votedIds.length, voters)
+          ) : picked ? (
+            <>
+              {t.lockVote} · <span className={`tabular-nums ${potential >= 150 ? 'text-[#7CF29A]' : 'text-[#FFC24D]'}`}>+{potential}</span>
+            </>
+          ) : (
+            t.tapTheReal
+          )}
         </Button>
       </Footer>
     </Screen>
