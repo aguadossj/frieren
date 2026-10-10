@@ -51,7 +51,7 @@ export default function Writing() {
       <div aria-hidden className="fixed inset-x-0 top-0 z-[60] h-[6px] bg-white sm:hidden" />
       <div aria-hidden className="fixed inset-x-0 bottom-0 z-[60] h-[6px] bg-white sm:hidden" />
     <Screen className="bg-white!">
-      <header className="flex min-h-[48px] shrink-0 items-center gap-2.5 bg-white px-3 py-2 text-ink">
+      <header className="flex min-h-[40px] shrink-0 items-center gap-2.5 bg-white px-3 py-1 text-ink">
         <span className="flex size-[32px] shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-extrabold text-white">
           {groupInitials(room.chat.title)}
         </span>
@@ -102,7 +102,7 @@ export default function Writing() {
         )}
       </div>
 
-      <div className={`shrink-0 bg-white px-2.5 ${typing ? 'pt-1.5 pb-1.5' : 'pt-1.5 pb-3'}`}>
+      <div className={`shrink-0 bg-white px-2.5 ${typing ? 'pt-1 pb-1' : 'pt-1 pb-1.5'}`}>
         {sent ? (
           <div className="flex h-[38px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[15px] font-extrabold text-ink">
             <Icon name="check" size={18} className="text-good" />
