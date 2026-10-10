@@ -106,8 +106,8 @@ idiomas que no sean inglés · historial de partidas · pantalla grande tipo TV 
 | **T3 — Contenido, IA, QA, deploy** | Packs, premios, IA, QR, sonidos, deploy, QA | `app/src/content/**`, `app/api/**`, `app/public/sfx/**`, QR en Lobby (avisar a T2), `AGENT_LOG.md`, `SETUP.md` |
 
 `app/src/game/scoring.ts` y `mockClient.ts`: T1 (la UI no los toca).
-**Deploy: solo Mario** (`cd app && npx vercel --prod --yes` en su portátil, su cuenta de Vercel). Los demás piden deploy en el chat del equipo.
-Las env vars (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `ANTHROPIC_API_KEY`) se añaden a **ese** proyecto (`npx vercel env add …` desde el portátil de Mario).
+**Deploy: automático.** Cada push a `main` publica en https://frieren-bfq.pages.dev (Cloudflare Pages). Ver `DEPLOY.md`.
+Env vars de build en Cloudflare Pages (Production): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `NODE_VERSION=22`. La clave de IA vive solo en Supabase (Edge Function).
 Git: `git pull --rebase` **antes de empezar cada tarea** y antes de cada push (el viernes dos sesiones hicieron el Paso 0 a la vez y chocaron),
 commits pequeños a `main`, `npm run build` antes de cada commit. Node ≥ 20.19 (Vite 8): `nvm use 22`.
 
