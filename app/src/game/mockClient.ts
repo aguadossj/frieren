@@ -16,6 +16,7 @@ import {
   PLAYER_COLORS,
 } from './types'
 import type { Answer, Chat, GameClient, GameState, Pack, Phase, Player, Room, RoundResult, Setup, SetupQuestion } from './types'
+import { getLang } from '../i18n'
 
 /** `crypto.randomUUID` solo existe en contextos seguros (https / localhost). En el móvil por la IP local
  *  (http://192.168.x.x:5173) no está, así que usamos un id aleatorio normal. */
@@ -35,6 +36,8 @@ const BOT_REPLIES = [
   'lol',
   'I was sleepwalking',
 ]
+// Respuestas de los bots cuando la interfaz está en castellano
+const BOT_REPLIES_ES = ['fue el gato', 'mañana te compro dos', 'rutina de skincare 💅', '¿quién pregunta?', 'sin comentarios 🙃', 'habla con mi abogado', 'jajaja', 'estaba sonámbulo']
 
 // Sin IA, el contexto elige el pack de chats de respaldo más parecido.
 const PACK_BY_SITUATION: Record<string, Pack> = {
@@ -162,7 +165,7 @@ export function createMockClient(): GameClient {
     result = null
     setPhase('writing', PHASE_SECONDS.writing, startVoting)
     for (const bot of bots()) {
-      later(2000 + Math.random() * 6000, () => submit(bot.id, pick(BOT_REPLIES)))
+      later(2000 + Math.random() * 6000, () => submit(bot.id, pick(getLang() === 'es' ? BOT_REPLIES_ES : BOT_REPLIES)))
     }
     emit()
   }
@@ -293,7 +296,7 @@ export function createMockClient(): GameClient {
 
   async function begin() {
     if (players.length < MIN_PLAYERS) {
-      error = `You need at least ${MIN_PLAYERS} players.`
+      error = getLang() === 'es' ? `Hacen falta al menos ${MIN_PLAYERS} jugadores.` : `You need at least ${MIN_PLAYERS} players.`
       emit()
       return
     }
