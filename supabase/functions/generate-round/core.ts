@@ -23,8 +23,10 @@ export interface Setup {
   age?: string | null // under_18 | 18_24 | 25_34 | 35_plus | mixed
   vibes?: string[] | null // spicy | exes | ethics | uni | work | chaos
   topic?: string | null // texto libre ≤ 120
-  situation?: string | null // pantalla de crear sala: drinks | party | dinner | home | trip | break
+  situation?: string | null // texto libre de "¿Qué está pasando ahora?" (≤ 120) o un valor antiguo: drinks | party…
   know?: string | null // "¿os conocéis?": yes | no
+  /** Lugar real si el host dijo que están juntos y compartió la ubicación (nombres de OpenStreetMap, sin coordenadas). */
+  right_now?: { place: string | null; nearby: string[]; local_time: string | null; together: boolean } | null
   lang?: 'en' | 'es' // idioma del host (selector EN · ES); por defecto inglés
   extra?: Record<string, string> // otras claves libres de save_setup (solo contexto)
 }
@@ -58,7 +60,13 @@ export interface Memory {
   running_jokes: string[]
   steer: string
   used_situations: string[]
+  used_themes?: string[] // ids de THEMES ya usados en la sala
   updated_round: number
+}
+
+export interface HouseExample {
+  title: string
+  lines: { who: string; text: string }[] // who: A, B… o WRITER
 }
 
 export interface GenerateRoundInput {
@@ -70,6 +78,7 @@ export interface GenerateRoundInput {
   history: PastRound[]
   memory?: Partial<Memory> | null
   style_examples?: { who: string; text: string }[][] // chats reales anonimizados (game.style_examples)
+  house_examples?: HouseExample[] // chats de referencia del equipo (game.fallback_chats), en el idioma de la sala
 }
 
 /** `chat` tiene la forma de `game.rounds.conversation`; el resto va a `rooms.memory` y `game.ai_generations`. */
@@ -84,7 +93,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v3'
+export const PROMPT_VERSION = 'round-v4'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -98,9 +107,87 @@ const VIBES: Record<string, string> = {
   spicy: 'nights out, crushes, who went home with who (flirty, never explicit)',
   exes: 'exes, dating apps, texting dilemmas',
   ethics: 'small moral dilemmas: found money, white lies, splitting the bill',
-  uni: 'uni and flatmate life: chores, stolen food, exams, group projects',
-  work: 'office drama: meetings, the boss, lunch thieves, reply-all disasters',
+  uni: 'uni life: exams, group projects, deadlines, flatmates, campus gossip',
+  work: 'office drama: meetings, the boss, reply-all disasters, the office party',
   chaos: 'absurd, surreal everyday chaos',
+}
+
+// Idioma de la sala: manda sobre todo lo demás (ejemplos, historial, nombres).
+export const LANGUAGES = {
+  en: { name: 'English', notes: 'Casual English texting. No Spanish words.' },
+  es: {
+    name: 'Spanish (Spain)',
+    notes:
+      'Castellano de España, como escriben universitarios de Barcelona o Madrid: vale, tío/tía, guay, flipar, quedada, ' +
+      'finde, birra, en plan, JAJAJA. Nunca español de Latinoamérica ni tópicos mexicanos: nada de güey, chido, platicar, ' +
+      'ahorita, órale, neta, tacos o taquerías. Ninguna palabra en inglés salvo las que se usan de verdad (story, match, like).',
+  },
+} as const
+
+// Tema de cada ronda: lo elige el código (sin repetir en la sala) para que no salga siempre lo mismo.
+export interface Theme {
+  id: string
+  en: string
+  es: string
+  adult?: boolean
+}
+export const THEMES: Theme[] = [
+  { id: 'secret', en: 'a secret about someone in the group just got out', es: 'acaba de salir a la luz un secreto de alguien del grupo' },
+  { id: 'last_night', en: 'something embarrassing someone did last night', es: 'algo vergonzoso que alguien hizo anoche' },
+  { id: 'lie', en: 'someone got caught in a small lie', es: 'han pillado a alguien en una mentirijilla' },
+  { id: 'lost', en: 'something important got lost or broken and nobody admits it', es: 'algo importante se ha perdido o roto y nadie lo admite' },
+  { id: 'plan', en: 'the group is making plans and one idea is terrible', es: 'el grupo está haciendo planes y una idea es malísima' },
+  { id: 'dare', en: 'a bet or a dare that went too far', es: 'una apuesta o un reto que se fue de las manos' },
+  { id: 'habit', en: 'someone has a weird new habit everyone noticed', es: 'alguien tiene una manía nueva rarísima que todos han notado' },
+  { id: 'dilemma', en: 'a small moral dilemma the group cannot agree on', es: 'un pequeño dilema moral en el que el grupo no se pone de acuerdo' },
+  { id: 'opinion', en: 'someone posted an unpopular opinion', es: 'alguien ha soltado una opinión impopular' },
+  { id: 'awkward', en: 'an awkward moment with a teacher, a boss or a neighbour', es: 'un momento incómodo con un profe, un jefe o un vecino' },
+  { id: 'event', en: 'organising an event and something went badly wrong', es: 'organizando un evento y algo ha salido fatal' },
+  { id: 'match', en: 'a match or a competition the group lost in a ridiculous way', es: 'un partido o una competición que el grupo perdió de forma ridícula' },
+  { id: 'talent', en: 'someone claims a hidden talent nobody believes', es: 'alguien dice tener un talento oculto que nadie se cree' },
+  { id: 'screenshot', en: 'a screenshot or a message sent to the wrong chat', es: 'una captura o un mensaje enviado al chat equivocado' },
+  { id: 'trip', en: 'a trip or a day out where everything went wrong', es: 'un viaje o una excursión en la que todo salió mal' },
+  { id: 'crush', en: 'someone has a suspicious new crush', es: 'alguien tiene un crush nuevo muy sospechoso', adult: true },
+  { id: 'night_out', en: 'where someone disappeared to on the last night out', es: 'dónde desapareció alguien la última noche de fiesta', adult: true },
+  { id: 'ex', en: 'an ex just showed up again (a like, a story, a text)', es: 'un ex ha vuelto a aparecer (un like, una story, un mensaje)', adult: true },
+]
+
+export function pickTheme(input: GenerateRoundInput): Theme {
+  const clean = Boolean(input.setup.age && CLEAN_AGES.has(input.setup.age))
+  const used = new Set(input.memory?.used_themes ?? [])
+  const allowed = THEMES.filter((t) => !(clean && t.adult))
+  const fresh = allowed.filter((t) => !used.has(t.id))
+  const pool = fresh.length > 0 ? fresh : allowed
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+// Detección de idioma barata: palabras funcionales y signos propios del castellano.
+const ES_WORDS = new Set('que qué de la el los las y es no pero para con por un una me te se lo yo tú tu ya eso esto vale tío tía pues muy hay está has ha he quién cómo dónde porque también nada todo esta este jaja jajaja sí'.split(' '))
+const EN_WORDS = new Set('the and you is to it we for what are can have do i my your that this with was who just so of in on lol yeah why how did not'.split(' '))
+const LATAM = /\b(g[üu]ey|wey|chido|platic\w*|ahorita|[óo]rale|neta|chamba|cuate|taquer[ií]a\w*|tacos?)\b/i
+
+export function detectLang(texts: string[]): 'es' | 'en' | null {
+  let es = 0
+  let en = 0
+  for (const text of texts) {
+    if (/[ñ¿¡áéíóú]/i.test(text)) es += 1
+    for (const word of text.toLowerCase().match(/[a-zñáéíóúü']+/g) ?? []) {
+      if (ES_WORDS.has(word)) es += 1
+      if (EN_WORDS.has(word)) en += 1
+    }
+  }
+  if (es === 0 && en === 0) return null
+  if (es >= en * 1.5 && es >= 2) return 'es'
+  if (en >= es * 1.5 && en >= 2) return 'en'
+  return null
+}
+
+/** null si el texto está en el idioma de la sala; si no, el motivo. */
+export function languageProblem(texts: string[], lang: 'en' | 'es'): string | null {
+  const detected = detectLang(texts)
+  if (detected && detected !== lang) return 'wrong_language'
+  if (lang === 'es' && texts.some((t) => LATAM.test(t))) return 'latam_spanish'
+  return null
 }
 const AUDIENCE: Record<string, string> = {
   students: 'uni students',
@@ -117,7 +204,7 @@ const SITUATIONS: Record<string, string> = {
   trip: 'on a trip together right now',
   break: 'on a class or work break right now',
 }
-const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang'])
+const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang', 'place', 'nearby', 'local_time', 'together'])
 const ADULT_VIBES = new Set(['spicy', 'exes'])
 const CLEAN_AGES = new Set(['under_18', 'mixed'])
 
@@ -162,9 +249,18 @@ export function parseInput(body: unknown): GenerateRoundInput {
     age: clip(s.age, 20) || null,
     vibes: (Array.isArray(s.vibes) ? s.vibes : []).map((v) => clip(v, 20)).filter((v) => v in VIBES),
     topic: clip(s.topic, 120) || null,
-    situation: clip(s.situation, 20) || null,
+    situation: clip(s.situation, 120) || null,
     know: clip(s.know, 10) || null,
     lang: s.lang === 'es' ? 'es' : 'en',
+    right_now:
+      s.place || s.nearby || s.local_time
+        ? {
+            place: clip(s.place, 120) || null,
+            nearby: (Array.isArray(s.nearby) ? s.nearby : []).map((v) => clip(v, 40)).filter(Boolean).slice(0, 8),
+            local_time: clip(s.local_time, 40) || null,
+            together: s.together === 'yes',
+          }
+        : null,
     extra: Object.fromEntries(
       Object.entries(s)
         .filter(([key]) => !SETUP_KEYS.has(key) && /^[a-z][a-z0-9_]{0,31}$/.test(key))
@@ -194,8 +290,15 @@ export function parseInput(body: unknown): GenerateRoundInput {
   }))
 
   const memory = b.memory && typeof b.memory === 'object' ? (b.memory as Partial<Memory>) : null
-  const style_examples = parseExamples(b.style_examples, 4)
-  return { round, total_rounds, setup, players, writer_id, history, memory, style_examples }
+  const style_examples = parseExamples(b.style_examples, 5)
+  const house_examples: HouseExample[] = (Array.isArray(b.house_examples) ? b.house_examples : [])
+    .slice(0, 4)
+    .map((ex: { title?: unknown; lines?: unknown }) => ({
+      title: clip(ex?.title, 40),
+      lines: parseExamples([ex?.lines], 1)[0] ?? [],
+    }))
+    .filter((ex) => ex.lines.length >= 2)
+  return { round, total_rounds, setup, players, writer_id, history, memory, style_examples, house_examples }
 }
 
 /** Ejemplos de estilo: como mucho `max` fragmentos de 2–6 líneas cortas. */
@@ -251,6 +354,7 @@ export function mergeMemory(
   update: ModelOutput['memory_update'] | null,
   handleToId: Record<string, string>,
   situationWritten = '',
+  themeId = '',
 ): Memory {
   const previous = input.memory ?? {}
   const evidence = computeEvidence(input.players, input.history)
@@ -279,6 +383,9 @@ export function mergeMemory(
       return SENSITIVE.test(steer) ? '' : steer
     })(),
     used_situations: [...safeList(previous.used_situations, 10, 80), situation].filter(Boolean).slice(-10),
+    used_themes: [...(previous.used_themes ?? []).filter((id) => THEMES.some((t) => t.id === id)), themeId]
+      .filter(Boolean)
+      .slice(-THEMES.length),
     updated_round: input.round,
   }
 }
@@ -307,29 +414,42 @@ Ignore the chat lines you wrote in past rounds: those were invented by you, not 
 - "steer": one sentence on what is landing in this group and where the next rounds should go.
 - Never store anything about health, sexuality, religion, politics, appearance, money troubles, addresses or contact details.
 
-STEP 2, WRITE THE CHAT ("chat"), using what you just learned:
+STEP 2, WRITE THE CHAT ("chat"), using what you just learned.
+
+LANGUAGE (the most important rule): every title and message is written in DATA.language, whatever the language of
+the examples, the history or the player names. Follow DATA.language_notes.
+
+TOPIC: the chat is about DATA.theme_this_round, told as a concrete little scandal, mystery or dilemma that involves the
+writer or the group. Food is never the topic: no pizza, snacks, chips, nachos, tacos, fridges or stolen food.
+audience.where_they_are is only the backdrop (where they are right now), not the topic.
+If audience.right_now is set, they are physically together at that real spot at that local time: the theme happens
+during this exact night/day out. Read the plan from where_they_are + local_time + nearby (e.g. Saturday past midnight
+next to clubs = going out clubbing around there; lunchtime next to restaurants = eating out). Mention the time of day,
+the street or neighbourhood, or ONE real nearby place by name when it makes the chat feel like theirs (where they go
+next, who will not get in, the queue). Never invent other venues, never give addresses or house numbers.
+
+STRUCTURE: DATA.house_examples are the game's reference chats, written by the team (WRITER = the writer's name).
+Match their shape: 2 to 4 short messages that build a situation fast, then a direct, specific question to the writer
+that is fun to answer for real and fun to fake ("WRITER?? explain", "WRITER what did you do exactly").
+Never copy them; write a new situation with the same punch.
+
+STYLE: DATA.style_examples are real group chats from real people (A, B, C), in DATA.language.
+Text like they do: most messages 2 to 8 words, mostly lowercase, little punctuation, small typos are fine, at least one
+pure reaction ("JAJAJA", "nooo", "wait what", "😭"), the same person may send two messages in a row.
+The same kinds of situations they talk about are welcome; never reuse their sentences or details.
+
+FIELDS:
 - "situation": a few words naming the situation. It must differ from everything in memory.used_situations.
-- "title": a group chat name, max 24 characters, may include one emoji.
+- "title": a real group chat name for these people (max 24 characters, may include one emoji), not a summary of the joke.
 - "lines": 2 to 4 messages. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
-  "text" is only what they type: never start it with the sender's name or "name:".
-- Messages are short, casual texting: max 70 characters, lowercase is fine, emojis welcome.
-- You may mention players by name. The LAST message must be a direct question to the writer, using their name,
-  that invites a funny or revealing reply that friends could plausibly fake.
-- Follow the audience: group, know_each_other, where_they_are (the chat can be about that moment), vibes, topic
-  and extra_context. From round 2 on, call back a running joke or something a player said
-  when it fits, and follow the steer. If the writer has been easy to spot (stats.spotted_by), ask something more open-ended.
+  "text" is only what they type: never start it with the sender's name or "name:". Max 70 characters each.
+- The LAST message is the question to the writer, using their name.
+- Follow the audience (group, know_each_other, content, vibes, topic, extra_context). From round 2 on, call back a
+  running joke or something a player said when it fits, and follow the steer. If the writer has been easy to spot
+  (stats.spotted_by), ask something more open-ended.
 
-STYLE: DATA.style_examples are real group chats between anonymous people (A, B, C), often in Spanish or Catalan.
-Your chat must read like those, not like a script. Copy how they text, not what they say:
-- most messages are 2 to 8 words, mostly lowercase, little punctuation, small typos are fine;
-- at least one message is just a reaction ("JAJAJA", "nooo", "wait what", "😭");
-- the same person may send two messages in a row; stretched words (siii, nooo) and caps for emphasis are welcome.
-Write everything in DATA.language. Never reuse their sentences, situations or details.
-The title is a real group chat name for these people, not a summary of the joke (no "Snack Heist" style titles).
-If audience.where_they_are is set, the chat happens right now at that place.
-
-CONTENT: write only in DATA.language. The humour comes from the situation, never from attacking someone. No insults about looks, body,
+CONTENT: the humour comes from the situation, never from attacking someone. No insults about looks, body,
 race, religion, sexuality or health. Nothing sexually explicit.`
 
 interface ModelOutput {
@@ -370,15 +490,19 @@ function buildSchema(allHandles: string[]) {
   })
 }
 
-function buildData(input: GenerateRoundInput, handleOf: (id: string) => string) {
+function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme) {
   const clean = Boolean(input.setup.age && CLEAN_AGES.has(input.setup.age))
   const vibes = (input.setup.vibes ?? []).filter((v) => !(clean && ADULT_VIBES.has(v)))
   const memory = input.memory ?? {}
   const evidence = computeEvidence(input.players, input.history)
+  const lang = input.setup.lang === 'es' ? 'es' : 'en'
   return {
-    language: input.setup.lang === 'es' ? 'Spanish from Spain, informal texting' : 'English',
+    language: LANGUAGES[lang].name,
+    language_notes: LANGUAGES[lang].notes,
+    theme_this_round: theme[lang],
     round: input.round,
     total_rounds: input.total_rounds,
+    house_examples: input.house_examples ?? [],
     style_examples: input.style_examples ?? [],
     writer_this_round: {
       handle: handleOf(input.writer_id),
@@ -393,7 +517,9 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string) 
           : input.setup.know === 'yes'
             ? 'yes: close friends, shared history and inside jokes are fair game'
             : null,
-      where_they_are: SITUATIONS[input.setup.situation ?? ''] ?? null,
+      // Botón antiguo (drinks, party…) o el texto libre que escribe el host
+      where_they_are: SITUATIONS[input.setup.situation ?? ''] ?? input.setup.situation ?? null,
+      right_now: input.setup.right_now ?? null,
       content: clean
         ? 'the group may include minors: keep it completely clean, no dating, drinking or flirting'
         : 'adults: cheeky is fine, never explicit',
@@ -455,6 +581,10 @@ function repairChat(output: ModelOutput, writerName: string, otherHandles: strin
     if (!otherHandles.includes(line.from)) line.from = otherHandles[i % otherHandles.length]
     if (typeof line.text !== 'string') return
     line.text = line.text.replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
+    // "WRITER" es el marcador de los ejemplos del equipo: siempre es el nombre del writer ("Nico WRITER" -> "Nico").
+    line.text = line.text
+      .replace(new RegExp(`${writerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+WRITER\\b`, 'gi'), writerName)
+      .replace(/\bWRITER\b/g, writerName)
     // "bo: i swear…" -> "i swear…": el remitente ya se ve en la burbuja.
     const sender = nameOf[line.from] ?? ''
     for (const prefix of [sender, ...sender.split(/\s+/)].filter((w) => w.length >= 2)) {
@@ -567,39 +697,43 @@ export async function generateRound(input: GenerateRoundInput, config: AiConfig)
     latency_ms: Date.now() - started,
     attempts,
   })
+  const theme = pickTheme(input)
   try {
-    return done(await generateOnce(input, config), 1)
+    return done(await generateOnce(input, config, theme), 1)
   } catch (error) {
     const retryable =
       error instanceof AiError &&
       (error.code === 'invalid_output' || (error.code === 'provider_status' && error.message.startsWith('400')))
     const left = deadline - Date.now()
     if (!retryable || left < 2500) throw error
-    return done(await generateOnce(input, { ...config, timeoutMs: left }), 2)
+    return done(await generateOnce(input, { ...config, timeoutMs: left }, theme), 2)
   }
 }
 
 type Attempt = Pick<GenerateRoundOutput, 'chat' | 'memory' | 'input_tokens' | 'output_tokens'>
 
-async function generateOnce(input: GenerateRoundInput, config: AiConfig): Promise<Attempt> {
+async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme): Promise<Attempt> {
   const handles = new Map(input.players.map((p, i) => [p.id, `P${i}`]))
   const handleToId = Object.fromEntries([...handles].map(([id, handle]) => [handle, id]))
   const handleOf = (id: string) => handles.get(id) ?? 'gone' // jugadores que ya se fueron
   const writer = input.players.find((p) => p.id === input.writer_id)!
   const otherHandles = input.players.filter((p) => p.id !== writer.id).map((p) => handleOf(p.id))
+  const lang = input.setup.lang === 'es' ? 'es' : 'en'
 
   const { json, usage } = await callModel<ModelOutput>(
     config,
     SYSTEM_PROMPT,
-    `DATA:\n${JSON.stringify(buildData(input, handleOf))}`,
+    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme))}`,
     'round',
     buildSchema([...handles.values()]),
   )
   const output = json
   repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
+  const texts = output?.chat?.lines?.map((l) => l.text) ?? []
   const problem =
     validateChat(output, writer.name, new Set(otherHandles)) ??
-    copiedFrom(output.chat.lines.map((l) => l.text), input.style_examples ?? [])
+    languageProblem([output.chat.title, ...texts], lang) ??
+    copiedFrom(texts, [...(input.style_examples ?? []), ...(input.house_examples ?? []).map((ex) => ex.lines)])
   if (problem) throw new AiError('invalid_output', problem)
 
   return {
@@ -608,7 +742,7 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig): Promis
       writer_id: writer.id,
       messages: output.chat.lines.map((line) => ({ player_id: handleToId[line.from], text: clip(line.text, 120) })),
     },
-    memory: mergeMemory(input, output.memory_update ?? null, handleToId, output.chat.situation),
+    memory: mergeMemory(input, output.memory_update ?? null, handleToId, output.chat.situation, theme.id),
     input_tokens: usage.prompt_tokens ?? null,
     output_tokens: usage.completion_tokens ?? null,
   }
