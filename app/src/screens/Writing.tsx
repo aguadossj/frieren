@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bubble, Icon, Screen, TimeBar, TypingDots, groupInitials } from '../components/ui'
+import { Avatar, Bubble, Icon, Screen, TimeBar, TypingDots, groupInitials } from '../components/ui'
 import { useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH, PHASE_SECONDS } from '../game/types'
 import { focusWithoutScroll, retintSafariBars } from '../lib/viewport'
@@ -12,6 +12,17 @@ export default function Writing() {
   const [mine, setMine] = useState<string | null>(null)
   const [typing, setTyping] = useState(false) // input con foco ⇒ teclado abierto
   const list = useRef<HTMLDivElement>(null)
+  // Presentación de la ronda (a quién imitar) sobre el chat oscurecido: ~2.6 s o hasta que se toque
+  const [intro, setIntro] = useState<'in' | 'out' | 'gone'>('in')
+  useEffect(() => {
+    const a = setTimeout(() => setIntro((v) => (v === 'in' ? 'out' : v)), INTRO_MS)
+    return () => clearTimeout(a)
+  }, [])
+  useEffect(() => {
+    if (intro !== 'out') return
+    const b = setTimeout(() => setIntro('gone'), 300)
+    return () => clearTimeout(b)
+  }, [intro])
 
   // Que Safari repinte sus barras con los colores del chat al entrar (y con los de la siguiente pantalla al salir)
   // Solo el chat es blanco: página y barras de Safari en blanco mientras esté abierto, rojo al salir
@@ -55,6 +66,7 @@ export default function Writing() {
   const sent = room.submittedIds.includes(me.id) || mine !== null
   const playerOf = (id: string) => room.players.find((p) => p.id === id)
   const step = 0.35 // s entre mensajes al entrar
+  const delay0 = intro === 'gone' ? 0 : INTRO_MS / 1000 // los mensajes entran cuando se va la presentación
   const hint = isWriter ? t.hintWriter(writer.name) : t.hintFaker(writer.name)
 
   // Layout tipo WhatsApp para aprovechar la pantalla del móvil:
@@ -81,7 +93,7 @@ export default function Writing() {
           const author = playerOf(m.playerId)
           const firstOfRun = i === 0 || room.chat!.messages[i - 1].playerId !== m.playerId
           return (
-            <div key={i} className={`animate-rise ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`} style={{ animationDelay: `${i * step}s` }}>
+            <div key={i} className={`animate-rise ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`} style={{ animationDelay: `${delay0 + i * step}s` }}>
               <Bubble className="max-w-[85%] rounded-[20px] px-4 py-2 text-[17px]">
                 {firstOfRun && (
                   <div className="text-[13px] leading-tight font-extrabold" style={{ color: author?.color }}>
@@ -95,7 +107,7 @@ export default function Writing() {
         })}
 
         {/* Lo que escribe el writer va a la derecha: "typing…" y luego tu respuesta */}
-        <div className="mt-2.5 flex animate-rise flex-col items-end" style={{ animationDelay: `${room.chat.messages.length * step}s` }}>
+        <div className="mt-2.5 flex animate-rise flex-col items-end" style={{ animationDelay: `${delay0 + room.chat.messages.length * step}s` }}>
           {mine ? (
             <>
               <Bubble dark className="max-w-[85%] animate-pop rounded-[20px] px-4 py-2 text-[17px]">{mine}</Bubble>
@@ -163,6 +175,64 @@ export default function Writing() {
         )}
       </div>
     </Screen>
+
+      {intro !== 'gone' && (
+        <RoundIntro
+          round={room.roundIndex + 1}
+          total={room.totalRounds}
+          writer={writer}
+          isWriter={isWriter}
+          leaving={intro === 'out'}
+          onClose={() => setIntro('out')}
+        />
+      )}
     </>
+  )
+}
+
+const INTRO_MS = 2600
+
+/** Tarjeta al empezar cada ronda: fondo oscurecido y difuminado + quién es el writer y qué hay que hacer. */
+function RoundIntro({
+  round,
+  total,
+  writer,
+  isWriter,
+  leaving,
+  onClose,
+}: {
+  round: number
+  total: number
+  writer: { name: string; color: string }
+  isWriter: boolean
+  leaving: boolean
+  onClose: () => void
+}) {
+  const t = useT()
+  return (
+    <button
+      type="button"
+      onClick={onClose}
+      aria-label={t.introTap}
+      className={`fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-8 backdrop-blur-[3px] ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
+    >
+      <div className="w-full max-w-[320px] animate-pop rounded-[28px] bg-white px-6 pt-5 pb-6 text-center text-ink shadow-2xl" style={{ animationDelay: '0.1s' }}>
+        <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand uppercase">
+          {t.round(round)} / {total}
+        </div>
+        <div className="mt-4 flex justify-center">
+          <Avatar player={writer} size={72} />
+        </div>
+        <div className="mt-3 text-[15px] font-bold text-neutral-500">{isWriter ? t.introYou : t.introImitate}</div>
+        <div className="truncate text-[34px] leading-tight font-black tracking-[-0.03em]">{writer.name}</div>
+        <p className="mt-2 text-[16px] leading-snug font-semibold text-neutral-600">
+          {isWriter ? t.introWriterSub : t.introFakerSub(writer.name)}
+        </p>
+        {/* Barra que se vacía mientras dura la presentación */}
+        <div className="mt-5 h-[5px] overflow-hidden rounded-full bg-neutral-100">
+          <div className="h-full origin-left rounded-full bg-brand" style={{ animation: `intro-bar ${INTRO_MS}ms linear both` }} />
+        </div>
+      </div>
+    </button>
   )
 }
