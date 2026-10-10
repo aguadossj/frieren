@@ -8,12 +8,9 @@
 //   del bot y la entrega con public.submit_bot_answer; registra con public.log_ai_generation. Sin round_id la devuelve.
 // - Prueba directa: GenerateRoundInput -> devuelve GenerateRoundOutput sin guardar nada.
 //
-// Dos modelos:
-// - Conversaciones (rondas) y bot Mimic: Hermes 3 70B en OpenRouter. Secretos AI_API_KEY (clave de OpenRouter);
-//   opcionales AI_BASE_URL, AI_MODEL y AI_JSON_MODE (json_schema | json_object | none).
-// - Lo demás (borradores de la ronda 1 en el lobby): Groq, gpt-oss-120b. Secreto GROQ_API_KEY; opcionales
-//   GROQ_BASE_URL y GROQ_MODEL. Sin GROQ_API_KEY, los borradores también van con Hermes.
-// Siempre GENERATE_ROUND_SECRET. SUPABASE_URL y la clave de servicio los pone Supabase.
+// Secretos: AI_API_KEY, GENERATE_ROUND_SECRET; opcionales AI_BASE_URL (OpenRouter por defecto), AI_MODEL (Hermes 3 70B)
+// y AI_JSON_MODE (json_schema | json_object | none) para proveedores o modelos sin salida estructurada.
+// SUPABASE_URL y la clave de servicio los pone Supabase.
 
 import { AiError, generateRound, parseInput } from './core.ts'
 import { MIMIC_PROMPT_VERSION, generateMimic } from './mimic.ts'
@@ -53,13 +50,6 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
   return res.json()
 }
 
-// Modo JSON de Hermes por defecto (se puede cambiar con el secreto AI_JSON_MODE).
-const HERMES_JSON_MODE = 'json_schema'
-
-// Para game.ai_generations: de qué proveedor salió cada llamada.
-const providerOf = (baseUrl: string) =>
-  baseUrl.includes('openrouter.ai') ? 'openrouter' : baseUrl.includes('groq.com') ? 'groq' : 'openai-compatible'
-
 const failStatus = (code: AiError['code']) =>
   code === 'timeout' ? 'timeout' : code === 'invalid_output' ? 'invalid' : 'error'
 
@@ -69,7 +59,6 @@ Deno.serve(async (request: Request) => {
   const secret = Deno.env.get('GENERATE_ROUND_SECRET')
   if (!secret || request.headers.get('x-generate-secret') !== secret) return json(401, { error: 'unauthorized' })
 
-  // Hermes: conversaciones de cada ronda y bot Mimic.
   const apiKey = Deno.env.get('AI_API_KEY')
   const config = {
     apiKey: apiKey ?? '',
@@ -78,21 +67,9 @@ Deno.serve(async (request: Request) => {
     // Ronda 1: la sala espera en `generating` (game.config generation_timeout_seconds = 20).
     // Rondas 2+: se piden al empezar la votación anterior, hay ~25 s de margen. Ajustado a Hermes 3 70B (~10–13 s).
     timeoutMs: 18000,
-    // En OpenRouter el único proveedor de Hermes 3 70B (DeepInfra) admite json_schema pero no json_object:
-    // json_object se descartaba en silencio. core.ts pide require_parameters para que no vuelva a pasar.
-    jsonMode: (Deno.env.get('AI_JSON_MODE') ?? HERMES_JSON_MODE) as 'json_schema' | 'json_object' | 'none',
+    // json_object (por defecto, Hermes 3) | json_schema | none: el esquema va en el prompt salvo con json_schema
+    jsonMode: (Deno.env.get('AI_JSON_MODE') ?? 'json_object') as 'json_schema' | 'json_object' | 'none',
   }
-  // Groq: borradores del lobby. Sin clave de Groq, Hermes.
-  const groqKey = Deno.env.get('GROQ_API_KEY')
-  const groq = groqKey
-    ? {
-        apiKey: groqKey,
-        baseUrl: Deno.env.get('GROQ_BASE_URL') ?? 'https://api.groq.com/openai/v1',
-        model: Deno.env.get('GROQ_MODEL') ?? 'openai/gpt-oss-120b',
-        timeoutMs: 18000,
-        jsonMode: 'json_schema' as const,
-      }
-    : config
 
   const body = await request.json().catch(() => null)
   const roundId = typeof body?.round_id === 'string' ? body.round_id : null
@@ -101,14 +78,14 @@ Deno.serve(async (request: Request) => {
   if (body?.mode === 'drafts') {
     const roomId = typeof body?.room_id === 'string' ? body.room_id : null
     try {
-      if (!groq.apiKey) throw new AiError('provider_failed', 'no GROQ_API_KEY or AI_API_KEY')
-      const output = await generateDrafts(body.input, { ...groq, timeoutMs: 30000 }, Number(body.count) || 3)
+      if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
+      const output = await generateDrafts(body.input, { ...config, timeoutMs: 30000 }, Number(body.count) || 3)
       if (!roomId) return json(200, output)
       const saved = output.drafts.length
         ? await rpc('ai_save_drafts', { p_room_id: roomId, p_setup_hash: String(body.setup_hash ?? ''), p_drafts: output.drafts })
         : 0
       await rpc('log_ai_generation', {
-        p_room_id: roomId, p_round_id: null, p_provider: providerOf(groq.baseUrl), p_model: output.model,
+        p_room_id: roomId, p_round_id: null, p_provider: 'openai-compatible', p_model: output.model,
         p_prompt_version: output.prompt_version, p_status: output.drafts.length ? 'ok' : 'error',
         p_input_tokens: output.input_tokens, p_output_tokens: output.output_tokens, p_latency_ms: output.latency_ms,
         p_error: output.errors.length ? output.errors.join(' | ').slice(0, 900) : null,
@@ -131,7 +108,7 @@ Deno.serve(async (request: Request) => {
       if (!roundId) return json(200, output)
       const accepted = await rpc('submit_bot_answer', { p_round_id: roundId, p_text: output.answer })
       await rpc('log_ai_generation', {
-        p_room_id: output.room_id, p_round_id: roundId, p_provider: providerOf(config.baseUrl), p_model: output.model,
+        p_room_id: output.room_id, p_round_id: roundId, p_provider: 'openai-compatible', p_model: output.model,
         p_prompt_version: output.prompt_version, p_status: 'ok', p_input_tokens: output.input_tokens,
         p_output_tokens: output.output_tokens, p_latency_ms: output.latency_ms, p_error: accepted ? null : 'not_accepted',
       }).catch((e) => console.error('mimic log', e))
@@ -142,7 +119,7 @@ Deno.serve(async (request: Request) => {
       console.error('mimic', roundId, code, message)
       if (roundId && roomId) {
         await rpc('log_ai_generation', {
-          p_room_id: roomId, p_round_id: roundId, p_provider: providerOf(config.baseUrl), p_model: config.model,
+          p_room_id: roomId, p_round_id: roundId, p_provider: 'openai-compatible', p_model: config.model,
           p_prompt_version: MIMIC_PROMPT_VERSION, p_status: failStatus(code), p_input_tokens: null,
           p_output_tokens: null, p_latency_ms: Date.now() - started, p_error: `${code}: ${message}`,
         }).catch((e) => console.error('mimic log', e))

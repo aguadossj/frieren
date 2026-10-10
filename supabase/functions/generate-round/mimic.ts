@@ -171,9 +171,8 @@ export async function generateMimic(contextValue: unknown, examplesValue: unknow
   try {
     result = await attempt(config.timeoutMs ?? 8000)
   } catch (error) {
-    // Solo si queda al menos lo que tardó el primer intento (con Hermes, ~varios segundos).
     const left = deadline - Date.now()
-    if (!(error instanceof AiError && error.code === 'invalid_output') || left < Math.max(2000, Date.now() - started)) throw error
+    if (!(error instanceof AiError && error.code === 'invalid_output') || left < 2000) throw error
     result = await attempt(left)
   }
   return {
