@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Avatar, Bubble, Icon, Screen, TimeBar, TypingDots, groupInitials } from '../components/ui'
+import ChatDoodles from '../components/ChatDoodles'
 import { useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH, PHASE_SECONDS } from '../game/types'
 import { focusWithoutScroll, retintSafariBars } from '../lib/viewport'
@@ -88,7 +89,10 @@ export default function Writing() {
         <TimeBar endsAt={room.phaseEndsAt} totalSeconds={room.settings?.writing_seconds ?? PHASE_SECONDS.writing} className="w-[38%] shrink-0" />
       </header>
 
-      <div ref={list} className="mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-[28px] bg-brand px-3 pt-3 pb-3">
+      {/* Tarjeta roja del chat con dibujitos blancos de fondo (fijos: no se mueven al hacer scroll) */}
+      <div className="relative mx-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-brand">
+        <ChatDoodles seed={room.roundIndex + 1} />
+      <div ref={list} className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3 pt-3 pb-3">
         {room.chat.messages.map((m, i) => {
           const author = playerOf(m.playerId)
           const firstOfRun = i === 0 || room.chat!.messages[i - 1].playerId !== m.playerId
@@ -129,6 +133,7 @@ export default function Writing() {
             {hint}
           </div>
         )}
+      </div>
       </div>
 
       <div className={`shrink-0 bg-white px-2.5 ${typing ? 'pt-1 pb-1' : 'pt-1 pb-1.5'}`}>
