@@ -177,56 +177,42 @@ export default function Writing() {
     </Screen>
 
       {intro !== 'gone' && (
-        <RoundIntro
-          writer={writer}
-          isWriter={isWriter}
-          leaving={intro === 'out'}
-          onClose={() => setIntro('out')}
-        />
+        <RoundIntro writer={writer} isWriter={isWriter} leaving={intro === 'out'} />
       )}
     </>
   )
 }
 
-const INTRO_MS = 3500
+const INTRO_MS = 5000
 
-/** Tarjeta al empezar cada ronda: fondo oscurecido y difuminado + quién es el writer y qué hay que hacer. */
-function RoundIntro({
-  writer,
-  isWriter,
-  leaving,
-  onClose,
-}: {
-  writer: { name: string; color: string }
-  isWriter: boolean
-  leaving: boolean
-  onClose: () => void
-}) {
+/** Al empezar cada ronda: fondo oscurecido y SOLO a quién hay que imitar (avatar + "Imita a" + nombre grande). */
+function RoundIntro({ writer, isWriter, leaving }: { writer: { name: string; color: string }; isWriter: boolean; leaving: boolean }) {
   const t = useT()
   return (
-    <button
-      type="button"
-      onClick={onClose}
-      aria-label={t.introTap}
-      className={`fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-8 backdrop-blur-[3px] ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
+    <div
+      aria-live="polite"
+      className={`fixed inset-0 z-[70] flex flex-col items-center justify-center gap-4 bg-black/75 px-8 text-center text-white backdrop-blur-[4px] ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
     >
-      <div className="w-full max-w-[320px] animate-pop rounded-[28px] bg-white px-6 pt-5 pb-6 text-center text-ink shadow-2xl" style={{ animationDelay: '0.1s' }}>
-        <div className="flex justify-center">
-          <Avatar player={writer} size={72} />
-        </div>
-        {isWriter ? (
-          <div className="mt-3 text-[30px] leading-tight font-black tracking-[-0.03em]">{t.introYou}</div>
-        ) : (
-          <>
-            <div className="mt-3 text-[17px] font-bold text-neutral-500">{t.introImitate}</div>
-            <div className="truncate text-[34px] leading-tight font-black tracking-[-0.03em]">{writer.name}</div>
-          </>
-        )}
-        {/* Barra que se vacía mientras dura la presentación */}
-        <div className="mt-5 h-[5px] overflow-hidden rounded-full bg-neutral-100">
-          <div className="h-full origin-left rounded-full bg-brand" style={{ animation: `intro-bar ${INTRO_MS}ms linear both` }} />
-        </div>
+      <div className="animate-pop" style={{ animationDelay: '0.15s' }}>
+        <Avatar player={writer} size={110} ring />
       </div>
-    </button>
+      {isWriter ? (
+        <div className="animate-pop text-[44px] leading-tight font-black tracking-[-0.03em]" style={{ animationDelay: '0.45s' }}>
+          {t.introYou}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center">
+          <div className="animate-rise text-[20px] font-bold text-white/75" style={{ animationDelay: '0.4s' }}>
+            {t.introImitate}
+          </div>
+          <div
+            className="max-w-full animate-pop truncate text-[64px] leading-none font-black tracking-[-0.04em]"
+            style={{ animationDelay: '0.65s' }}
+          >
+            {writer.name}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
