@@ -164,8 +164,19 @@ function NamePage({ onBack }: { onBack: () => void }) {
     }
   }
 
+  // "¿Qué está pasando ahora?" es obligatorio: sin él no se puede seguir (la IA lo necesita para los chats)
+  const [situationMissing, setSituationMissing] = useState(false)
+  const situationRef = useRef<HTMLTextAreaElement>(null)
+  const MIN_SITUATION = 3
+
   const submit = () => {
     if (!name.trim() || busy) return
+    if (situation.trim().length < MIN_SITUATION) {
+      setSituationMissing(true)
+      situationRef.current?.focus({ preventScroll: true })
+      situationRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      return
+    }
     answers.current = {}
     placeLookup.current = null
     setStep('swipe')
@@ -241,20 +252,32 @@ function NamePage({ onBack }: { onBack: () => void }) {
                 </span>
               </span>
               <textarea
+                ref={situationRef}
                 rows={4}
+                aria-required="true"
+                aria-invalid={situationMissing}
                 maxLength={MAX_SITUATION}
                 value={situation}
-                onChange={(e) => setSituation(e.target.value)}
+                onChange={(e) => {
+                  setSituation(e.target.value)
+                  if (e.target.value.trim().length >= MIN_SITUATION) setSituationMissing(false)
+                }}
                 placeholder={t.situationPlaceholder}
-                className="w-full resize-none rounded-[28px] bg-white px-6 py-4 text-[17px] leading-snug font-semibold text-ink outline-none placeholder:font-medium placeholder:text-neutral-400"
+                className={`w-full resize-none rounded-[28px] bg-white px-6 py-4 text-[17px] leading-snug font-semibold text-ink outline-none placeholder:font-medium placeholder:text-neutral-400 ${situationMissing ? 'animate-nudge ring-4 ring-ink' : ''}`}
               />
-              <span className="text-[14px] font-semibold text-white/70">{t.situationHint}</span>
+              <span className={`text-[14px] font-semibold ${situationMissing ? 'font-extrabold text-white' : 'text-white/70'}`} role={situationMissing ? 'alert' : undefined}>
+                {situationMissing ? t.situationRequired : t.situationHint}
+              </span>
           </label>
         </Body>
 
         <Footer>
           {error && <p className="text-center text-[16px] font-bold">{error}</p>}
-          <Button type="submit" disabled={!name.trim()} className="flex items-center justify-center gap-3">
+          <Button
+            type="submit"
+            disabled={!name.trim()}
+            className={`flex items-center justify-center gap-3 ${situation.trim().length < MIN_SITUATION ? 'opacity-60' : ''}`}
+          >
             {t.next}
             <Icon name="arrowRight" size={22} />
           </Button>
