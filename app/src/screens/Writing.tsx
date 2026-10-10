@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Avatar, Bubble, Icon, Screen, TimeBar, TypingDots, groupInitials } from '../components/ui'
 import ChatDoodles from '../components/ChatDoodles'
+import { SettingsGear } from '../components/HostSettings'
 import { useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH, PHASE_SECONDS } from '../game/types'
 import { focusWithoutScroll, retintSafariBars } from '../lib/viewport'
@@ -87,6 +88,7 @@ export default function Writing() {
         </span>
         <div className="min-w-0 flex-1 truncate text-[16px] leading-tight font-extrabold">{room.chat.title}</div>
         <TimeBar endsAt={room.phaseEndsAt} totalSeconds={room.settings?.writing_seconds ?? PHASE_SECONDS.writing} className="w-[38%] shrink-0" />
+        <SettingsGear />
       </header>
 
       {/* Tarjeta roja del chat con dibujitos blancos de fondo (fijos: no se mueven al hacer scroll) */}

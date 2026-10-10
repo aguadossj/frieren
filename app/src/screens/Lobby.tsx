@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Avatar, Button, Eyebrow, Footer, Icon, LangToggle, Row, Screen } from '../components/ui'
 import QR, { shareInvite } from '../components/QR'
+import { SettingsGear } from '../components/HostSettings'
 import { useGame } from '../game/useGame'
 import { MIN_PLAYERS } from '../game/types'
 import { useT } from '../i18n'
@@ -60,7 +61,10 @@ export default function Lobby() {
         >
           <Icon name="arrowLeft" size={22} />
         </button>
-        <LangToggle />
+        <div className="flex items-center gap-2">
+          <LangToggle />
+          <SettingsGear onRed />
+        </div>
       </div>
 
       {/* Zona central con UN solo scroll (QR/bienvenida + jugadores). Antes la lista tenía su propio scroll y en

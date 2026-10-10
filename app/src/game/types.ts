@@ -6,7 +6,7 @@ export type Phase = 'lobby' | 'generating' | 'writing' | 'voting' | 'reveal' | '
 export type Pack = 'uni' | 'spicy' | 'dating' | 'moral'
 export type GroupType = 'students' | 'friends' | 'coworkers' | 'family'
 
-export const PHASE_SECONDS = { writing: 25, voting: 15, reveal: 8, leaderboard: 4 } as const
+export const PHASE_SECONDS = { writing: 45, voting: 25, reveal: 12, leaderboard: 4 } as const // valores por defecto del backend
 export const MIN_PLAYERS = 3
 export const MAX_PLAYERS = 8
 export const MAX_ROUNDS = 5
@@ -98,6 +98,7 @@ export interface RoomSettings {
   leaderboard_seconds: number
   max_players: number
   mimic?: boolean // el host activa el bot "Mimic" con updateSettings({ mimic: true })
+  host_advance?: boolean // por defecto true: tras cada ronda se espera a que el host pulse "siguiente" (skipPhase)
 }
 
 /** Pregunta inicial del catálogo (tabla game.setup_questions). */
