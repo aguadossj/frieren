@@ -178,8 +178,6 @@ export default function Writing() {
 
       {intro !== 'gone' && (
         <RoundIntro
-          round={room.roundIndex + 1}
-          total={room.totalRounds}
           writer={writer}
           isWriter={isWriter}
           leaving={intro === 'out'}
@@ -190,19 +188,15 @@ export default function Writing() {
   )
 }
 
-const INTRO_MS = 2600
+const INTRO_MS = 3500
 
 /** Tarjeta al empezar cada ronda: fondo oscurecido y difuminado + quién es el writer y qué hay que hacer. */
 function RoundIntro({
-  round,
-  total,
   writer,
   isWriter,
   leaving,
   onClose,
 }: {
-  round: number
-  total: number
   writer: { name: string; color: string }
   isWriter: boolean
   leaving: boolean
@@ -217,17 +211,17 @@ function RoundIntro({
       className={`fixed inset-0 z-[70] flex items-center justify-center bg-black/65 px-8 backdrop-blur-[3px] ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
     >
       <div className="w-full max-w-[320px] animate-pop rounded-[28px] bg-white px-6 pt-5 pb-6 text-center text-ink shadow-2xl" style={{ animationDelay: '0.1s' }}>
-        <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand uppercase">
-          {t.round(round)} / {total}
-        </div>
-        <div className="mt-4 flex justify-center">
+        <div className="flex justify-center">
           <Avatar player={writer} size={72} />
         </div>
-        <div className="mt-3 text-[15px] font-bold text-neutral-500">{isWriter ? t.introYou : t.introImitate}</div>
-        <div className="truncate text-[34px] leading-tight font-black tracking-[-0.03em]">{writer.name}</div>
-        <p className="mt-2 text-[16px] leading-snug font-semibold text-neutral-600">
-          {isWriter ? t.introWriterSub : t.introFakerSub(writer.name)}
-        </p>
+        {isWriter ? (
+          <div className="mt-3 text-[30px] leading-tight font-black tracking-[-0.03em]">{t.introYou}</div>
+        ) : (
+          <>
+            <div className="mt-3 text-[17px] font-bold text-neutral-500">{t.introImitate}</div>
+            <div className="truncate text-[34px] leading-tight font-black tracking-[-0.03em]">{writer.name}</div>
+          </>
+        )}
         {/* Barra que se vacía mientras dura la presentación */}
         <div className="mt-5 h-[5px] overflow-hidden rounded-full bg-neutral-100">
           <div className="h-full origin-left rounded-full bg-brand" style={{ animation: `intro-bar ${INTRO_MS}ms linear both` }} />
