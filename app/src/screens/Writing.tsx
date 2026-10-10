@@ -109,16 +109,6 @@ export default function Writing() {
           const author = playerOf(m.playerId)
           const msgs = room.chat!.messages
           const firstOfRun = i === 0 || msgs[i - 1].playerId !== m.playerId
-          // Si la IA pone un mensaje en boca de quien tiene este móvil, va a la derecha (como en WhatsApp: "tú")
-          if (m.playerId === me.id) {
-            return (
-              <div key={i} className={`flex animate-rise justify-end ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
-                <Bubble dark className="max-w-[80%] rounded-[20px] rounded-br-[6px] px-4 py-2 text-[17px]">
-                  {m.text}
-                </Bubble>
-              </div>
-            )
-          }
           return (
             <div key={i} className={`flex animate-rise items-start gap-2 ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
               {/* Foto de perfil en el primer mensaje de cada tanda; en los siguientes, hueco para que queden alineados */}
