@@ -1,4 +1,14 @@
-# Deploy automático: Cloudflare Pages
+# Deploy automático: Cloudflare (Workers con static assets)
+
+**URL de producción: https://frieren.maguadomartinez.workers.dev**
+
+> El proyecto se creó como **Worker** (no Pages). La configuración vive en `app/wrangler.jsonc`: compila con
+> `npm run build` y publica `app/dist` (SPA). En el dashboard del Worker → **Settings → Build** debe estar:
+> Root directory `app`, Deploy command `npx wrangler deploy` (build command puede quedar vacío: lo hace wrangler),
+> y en **Build variables and secrets** (¡no en las variables de runtime!): `VITE_SUPABASE_URL`,
+> `VITE_SUPABASE_PUBLISHABLE_KEY` y `NODE_VERSION=22`. Las VITE_* se incrustan al compilar.
+
+(Instrucciones originales para Pages, por si se rehace como proyecto de Pages:)
 
 Cada push a `main` publica la web sola. Cada rama tiene además su propia URL de prueba.
 Gratis, sin límite de ancho de banda y sin bloquear commits de colaboradores.
