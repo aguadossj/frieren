@@ -1,4 +1,4 @@
-// Idioma de la interfaz (EN/ES). Se guarda en el móvil y por defecto sigue al idioma del sistema.
+// Idioma de la interfaz (EN/ES). Se guarda en el móvil; por defecto, inglés.
 // Uso: `const t = useT()` → `t.createRoom`, `t.youreIn(name)`. Cambiar: `setLang('es')`.
 import { useSyncExternalStore } from 'react'
 
@@ -10,9 +10,10 @@ function initial(): Lang {
     const saved = localStorage.getItem(KEY)
     if (saved === 'en' || saved === 'es') return saved
   } catch {
-    /* sin almacenamiento: seguimos con el del sistema */
+    /* sin almacenamiento: inglés */
   }
-  return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('es') ? 'es' : 'en'
+  // Por defecto, inglés (también la explicación de la primera visita); quien cambie a ES lo tiene guardado
+  return 'en'
 }
 
 let current: Lang = initial()
