@@ -1,16 +1,15 @@
 /**
- * "Cómo se juega": pop-up a pantalla completa con los 3 pasos, que van apareciendo uno a uno.
+ * "Cómo se juega": pantalla completa con 4 páginas que se pasan una a una (botón, deslizar o ← →).
+ * Cada página enseña una captura REAL del juego (app/public/howto/{es|en}-*.webp, sacadas de una partida de verdad)
+ * dentro de un móvil, con un título y una frase.
  * Sale solo la primera vez que alguien abre la web (se recuerda en localStorage) y desde el botón "Cómo jugar" de la portada.
- * Tocar en cualquier sitio muestra de golpe los pasos que faltan; "¡A jugar!" (o Saltar / Esc) lo cierra.
  */
-import { useEffect, useState, type ReactNode } from 'react'
-import { useT } from '../i18n'
-import { Icon, TypingDots } from './ui'
+import { useEffect, useRef, useState } from 'react'
+import { useLang, useT } from '../i18n'
+import { Icon } from './ui'
 
 const SEEN_KEY = 'typing.howto.seen'
-/** Cuándo aparece cada paso (ms desde que se abre): 1,5 s entre uno y otro. */
-const STEP_AT = [500, 2000, 3500]
-const BUTTON_AFTER = 1000 // el botón sale 1 s después del último paso
+const SHOTS = ['chat', 'vote', 'reveal', 'standings'] as const
 
 export function seenHowTo(): boolean {
   try {
@@ -30,15 +29,21 @@ function markSeen() {
 
 export default function HowToPlay({ onClose }: { onClose: () => void }) {
   const t = useT()
-  const [shown, setShown] = useState(0) // pasos visibles (0–3)
-  const [ready, setReady] = useState(false) // botón "¡A jugar!" visible
+  const lang = useLang()
+  const pages = t.howPages
+  const [page, setPage] = useState(0)
+  const [dir, setDir] = useState<1 | -1>(1)
   const [leaving, setLeaving] = useState(false)
+  const startX = useRef<number | null>(null)
+  const last = page === pages.length - 1
 
+  // Precargar las 4 capturas para que el paso de página sea instantáneo
   useEffect(() => {
-    const ids = STEP_AT.map((ms, i) => setTimeout(() => setShown((n) => Math.max(n, i + 1)), ms))
-    ids.push(setTimeout(() => setReady(true), STEP_AT[STEP_AT.length - 1] + BUTTON_AFTER))
-    return () => ids.forEach(clearTimeout)
-  }, [])
+    SHOTS.forEach((s) => {
+      const img = new Image()
+      img.src = `/howto/${lang}-${s}.webp`
+    })
+  }, [lang])
 
   const close = () => {
     if (leaving) return
@@ -46,153 +51,107 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
     setLeaving(true)
     setTimeout(onClose, 250)
   }
-
-  // Tocar antes de tiempo = enseñar todo ya (para quien lee rápido)
-  const revealAll = () => {
-    setShown(3)
-    setReady(true)
+  const go = (to: number) => {
+    if (to < 0 || to >= pages.length || to === page) return
+    setDir(to > page ? 1 : -1)
+    setPage(to)
   }
+  const next = () => (last ? close() : go(page + 1))
 
+  // Teclado: ← → para pasar, Esc para cerrar
+  const keys = useRef({ next, prev: () => go(page - 1), close })
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
+    keys.current = { next, prev: () => go(page - 1), close }
+  })
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') keys.current.next()
+      if (e.key === 'ArrowLeft') keys.current.prev()
+      if (e.key === 'Escape') keys.current.close()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
-
-  const visuals: ReactNode[] = [<VisualMessage key="1" />, <VisualFake key="2" />, <VisualVote key="3" />]
+  }, [])
 
   return (
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="howto-title"
-      onClick={revealAll}
       className={`absolute inset-x-0 top-0 z-[60] flex h-full flex-col overflow-hidden bg-ink text-white sm:top-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
       style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      {/* Saltar: solo mientras van saliendo los pasos */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          close()
-        }}
-        className={`absolute top-2 right-3 z-10 h-[44px] px-3 text-[15px] font-extrabold text-white/60 transition-opacity ${ready ? 'pointer-events-none opacity-0' : ''}`}
-        style={{ marginTop: 'env(safe-area-inset-top)' }}
-        tabIndex={ready ? -1 : 0}
-      >
-        {t.howSkip}
-      </button>
-
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5">
-        <div className="my-auto flex flex-col gap-3 pt-14 pb-4 [@media(max-height:700px)]:gap-2.5 [@media(max-height:700px)]:pt-11">
-          <div className="mb-3 text-center [@media(max-height:700px)]:mb-1">
-            <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand uppercase [@media(max-height:700px)]:hidden">{t.howEyebrow}</div>
-            <h2 id="howto-title" className="mt-1.5 animate-pop text-[44px] leading-none font-black tracking-[-0.03em] [@media(max-height:700px)]:text-[38px]">
-              {t.howTitle}
-            </h2>
-          </div>
-
-          {t.howSteps.map(([title, line], i) => (
-            <div
-              key={title}
-              aria-hidden={i >= shown}
-              className={`rounded-[26px] bg-white p-4 text-ink transition-all duration-500 ease-[cubic-bezier(0.2,0.9,0.3,1.2)] [@media(max-height:700px)]:p-3 ${
-                i < shown ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-5 scale-95 opacity-0'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand text-[17px] font-black text-white">{i + 1}</span>
-                <div className="min-w-0 leading-tight">
-                  <div className="text-[19px] font-black tracking-[-0.01em]">{title}</div>
-                  <div className="mt-0.5 text-[15px] leading-snug font-medium text-neutral-500">{line}</div>
-                </div>
-              </div>
-              {/* El hueco de la ilustración está reservado desde el principio (nada salta al aparecer cada paso);
-                  se vuelve a montar al mostrarse para que su animación arranque en ese momento. */}
-              <div className="mt-3 pl-12 [@media(max-height:700px)]:mt-2" key={i < shown ? 'on' : 'off'} style={i < shown ? undefined : { visibility: 'hidden' }}>
-                {visuals[i]}
-              </div>
-            </div>
+      {/* Progreso tipo "stories" (cada tramo lleva a su página) + Saltar */}
+      <div className="flex shrink-0 items-center gap-3 px-4 pt-2">
+        <div className="flex flex-1 gap-1.5">
+          {pages.map((p, i) => (
+            <button key={p.title} onClick={() => go(i)} aria-label={`${i + 1} / ${pages.length}`} className="flex h-[44px] flex-1 items-center">
+              <span className={`h-[5px] w-full rounded-full transition-colors duration-300 ${i <= page ? 'bg-white' : 'bg-white/20'}`} />
+            </button>
           ))}
+        </div>
+        {!last && (
+          <button onClick={close} className="h-[44px] shrink-0 px-2 text-[15px] font-extrabold text-white/60">
+            {t.howSkip}
+          </button>
+        )}
+      </div>
+
+      {/* Captura real dentro de un móvil; se puede deslizar para pasar de página */}
+      <div
+        className="flex min-h-0 flex-1 touch-pan-y items-center justify-center px-6 py-3 select-none"
+        onPointerDown={(e) => (startX.current = e.clientX)}
+        onPointerUp={(e) => {
+          if (startX.current === null) return
+          const dx = e.clientX - startX.current
+          startX.current = null
+          if (dx < -50) next()
+          else if (dx > 50) go(page - 1)
+        }}
+        onPointerCancel={() => (startX.current = null)}
+      >
+        <div
+          key={page}
+          className="relative h-full max-h-[480px] overflow-hidden rounded-[34px] border-[7px] border-[#2B2B2B] bg-brand shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
+          style={{
+            aspectRatio: '450 / 975',
+            animation: `${dir === 1 ? 'howto-in-right' : 'howto-in-left'} 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both`,
+            rotate: page % 2 ? '2deg' : '-2deg',
+          }}
+        >
+          <img
+            src={`/howto/${lang}-${SHOTS[page]}.webp`}
+            alt=""
+            draggable={false}
+            className="size-full object-cover object-top"
+          />
         </div>
       </div>
 
-      <div className="shrink-0 px-5 pt-2 pb-6">
+      {/* Texto de la página */}
+      <div key={`text-${page}`} className="shrink-0 animate-rise px-6 text-center">
+        <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
+          {page + 1} / {pages.length}
+        </div>
+        <h2 id="howto-title" className="mt-1 text-[32px] leading-[1.05] font-black tracking-[-0.03em] [@media(max-height:700px)]:text-[27px]">
+          {pages[page].title}
+        </h2>
+        <p className="mx-auto mt-2 min-h-[48px] max-w-[330px] text-[17px] leading-snug font-semibold text-white/75 [@media(max-height:700px)]:text-[15px]">
+          {pages[page].body}
+        </p>
+      </div>
+
+      <div className="shrink-0 px-5 pt-3 pb-6">
         <button
-          onClick={(e) => {
-            e.stopPropagation()
-            close()
-          }}
-          className={`flex h-[66px] w-full items-center justify-center gap-3 rounded-full bg-brand text-[21px] font-extrabold text-white transition-all duration-500 active:scale-[0.97] ${
-            ready ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
+          onClick={next}
+          className={`flex h-[66px] w-full items-center justify-center gap-3 rounded-full text-[21px] font-extrabold transition active:scale-[0.97] ${
+            last ? 'bg-brand text-white' : 'bg-white text-ink'
           }`}
-          tabIndex={ready ? 0 : -1}
         >
-          {t.howPlay}
+          {last ? t.howPlay : t.howNext}
           <Icon name="arrowRight" size={22} />
         </button>
       </div>
-    </div>
-  )
-}
-
-/* Mini-ilustraciones de cada paso (mismas piezas que el juego: avatares de colores, burbujas, puntitos) */
-
-const Dot = ({ color, letter, size = 26 }: { color: string; letter: string; size?: number }) => (
-  <span
-    className="flex shrink-0 items-center justify-center rounded-full font-extrabold text-white"
-    style={{ background: color, width: size, height: size, fontSize: size * 0.45 }}
-  >
-    {letter}
-  </span>
-)
-
-function VisualMessage() {
-  const t = useT()
-  return (
-    <div className="flex animate-rise items-end gap-2" style={{ animationDelay: '0.2s' }}>
-      <Dot color="#2563EB" letter="P" />
-      <div className="rounded-[16px] rounded-bl-[4px] bg-neutral-100 px-3 py-2 text-[14px] whitespace-nowrap leading-snug font-semibold">{t.howDemoMessage}</div>
-    </div>
-  )
-}
-
-function VisualFake() {
-  return (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-      {[
-        ['#16A34A', 'M'],
-        ['#7C3AED', 'L'],
-        ['#F97316', 'A'],
-      ].map(([color, letter], i) => (
-        <span key={letter} className="flex animate-pop items-center gap-0.5" style={{ animationDelay: `${0.2 + i * 0.18}s` }}>
-          <Dot color={color} letter={letter} size={22} />
-          <span className="flex h-[26px] w-[42px] items-center justify-center rounded-full bg-neutral-100 [&>span]:scale-[0.6]">
-            <TypingDots />
-          </span>
-        </span>
-      ))}
-    </div>
-  )
-}
-
-function VisualVote() {
-  const t = useT()
-  return (
-    <div className="flex items-center gap-2">
-      <span className="animate-rise rounded-[16px] bg-neutral-100 px-3 py-1.5 text-[14px] whitespace-nowrap font-semibold text-neutral-400" style={{ animationDelay: '0.2s' }}>
-        {t.howDemoFake}
-      </span>
-      <span
-        className="flex animate-pop items-center gap-1.5 rounded-[16px] bg-white px-3 py-1.5 text-[14px] whitespace-nowrap font-semibold outline-[3px] outline-ink outline-solid"
-        style={{ animationDelay: '0.45s' }}
-      >
-        <Icon name="check" size={14} />
-        {t.howDemoReal}
-      </span>
-      <span className="animate-pop text-[15px] font-black text-good" style={{ animationDelay: '0.8s' }}>
-        +200
-      </span>
     </div>
   )
 }
