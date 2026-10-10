@@ -42,13 +42,14 @@ export default function Voting() {
           <p className="shrink-0 self-center rounded-full bg-ink px-4 py-1 text-[13px] font-bold">{t.aiAmongThese}</p>
         )}
 
-        {/* Opciones: todas del mismo tamaño, repartiendo el alto disponible */}
-        <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+        {/* Opciones: todas del mismo tamaño (alto fijo). Si no caben, solo esta lista hace scroll;
+            la pregunta de arriba y el botón de votar se quedan fijos. */}
+        <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain px-1 pt-1 pb-2">
           {room.answers.map((answer, i) => {
             const selected = choice === answer.id
             const dimmed = answer.mine || (locked && !selected)
             return (
-              <div key={answer.id} className="flex max-h-[96px] min-h-[58px] flex-1 basis-0 animate-rise" style={{ animationDelay: `${i * 0.07}s` }}>
+              <div key={answer.id} className="flex h-[84px] shrink-0 animate-rise" style={{ animationDelay: `${i * 0.07}s` }}>
               <button
                 className={`flex w-full items-center gap-3.5 rounded-[22px] px-4 text-left transition-[transform,background-color,color,opacity] duration-200 active:scale-[0.98] disabled:active:scale-100 ${
                   selected ? 'bg-ink text-white' : 'bg-white text-ink'

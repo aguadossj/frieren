@@ -40,13 +40,13 @@ export function Reveal() {
         </div>
 
         {/* Mismas tarjetas y mismo orden que en la votación; se giran para revelar */}
-        <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+        <div className="-mx-1 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain px-1 pt-1 pb-2">
           {result.answers.map((a, i) => {
             const bot = a.isBot || a.authorId === MIMIC_AUTHOR_ID
             const tone = a.isReal ? 'bg-good text-white' : bot ? 'bg-ink text-white' : 'bg-white text-ink'
             const voters = a.voterIds.map(playerOf).filter(Boolean) as Player[]
             return (
-              <div key={a.id} className="flex max-h-[96px] min-h-[58px] flex-1 basis-0 animate-flip" style={{ animationDelay: `${0.25 + i * 0.18}s` }}>
+              <div key={a.id} className="flex h-[84px] shrink-0 animate-flip" style={{ animationDelay: `${0.25 + i * 0.18}s` }}>
                 <div className={`flex w-full items-center gap-3.5 rounded-[22px] px-4 ${tone}`}>
                   <span
                     className={`flex size-9 shrink-0 items-center justify-center rounded-full text-[14px] font-black ${
