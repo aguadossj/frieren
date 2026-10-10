@@ -29,7 +29,7 @@ Votación en dos pasos: tocar burbuja → **Lock vote**. Final = Leaderboard con
 - Respuesta ≤ 80 caracteres. Si se acaba el tiempo sin enviar → "…".
 - Votación: real + hasta 4 impostores al azar (máx. 5), barajadas, todas con el avatar del writer.
   El writer no vota; nadie vota la suya. 😂 opcional a cualquiera.
-- Puntos (estilo Kahoot): solo puntúa **acertar la real**, de **+200** (votas al instante) a **+100** (último segundo), de 10 en 10. Fallar = 0. Votar al bot Mimic = **−100** (nunca por debajo de 0). Engañar, ser reconocido y los 😂 no dan puntos. SQL: `game.speed_points` (migración `speed_scoring`).
+- Puntos (estilo Kahoot): solo puntúa **acertar la real**, de **+200** (votas al instante) a **+100** (último segundo), de 10 en 10. Fallar = 0. Votar al bot Mimic = **−100** (la puntuación puede ser negativa). Engañar, ser reconocido y los 😂 no dan puntos. SQL: `game.speed_points` (migración `speed_scoring`).
 - Premio del presentador: plantillas en `app/src/content/awards.ts`; IA si hay clave.
 
 ## Fuera de alcance (no se construye)

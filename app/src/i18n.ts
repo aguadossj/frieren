@@ -47,7 +47,10 @@ export function useT() {
   return STRINGS[useLang()]
 }
 
-const fmt = (n: number) => n.toLocaleString('en')
+/** 1,250 / −100 (signo menos de verdad, no guion: la puntuación puede ser negativa) */
+export const fmt = (n: number) => (n < 0 ? '−' : '') + Math.abs(n).toLocaleString('en')
+/** +170 / −100 */
+export const signed = (n: number) => (n < 0 ? fmt(n) : `+${fmt(n)}`)
 const MEDALS = ['🥇', '🥈', '🥉']
 const ordinalEn = (n: number) => {
   const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'
@@ -158,7 +161,7 @@ const en = {
   nobodyGotIt: 'Nobody got it',
   tooEasy: 'Too easy',
   fooled: (n: number) => `${n} fooled`,
-  youPoints: (n: number) => `You +${n}`,
+  youPoints: (n: number) => `You ${signed(n)}`,
   realBy: (name: string) => `REAL · ${name}`,
   mimicTag: 'MIMIC · the AI',
   by: (name: string) => `by ${name}`,
@@ -306,7 +309,7 @@ const es: typeof en = {
   nobodyGotIt: 'Nadie acertó',
   tooEasy: 'Demasiado fácil',
   fooled: (n) => `${n} engañados`,
-  youPoints: (n) => `Tú +${n}`,
+  youPoints: (n) => `Tú ${signed(n)}`,
   realBy: (name) => `REAL · ${name}`,
   mimicTag: 'MIMIC · la IA',
   by: (name) => `de ${name}`,

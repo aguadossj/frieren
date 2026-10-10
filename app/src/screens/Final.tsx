@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from 'react'
 import { Avatar, Body, Button, Footer, Icon, Row, Screen, TopBar, TopNote } from '../components/ui'
 import { PUBLIC_URL, shareText } from '../components/QR'
 import { useGame } from '../game/useGame'
-import { useT } from '../i18n'
+import { fmt, useT } from '../i18n'
 import type { Player } from '../game/types'
 
 /**
@@ -85,7 +85,7 @@ export default function Final() {
                 >
                   <span className={`leading-none font-black ${place === 1 ? 'text-[44px]' : 'text-[34px]'}`}>{place}</span>
                   <span className={`mt-1 text-[14px] font-extrabold tabular-nums ${place === 1 ? 'text-white/70' : 'text-neutral-400'}`}>
-                    {p.score.toLocaleString('en')} {t.pts}
+                    {fmt(p.score)} {t.pts}
                   </span>
                 </div>
               </div>
@@ -98,7 +98,7 @@ export default function Final() {
             <b className="w-5 text-center text-[18px] text-neutral-400">{i + 4}</b>
             <Avatar player={p} />
             <span className="flex-1 truncate text-[19px] font-semibold">{label(p)}</span>
-            <b className="text-[19px] tabular-nums">{p.score.toLocaleString('en')}</b>
+            <b className="text-[19px] tabular-nums">{fmt(p.score)}</b>
           </Row>
         ))}
       </Body>
