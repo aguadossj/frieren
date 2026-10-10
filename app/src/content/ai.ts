@@ -5,12 +5,8 @@
 
 import type { Chat, GroupType, Pack, Player } from '../game/types'
 
-export interface AiSetup {
-  who?: string | null
-  age?: string | null
-  vibes?: string[] | null
-  topic?: string | null
-}
+// Igual que rooms.setup: preguntas del catálogo (who, age, vibes, topic) + contexto libre (situation, know…).
+export type AiSetup = Record<string, string | string[] | number | null>
 
 export interface AiPastRound {
   round: number

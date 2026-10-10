@@ -238,7 +238,7 @@ export function createMockClient(): GameClient {
       {
         round: index + 1,
         total_rounds: totalRounds,
-        setup: setupFromLobby(pack, groupType),
+        setup: { ...setupFromLobby(pack, groupType), ...setup }, // lo que eligió el host manda
         players: toAiPlayers(players),
         writer_id: writerOrder[index],
         history: structuredClone(history),

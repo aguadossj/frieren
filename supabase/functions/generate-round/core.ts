@@ -295,6 +295,7 @@ STEP 2, WRITE THE CHAT ("chat"), using what you just learned:
 - "title": a group chat name, max 24 characters, may include one emoji.
 - "lines": 2 to 4 messages. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
+  "text" is only what they type: never start it with the sender's name or "name:".
 - Messages are short, casual texting: max 70 characters, lowercase is fine, emojis welcome.
 - You may mention players by name. The LAST message must be a direct question to the writer, using their name,
   that invites a funny or revealing reply that friends could plausibly fake.
@@ -351,6 +352,11 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string) 
   return {
     round: input.round,
     total_rounds: input.total_rounds,
+    writer_this_round: {
+      handle: handleOf(input.writer_id),
+      name: input.players.find((p) => p.id === input.writer_id)?.name,
+      note: 'the last message must be a question to THIS player (not to a previous writer)',
+    },
     audience: {
       group: AUDIENCE[input.setup.who ?? ''] ?? (input.setup.know === 'no' ? 'people who mostly just met' : 'friends'),
       know_each_other:
@@ -419,11 +425,30 @@ function repairChat(output: ModelOutput, writerName: string, otherHandles: strin
   lines.forEach((line, i) => {
     if (!line) return
     if (!otherHandles.includes(line.from)) line.from = otherHandles[i % otherHandles.length]
-    if (typeof line.text === 'string') line.text = line.text.replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
+    if (typeof line.text !== 'string') return
+    line.text = line.text.replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
+    // "bo: i swear…" -> "i swear…": el remitente ya se ve en la burbuja.
+    const sender = nameOf[line.from] ?? ''
+    for (const prefix of [sender, ...sender.split(/\s+/)].filter((w) => w.length >= 2)) {
+      const stripped = line.text.replace(new RegExp(`^\\s*${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*:\\s*`, 'i'), '')
+      if (stripped !== line.text && stripped.trim()) {
+        line.text = stripped
+        break
+      }
+    }
   })
   const last = lines[lines.length - 1]
   if (typeof last?.text === 'string' && last.text.includes('?') && !mentions(last.text, writerName)) {
-    last.text = `${writerName} ${last.text.replace(/^[^\p{L}\p{N}]*/u, '')}`
+    // Si la pregunta va a otro jugador (p. ej. al writer de la ronda anterior), se cambia ese nombre por el del writer.
+    const other = Object.values(nameOf).find((name) => name !== writerName && mentions(last.text, name))
+    const word =
+      other &&
+      (last.text.toLowerCase().includes(other.toLowerCase())
+        ? other
+        : other.split(/\s+/).find((w) => w.length >= 2 && mentions(last.text, w)))
+    last.text = word
+      ? last.text.replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), writerName)
+      : `${writerName} ${last.text.replace(/^[^\p{L}\p{N}]*/u, '')}`
   }
 }
 
