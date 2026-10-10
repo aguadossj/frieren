@@ -9,6 +9,7 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { GameClient, GameState, GroupType, Pack, Room, RoomSettings, Setup, SetupQuestion } from './types'
+import { PLAYER_COLORS } from './types'
 import { getLang } from '../i18n'
 import type { Lang } from '../i18n'
 
@@ -279,8 +280,11 @@ export function createSupabaseClient(): GameClient {
     },
     async checkRoom(code) {
       try {
-        const r = await rpc<{ ok: boolean; reason: string | null }>('check_room', { p_code: code })
-        return r.ok ? { ok: true } : { ok: false, message: friendly(r.reason ?? 'room_not_found') }
+        const r = await rpc<{ ok: boolean; reason: string | null; players?: number; color?: string | null }>('check_room', { p_code: code })
+        if (!r.ok) return { ok: false, message: friendly(r.reason ?? 'room_not_found') }
+        // `color` viene de la migración check_room_color; sin ella, el siguiente color en orden según cuántos hay
+        const guess = typeof r.players === 'number' ? PLAYER_COLORS[r.players % PLAYER_COLORS.length] : undefined
+        return { ok: true, color: r.color ?? guess }
       } catch {
         // Si la función aún no está desplegada o falla la red, no bloqueamos: join_room vuelve a comprobarlo
         return { ok: true }
