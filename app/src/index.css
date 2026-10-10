@@ -92,6 +92,18 @@
   25% { transform: translateX(-26px) rotate(-2deg); }
   60% { transform: translateX(26px) rotate(2deg); }
 }
+/* Flechas a mano del mazo: se dibujan al entrar y luego empujan hacia su lado */
+.scribble path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: scribble-draw 0.45s ease-out 0.5s forwards; }
+.scribble .scribble-head { animation-delay: 0.9s; animation-duration: 0.2s; }
+@keyframes scribble-draw { to { stroke-dashoffset: 0; } }
+.swipe-nudge-l { display: block; animation: nudge-l 1.5s ease-in-out 1.4s infinite; }
+.swipe-nudge-r { display: block; animation: nudge-r 1.5s ease-in-out 1.4s infinite; }
+@keyframes nudge-l { 0%, 60%, 100% { translate: 0; } 30% { translate: -5px; } }
+@keyframes nudge-r { 0%, 60%, 100% { translate: 0; } 30% { translate: 5px; } }
+@media (prefers-reduced-motion: reduce) {
+  .scribble path { animation: none; stroke-dashoffset: 0; }
+  .swipe-nudge-l, .swipe-nudge-r { animation: none; }
+}
 @keyframes wave {
   0%, 100% { transform: rotate(0); }
   25% { transform: rotate(-16deg); }

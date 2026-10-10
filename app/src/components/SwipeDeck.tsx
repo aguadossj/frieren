@@ -38,13 +38,11 @@ export const GLYPHS = {
 
 export default function SwipeDeck({
   cards,
-  intro,
-  how,
+  lead,
   onAnswer,
 }: {
   cards: SwipeCard[]
-  intro: string
-  how: string // "Swipe": pequeño y centrado entre ← No y Sí → de la tarjeta
+  lead: string // "Swipe if": va encima de cada respuesta del pie de la tarjeta
   onAnswer: (id: string, yes: boolean) => void
 }) {
   const [index, setIndex] = useState(0)
@@ -92,18 +90,14 @@ export default function SwipeDeck({
     <div className="flex min-h-0 w-full flex-1 flex-col gap-4">
       {/* Respuestas dadas, como burbujas enviadas */}
       <div className="flex min-h-[34px] shrink-0 flex-wrap items-center justify-end gap-1.5">
-        {given.length === 0 ? (
-          <span className="mr-auto text-[16px] font-bold text-white/80">{intro}</span>
-        ) : (
-          given.map((g) => (
-            <span
-              key={g.id}
-              className={`animate-pop rounded-[16px] rounded-br-[5px] px-3 py-1.5 text-[14px] font-extrabold ${g.yes ? 'bg-white text-good' : 'bg-ink text-white'}`}
-            >
-              {g.label}
-            </span>
-          ))
-        )}
+        {given.map((g) => (
+          <span
+            key={g.id}
+            className={`animate-pop rounded-[16px] rounded-br-[5px] px-3 py-1.5 text-[14px] font-extrabold ${g.yes ? 'bg-white text-good' : 'bg-ink text-white'}`}
+          >
+            {g.label}
+          </span>
+        ))}
       </div>
 
       <div className="relative min-h-0 flex-1">
@@ -182,18 +176,33 @@ export default function SwipeDeck({
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-1 text-[17px] font-extrabold whitespace-nowrap">
-                  <span className="flex items-center gap-1.5 transition-opacity" style={{ opacity: 1 - yes * 0.8 }}>
-                    <span className="text-[22px] leading-none">←</span>
-                    {card.no}
-                  </span>
-                  <span className="shrink-0 px-2 text-[13px] font-bold text-neutral-400 transition-opacity" style={{ opacity: 1 - Math.max(yes, no) }}>
-                    {how}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-good transition-opacity" style={{ opacity: 1 - no * 0.8 }}>
-                    {card.yes}
-                    <span className="text-[22px] leading-none">→</span>
-                  </span>
+                {/* Pie: "Swipe if No" arriba a la izquierda y "Swipe if Yes" abajo a la derecha, torcidos,
+                    cada uno con una flecha a mano que apunta hacia donde hay que deslizar */}
+                <div className="relative h-[104px] shrink-0 whitespace-nowrap">
+                  <div
+                    className="absolute top-0 left-[-6px] flex -rotate-[6deg] items-center gap-1 transition-opacity"
+                    style={{ opacity: 1 - yes * 0.8 }}
+                  >
+                    <span className="swipe-nudge-l">
+                      <Scribble flip />
+                    </span>
+                    <span className="leading-none">
+                      <span className="block text-[14px] font-bold text-neutral-400">{lead}</span>
+                      <span className="block text-[22px] font-black">{card.no}</span>
+                    </span>
+                  </div>
+                  <div
+                    className="absolute right-[-6px] bottom-0 flex rotate-[4deg] items-center gap-1 text-good transition-opacity"
+                    style={{ opacity: 1 - no * 0.8 }}
+                  >
+                    <span className="text-right leading-none">
+                      <span className="block text-[14px] font-bold text-neutral-400">{lead}</span>
+                      <span className="block text-[22px] font-black">{card.yes}</span>
+                    </span>
+                    <span className="swipe-nudge-r">
+                      <Scribble />
+                    </span>
+                  </div>
                 </div>
 
                 {/* Al arrastrar: la tarjeta se tiñe y aparece la respuesta en grande, como burbuja */}
@@ -221,5 +230,27 @@ export default function SwipeDeck({
         )}
       </div>
     </div>
+  )
+}
+
+/** Flecha dibujada a mano (trazo curvo + punta de dos rayas) que se "dibuja" al entrar la tarjeta. Apunta a la derecha; `flip` a la izquierda. */
+function Scribble({ flip = false }: { flip?: boolean }) {
+  return (
+    <svg
+      width="72"
+      height="55"
+      viewBox="0 0 58 44"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={4.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="scribble block"
+      style={flip ? { transform: 'scaleX(-1) rotate(8deg)' } : { transform: 'rotate(-4deg)' }}
+      aria-hidden="true"
+    >
+      <path pathLength={1} d="M4 38c9 2.5 22 1 33-7.5 6-4.6 10.5-11 13.5-19" />
+      <path pathLength={1} className="scribble-head" d="M39.5 14.5 50.8 9.5 54 21.5" />
+    </svg>
   )
 }

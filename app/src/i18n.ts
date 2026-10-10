@@ -101,8 +101,7 @@ const en = {
   situationHint: 'What you’re doing, where, and who’s there.',
   situationRequired: 'Tell us what you’re up to so we can start.',
   openingRoom: 'Opening your room…',
-  quickOnes: '5 quick ones. Swipe.',
-  swipeHint: 'Swipe',
+  swipeIf: 'Swipe if',
   lookingAround: 'Looking around you…',
   near: 'Near',
   cards: {
@@ -275,8 +274,7 @@ const es: typeof en = {
   situationHint: 'Qué hacéis, dónde estáis y quién hay.',
   situationRequired: 'Cuéntanos qué estáis haciendo para empezar.',
   openingRoom: 'Abriendo tu sala…',
-  quickOnes: '5 preguntas rápidas. Desliza.',
-  swipeHint: 'Desliza',
+  swipeIf: 'Desliza si',
   lookingAround: 'Mirando qué hay por la zona…',
   near: 'Cerca',
   cards: {
