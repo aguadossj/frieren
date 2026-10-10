@@ -33,16 +33,28 @@ const nameOf = Object.fromEntries(players.map((p) => [p.id, p.name]))
 
 // Lo que escribiría un host de verdad, con las tarjetas del setup (adultos, picante, os conocéis).
 const SETTINGS = [
+  // Español
   { lang: 'es', situation: 'cumpleaños de Mario, cumple 30 y no supera a su ex', adults: true, spicy: true, know: true },
   { lang: 'es', situation: 'previa en casa de Pau antes de ir a Razzmatazz', adults: true, spicy: true, know: true },
   { lang: 'es', situation: 'en el bar después de la hackathon, llevamos dos días sin dormir', adults: true, spicy: false, know: true },
   { lang: 'es', situation: 'cena de piso, alguien ha vuelto a dejar los platos sin fregar', adults: true, spicy: false, know: true },
   { lang: 'es', situation: 'viaje en coche a Valencia, quedan 3 horas', adults: true, spicy: true, know: true },
   { lang: 'es', situation: 'comida familiar de domingo en casa de la abuela', adults: false, spicy: false, know: true },
+  { lang: 'es', situation: 'primer día de Erasmus en Bolonia, nos acabamos de conocer', adults: true, spicy: true, know: false },
+  { lang: 'es', situation: 'en la playa de la Barceloneta, 35 grados', adults: true, spicy: false, know: true },
+  { lang: 'es', situation: 'estudiando en la biblio para el examen de mañana', adults: true, spicy: false, know: true },
+  { lang: 'es', situation: 'boda de la prima de Nico, barra libre', adults: true, spicy: true, know: true },
+  // English
   { lang: 'en', situation: "Mario's leaving party, he's moving to Berlin on Monday", adults: true, spicy: true, know: true },
   { lang: 'en', situation: 'watching the Barça match at a bar, losing 2-0', adults: true, spicy: false, know: true },
   { lang: 'en', situation: 'first time meeting at a hackathon in Barcelona', adults: true, spicy: false, know: false },
   { lang: 'en', situation: 'school trip to the science museum', adults: false, spicy: false, know: true },
+  { lang: 'en', situation: 'pre-drinks before a house party in Gràcia', adults: true, spicy: true, know: true },
+  { lang: 'en', situation: 'Sunday brunch, everyone is hungover', adults: true, spicy: true, know: true },
+  { lang: 'en', situation: 'camping trip, it has rained for two days', adults: true, spicy: false, know: true },
+  { lang: 'en', situation: 'office Christmas dinner', adults: true, spicy: false, know: true },
+  { lang: 'en', situation: 'family road trip to the Pyrenees', adults: false, spicy: false, know: true },
+  { lang: 'en', situation: 'speed-dating night, we just sat down at the same table', adults: true, spicy: true, know: false },
 ]
 
 const setupOf = (s) => ({

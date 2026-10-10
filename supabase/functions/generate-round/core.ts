@@ -927,8 +927,17 @@ export async function callModel<T>(
     }
   }
   if (!response.ok) throw new AiError('provider_status', `${response.status} ${await response.text().catch(() => '')}`)
+  // OpenRouter responde 200 al momento y genera mientras mantiene la conexión abierta: si se acaba el tiempo, se corta
+  // la LECTURA del cuerpo. Eso es un timeout, no un JSON malo (antes salía como not_json y no se veía en las métricas).
+  let data: { choices?: { message?: { content?: unknown } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } }
   try {
-    const data = await response.json()
+    data = await response.json()
+  } catch (error) {
+    const name = error instanceof Error ? error.name : ''
+    if (name === 'TimeoutError' || name === 'AbortError') throw new AiError('timeout', 'body_read_timeout')
+    throw new AiError('invalid_output', 'not_json')
+  }
+  try {
     return { json: parseJsonReply(data.choices?.[0]?.message?.content) as T, usage: data.usage ?? {} }
   } catch {
     throw new AiError('invalid_output', 'not_json')
