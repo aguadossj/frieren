@@ -93,7 +93,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v4'
+export const PROMPT_VERSION = 'round-v5'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -123,6 +123,55 @@ export const LANGUAGES = {
       'ahorita, órale, neta, tacos o taquerías. Ninguna palabra en inglés salvo las que se usan de verdad (story, match, like).',
   },
 } as const
+
+// Medido en los fragmentos reales de game.style_examples (vista game.ai_naturalness, 10 oct 2026).
+export const TEXTING = {
+  es: {
+    median_message_length: '16 characters (about 4 words); the final question can be a bit longer',
+    messages_with_emoji: '1 in 5',
+    messages_with_laughter: '1 in 6 (JAJAJA, jajaja, jsjs)',
+    messages_starting_with_a_capital: 'about half (phones auto-capitalize)',
+    messages_with_a_comma: 'almost none (3%)',
+    opening_question_or_exclamation_marks: 'never (0%)',
+    final_period: 'never',
+  },
+  en: {
+    median_message_length: '15 characters (about 4 words); the final question can be a bit longer',
+    messages_with_emoji: '1 in 12',
+    messages_with_laughter: '1 in 12 (lol, haha, LMAO)',
+    messages_starting_with_a_capital: 'about 4 in 10',
+    messages_with_a_comma: 'almost none (2%)',
+    final_period: 'almost never (1%)',
+  },
+} as const
+
+const MAX_LINES = 6
+const words = (text: string) => text.trim().split(/\s+/).filter(Boolean).length
+
+/**
+ * Lo que el modelo sigue haciendo mal por mucho que se le pida, corregido en código con los datos reales:
+ * sin ¿ ¡ iniciales, sin punto final, y las frases con comas se parten en mensajes seguidos de la misma persona
+ * (así escribe la gente). En la pregunta final las comas se quitan sin partir.
+ */
+export function naturalize(lines: { from: string; text: string }[]): { from: string; text: string }[] {
+  const clean = (text: string) =>
+    text.replace(/[¿¡]/g, '').replace(/\s+/g, ' ').trim().replace(/(?<![.])\.$/, '').trim()
+  const out: { from: string; text: string }[] = []
+  lines.forEach((line, i) => {
+    const text = clean(line.text)
+    const last = i === lines.length - 1
+    if (last) {
+      out.push({ from: line.from, text: text.replace(/\s*,\s*/g, ' ') })
+      return
+    }
+    const parts = text.split(/\s*[,;]\s+|\s+-\s+/).map(clean).filter(Boolean)
+    const canSplit = parts.length > 1 && parts.every((p) => words(p) >= 2)
+    const room = MAX_LINES - (lines.length - i - 1) - out.length // deja sitio para las líneas que faltan
+    if (canSplit && parts.length <= room) parts.forEach((p) => out.push({ from: line.from, text: p }))
+    else out.push({ from: line.from, text: text.replace(/\s*,\s*/g, ' ') })
+  })
+  return out
+}
 
 // Tema de cada ronda: lo elige el código (sin repetir en la sala) para que no salga siempre lo mismo.
 export interface Theme {
@@ -434,16 +483,18 @@ that is fun to answer for real and fun to fake ("WRITER?? explain", "WRITER what
 Never copy them; write a new situation with the same punch.
 
 STYLE: DATA.style_examples are real group chats from real people (A, B, C), in DATA.language.
-Text like they do: most messages 2 to 8 words, mostly lowercase, little punctuation, small typos are fine, at least one
-pure reaction ("JAJAJA", "nooo", "wait what", "😭"), the same person may send two messages in a row.
+DATA.texting_targets were measured on hundreds of real messages: match them. Real people send bursts of very short
+messages instead of one long sentence: split every thought into its own message, almost never use commas, never use
+opening ¿ or ¡, and drop the final period. A pure reaction ("JAJAJA", "nooo", "wait what", "😭") counts as a message.
+The same person often sends two or three messages in a row. Small typos are fine.
 The same kinds of situations they talk about are welcome; never reuse their sentences or details.
 
 FIELDS:
 - "situation": a few words naming the situation. It must differ from everything in memory.used_situations.
 - "title": a real group chat name for these people (max 24 characters, may include one emoji), not a summary of the joke.
-- "lines": 2 to 4 messages. "from" is the handle of the sender. The writer NEVER sends a message.
+- "lines": 3 to 6 short messages. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
-  "text" is only what they type: never start it with the sender's name or "name:". Max 70 characters each.
+  "text" is only what they type: never start it with the sender's name or "name:". Max 60 characters each.
 - The LAST message is the question to the writer, using their name.
 - Follow the audience (group, know_each_other, content, vibes, topic, extra_context). From round 2 on, call back a
   running joke or something a player said when it fits, and follow the steer. If the writer has been easy to spot
@@ -499,6 +550,7 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, 
   return {
     language: LANGUAGES[lang].name,
     language_notes: LANGUAGES[lang].notes,
+    texting_targets: TEXTING[lang],
     theme_this_round: theme[lang],
     round: input.round,
     total_rounds: input.total_rounds,
@@ -613,7 +665,7 @@ function repairChat(output: ModelOutput, writerName: string, otherHandles: strin
 function validateChat(output: ModelOutput, writerName: string, otherHandles: Set<string>): string | null {
   const chat = output?.chat
   if (!chat || typeof chat.title !== 'string' || !chat.title.trim() || chat.title.length > 40) return 'title'
-  if (!Array.isArray(chat.lines) || chat.lines.length < 2 || chat.lines.length > 5) return 'lines'
+  if (!Array.isArray(chat.lines) || chat.lines.length < 2 || chat.lines.length > 7) return 'lines'
   for (const line of chat.lines) {
     if (!otherHandles.has(line?.from)) return 'from'
     if (typeof line.text !== 'string' || !line.text.trim() || line.text.length > 120) return 'text'
@@ -729,6 +781,10 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
   )
   const output = json
   repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
+  if (Array.isArray(output?.chat?.lines)) {
+    output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()))
+    output.chat.title = String(output.chat.title ?? '').replace(/[¿¡]/g, '').trim()
+  }
   const texts = output?.chat?.lines?.map((l) => l.text) ?? []
   const problem =
     validateChat(output, writer.name, new Set(otherHandles)) ??
