@@ -16,6 +16,13 @@ import {
 } from './types'
 import type { Answer, Chat, GameClient, GameState, Pack, Phase, Player, Room, RoundResult, Setup, SetupQuestion } from './types'
 
+/** `crypto.randomUUID` solo existe en contextos seguros (https / localhost). En el móvil por la IP local
+ *  (http://192.168.x.x:5173) no está, así que usamos un id aleatorio normal. */
+const newId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+
 const BOT_NAMES = ['Marta', 'Laura', 'Pol']
 const BOT_REPLIES = [
   'it was the cat bro',
@@ -129,7 +136,7 @@ export function createMockClient(): GameClient {
 
   function addPlayer(name: string, isHost: boolean): Player {
     const player: Player = {
-      id: crypto.randomUUID(),
+      id: newId(),
       name: name.trim().slice(0, MAX_NAME_LENGTH),
       color: PLAYER_COLORS[players.length % PLAYER_COLORS.length],
       score: 0,

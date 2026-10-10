@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, Screen, TextInput, TypingDots } from '../components/ui'
 import { useGame } from '../game/useGame'
@@ -131,7 +131,17 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
   const [situation, setSituation] = useState<string | null>(null)
   const [know, setKnow] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [nudge, setNudge] = useState<'situation' | 'know' | null>(null)
+  const situationRef = useRef<HTMLDivElement>(null)
+  const knowRef = useRef<HTMLDivElement>(null)
   const join = mode === 'join'
+
+  /** Falta una respuesta: llevar a esa pregunta y resaltarla (en móvil puede quedar fuera de pantalla). */
+  const point = (which: 'situation' | 'know') => {
+    setNudge(which)
+    ;(which === 'situation' ? situationRef : knowRef).current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => setNudge(null), 900)
+  }
 
   const submit = async () => {
     if (!name.trim() || busy) return
@@ -140,7 +150,8 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
       return void game.joinRoom(code, name).finally(() => setBusy(false))
     }
     if (step === 'name') return setStep('setup')
-    if (!situation || !know) return
+    if (!situation) return point('situation')
+    if (!know) return point('know')
     setBusy(true)
     try {
       await game.createRoom(name)
@@ -191,7 +202,11 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
               <p className="mt-2 text-[17px] font-semibold text-white/85">The chats will match the moment.</p>
             </div>
 
-            <div className="grid animate-rise grid-cols-2 gap-2.5" style={{ animationDelay: '0.05s' }}>
+            <div
+              ref={situationRef}
+              className={`grid animate-rise grid-cols-2 gap-2.5 rounded-[26px] transition ${nudge === 'situation' ? 'animate-nudge ring-4 ring-white' : ''}`}
+              style={{ animationDelay: '0.05s' }}
+            >
               {SITUATIONS.map((s) => (
                 <Choice key={s.value} selected={situation === s.value} onClick={() => setSituation(s.value)}>
                   <span className="text-[26px] leading-none">{s.emoji}</span>
@@ -200,7 +215,11 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
               ))}
             </div>
 
-            <div className="flex animate-rise flex-col gap-2.5" style={{ animationDelay: '0.1s' }}>
+            <div
+              ref={knowRef}
+              className={`flex animate-rise scroll-mb-32 flex-col gap-2.5 rounded-[26px] transition ${nudge === 'know' ? 'animate-nudge ring-4 ring-white ring-offset-4 ring-offset-brand' : ''}`}
+              style={{ animationDelay: '0.1s' }}
+            >
               <Eyebrow>Do you know each other?</Eyebrow>
               <div className="grid grid-cols-2 gap-2.5">
                 {KNOW.map((k) => (
@@ -225,9 +244,16 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
               <Icon name="arrowRight" size={22} />
             </Button>
           ) : (
-            <Button type="submit" disabled={!situation || !know || busy}>
-              {!situation ? 'Pick what you’re up to' : !know ? 'Do you know each other?' : 'Create room'}
-            </Button>
+            <>
+              {(!situation || !know) && (
+                <p className="text-center text-[15px] font-semibold text-white/85">
+                  {!situation ? 'Pick what you’re up to' : 'One more: do you know each other?'}
+                </p>
+              )}
+              <Button type="submit" disabled={busy} className={!situation || !know ? 'opacity-70' : ''}>
+                {busy ? 'Creating…' : 'Create room'}
+              </Button>
+            </>
           )}
         </Footer>
       </form>
