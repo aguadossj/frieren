@@ -12,16 +12,12 @@ export default function Writing() {
   const [typing, setTyping] = useState(false) // input con foco ⇒ teclado abierto
   const list = useRef<HTMLDivElement>(null)
 
-  // La barra de escribir es blanca: lo que asoma bajo ella con el teclado abierto también (ver index.css)
+  // Marca la pantalla de chat (index.css: barra inferior de Safari roja como la barra de escribir)
   useEffect(() => {
     const html = document.documentElement
-    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
-    const prevTheme = meta?.content
     html.dataset.pageBg = 'chat'
-    if (meta) meta.content = '#ffffff'
     return () => {
       delete html.dataset.pageBg
-      if (meta && prevTheme) meta.content = prevTheme
     }
   }, [])
 
@@ -59,7 +55,7 @@ export default function Writing() {
   // (index.css, data-page-bg=chat) para que Safari tiña su barra de arriba blanca y la de abajo roja.
   return (
     <Screen className="bg-white!">
-      <header className="flex shrink-0 items-center gap-3 bg-white px-4 py-2 text-ink">
+      <header className="flex min-h-[60px] shrink-0 items-center gap-3 bg-white px-4 py-2.5 text-ink">
         <span className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-brand text-[16px] font-extrabold text-white">
           {groupInitials(room.chat.title)}
         </span>
