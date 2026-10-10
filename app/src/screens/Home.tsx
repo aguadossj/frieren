@@ -4,7 +4,8 @@ import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import HowToPlay, { seenHowTo } from '../components/HowToPlay'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
-import { getLang, useT } from '../i18n'
+import { getLang, useLang, useT } from '../i18n'
+import { LEGAL, LEGAL_PAGES, LEGAL_PATHS } from '../content/legal'
 import { describePlace, knownPosition } from '../lib/place'
 import type { PlaceContext } from '../lib/place'
 import { useGame } from '../game/useGame'
@@ -121,6 +122,7 @@ function Start({ onCreate, onJoin, onHowTo }: { onCreate: () => void; onJoin: ()
           <Icon name="arrowRight" size={22} />
         </Button>
 
+        <LegalLinks />
       </Footer>
     </Screen>
   )
@@ -137,7 +139,13 @@ const MAX_SITUATION = 120
 function NamePage({ onBack }: { onBack: () => void }) {
   const { game, error } = useGame()
   const t = useT()
-  const cards: SwipeCard[] = CARD_IDS.map((id) => ({ id, icon: CARD_ICONS[id], ...t.cards[id] }))
+  const lang = useLang()
+  const cards: SwipeCard[] = CARD_IDS.map((id) => ({
+    id,
+    icon: CARD_ICONS[id],
+    ...t.cards[id],
+    ...(id === 'mimic' && { link: { label: LEGAL[lang].ui.mimicLink, href: `${LEGAL_PATHS.ai}#mimic` } }),
+  }))
   const [name, setName] = useState('')
   const [situation, setSituation] = useState('')
   const [step, setStep] = useState<'name' | 'swipe'>('name')
@@ -523,5 +531,22 @@ function CodeTiles({ label, value, onChange }: { label: string; value: string; o
         className="absolute inset-0 h-full w-full cursor-text opacity-0"
       />
     </div>
+  )
+}
+
+/** Pie de la portada: Privacy · AI · Terms (páginas en content/legal.ts). Discreto, pero con área táctil de 44 px. */
+function LegalLinks() {
+  const copy = LEGAL[useLang()]
+  return (
+    <nav aria-label="Legal" className="-mt-2 -mb-4 flex items-center justify-center text-[13px] font-bold text-white/60">
+      {LEGAL_PAGES.map((k, i) => (
+        <span key={k} className="flex items-center">
+          {i > 0 && <span aria-hidden="true">·</span>}
+          <a href={LEGAL_PATHS[k]} className="flex h-[44px] items-center px-2.5 active:text-white">
+            {copy[k].tab}
+          </a>
+        </span>
+      ))}
+    </nav>
   )
 }

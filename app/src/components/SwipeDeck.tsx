@@ -8,6 +8,8 @@ export interface SwipeCard {
   id: string
   question: string
   hint?: string
+  /** Enlace pequeño bajo la pista (se abre en otra pestaña para no perder el mazo). */
+  link?: { label: string; href: string }
   no: string
   yes: string
   icon: ReactNode
@@ -157,6 +159,17 @@ export default function SwipeDeck({ cards, intro, onAnswer }: { cards: SwipeCard
                   <div>
                     <p className="text-[40px] leading-[1.04] font-black tracking-[-0.035em]">{card.question}</p>
                     {card.hint && <p className="mt-4 text-[18px] leading-snug font-semibold text-neutral-500">{card.hint}</p>}
+                    {card.link && (
+                      <a
+                        href={card.link.href}
+                        target="_blank"
+                        rel="noopener"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="-ml-1 mt-2 inline-flex h-[44px] items-center px-1 text-[16px] font-extrabold text-ink underline decoration-brand decoration-2 underline-offset-4"
+                      >
+                        {card.link.label}
+                      </a>
+                    )}
                   </div>
                 </div>
 
