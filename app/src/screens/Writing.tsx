@@ -17,7 +17,7 @@ export default function Writing() {
     const html = document.documentElement
     const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     const prevTheme = meta?.content
-    html.dataset.pageBg = 'white'
+    html.dataset.pageBg = 'chat'
     if (meta) meta.content = '#ffffff'
     return () => {
       delete html.dataset.pageBg
@@ -53,21 +53,17 @@ export default function Writing() {
   const hint = isWriter ? `You're ${writer.name} · say it for real` : `Fool them · write like ${writer.name}`
 
   // Layout tipo WhatsApp para aprovechar la pantalla del móvil:
-  // cabecera compacta (ronda en el subtítulo) · chat rojo con el nombre DENTRO de la burbuja ·
+  // cabecera mínima (solo nombre del grupo + tiempo) · chat rojo con el nombre DENTRO de la burbuja ·
   // pista como nota pequeña al final del chat · abajo solo la barra de escribir.
-  // La pantalla es blanca y solo el chat es rojo: así Safari tiñe de blanco sus barras de arriba y abajo.
+  // Cabecera blanca arriba, chat y barra de escribir rojos abajo; el fondo de la página sigue el mismo corte
+  // (index.css, data-page-bg=chat) para que Safari tiña su barra de arriba blanca y la de abajo roja.
   return (
     <Screen className="bg-white!">
-      <header className="flex shrink-0 items-center gap-3 bg-white px-4 py-2.5 text-ink">
-        <span className="flex size-[42px] shrink-0 items-center justify-center rounded-full bg-brand text-[16px] font-extrabold text-white">
+      <header className="flex shrink-0 items-center gap-3 bg-white px-4 py-2 text-ink">
+        <span className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-brand text-[16px] font-extrabold text-white">
           {groupInitials(room.chat.title)}
         </span>
-        <div className="min-w-0 flex-1 leading-tight">
-          <div className="truncate text-[18px] font-extrabold">{room.chat.title}</div>
-          <div className="truncate text-[14px] font-semibold text-brand">
-            Round {room.roundIndex + 1}/{room.totalRounds} · {mine ? 'sent ✓' : `${writer.name} is typing…`}
-          </div>
-        </div>
+        <div className="min-w-0 flex-1 truncate text-[18px] leading-tight font-extrabold">{room.chat.title}</div>
         <TimerPill seconds={seconds} />
       </header>
 
@@ -114,9 +110,9 @@ export default function Writing() {
         )}
       </div>
 
-      <div className={`shrink-0 bg-white px-3 ${typing ? 'pt-2 pb-2' : 'pt-2.5 pb-4'}`}>
+      <div className={`shrink-0 bg-brand px-3 ${typing ? 'pt-1 pb-2' : 'pt-1 pb-4'}`}>
         {sent ? (
-          <div className="flex h-[48px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[16px] font-extrabold text-ink">
+          <div className="flex h-[48px] items-center justify-center gap-2 rounded-full bg-white text-[16px] font-extrabold text-ink">
             <Icon name="check" size={18} className="text-good" />
             Waiting for others {room.submittedIds.length}/{room.players.length}
           </div>
@@ -134,7 +130,7 @@ export default function Writing() {
             }}
           >
             <input
-              className="h-[46px] min-w-0 flex-1 rounded-full bg-neutral-100 px-5 text-[17px] text-ink outline-none placeholder:text-neutral-400"
+              className="h-[46px] min-w-0 flex-1 rounded-full bg-white px-5 text-[17px] text-ink outline-none placeholder:text-neutral-400"
               placeholder={`Message as ${writer.name}`}
               maxLength={MAX_ANSWER_LENGTH}
               value={text}
@@ -150,7 +146,7 @@ export default function Writing() {
               aria-label="Send"
               onMouseDown={(e) => e.preventDefault() /* no cerrar el teclado al tocar enviar */}
               disabled={!text.trim()}
-              className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50"
+              className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-ink text-white transition active:scale-90 disabled:opacity-50"
             >
               <Icon name="arrowRight" size={22} className="-rotate-90" />
             </button>

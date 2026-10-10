@@ -52,10 +52,10 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 html[data-keyboard='open'] #root { padding-bottom: 0; }
-/* Chat: cabecera y barra de escribir blancas, así que lo que hay por encima (barra de estado / de Safari)
-   y por debajo (detrás de la barra ˄ ˅ ✓ de iOS con el teclado abierto) también es blanco. Lo activa Writing.tsx. */
+/* Chat: cabecera blanca arriba y chat/barra de escribir rojos abajo. El fondo de la página repite el corte:
+   blanco detrás de la barra de estado/Safari de arriba, rojo abajo (y detrás de la barra ˄ ˅ ✓ con teclado). Lo activa Writing.tsx. */
 @media (max-width: 639px) {
-  html[data-page-bg='white'], html[data-page-bg='white'] body { background: #fff; }
+  html[data-page-bg='chat'], html[data-page-bg='chat'] body { background: linear-gradient(#fff 50%, var(--color-brand) 50%); }
 }
 
 /* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
