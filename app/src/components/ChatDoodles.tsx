@@ -54,19 +54,19 @@ function rng(seed: number) {
 
 const W = 400
 const H = 900
-const CELL = 74 // rejilla con desplazamiento aleatorio: reparto uniforme pero sin parecer una cuadrícula
+const CELL = 54 // rejilla (más pequeña = más dibujos) con desplazamiento aleatorio: reparto uniforme pero sin parecer una cuadrícula
 
-export default function ChatDoodles({ seed, opacity = 0.13 }: { seed: number; opacity?: number }) {
+export default function ChatDoodles({ seed, opacity = 0.13, className = '' }: { seed: number; opacity?: number; className?: string }) {
   const items = useMemo(() => {
     const rand = rng(seed * 7919 + 17)
     const out: { d: string; x: number; y: number; r: number; s: number }[] = []
     for (let row = 0; row * CELL < H; row++) {
-      for (let col = 0; col * CELL < W; col++) {
-        if (rand() < 0.12) continue // algún hueco para que respire
+      for (let col = 0; col * CELL < W + CELL; col++) {
+        if (rand() < 0.06) continue // algún hueco suelto
         out.push({
           d: ICONS[Math.floor(rand() * ICONS.length)],
-          x: col * CELL + 10 + rand() * (CELL - 40) + (row % 2 ? CELL / 2 : 0),
-          y: row * CELL + 10 + rand() * (CELL - 40),
+          x: col * CELL + 4 + rand() * (CELL - 36) + (row % 2 ? CELL / 2 : 0) - CELL / 2,
+          y: row * CELL + 4 + rand() * (CELL - 36),
           r: Math.round(rand() * 60 - 30),
           s: 1.05 + rand() * 0.45,
         })
@@ -78,7 +78,7 @@ export default function ChatDoodles({ seed, opacity = 0.13 }: { seed: number; op
   return (
     <svg
       aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full"
+      className={`pointer-events-none absolute inset-0 h-full w-full ${className}`}
       viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="xMidYMin slice"
       style={{ opacity }}

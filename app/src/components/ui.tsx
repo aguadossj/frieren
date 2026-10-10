@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import type { Player } from '../game/types'
 import { shareInvite } from './QR'
+import ChatDoodles from './ChatDoodles'
 import { setLang, useLang, useT } from '../i18n'
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
@@ -61,15 +62,32 @@ export const Eyebrow = ({ children, className = '' }: { children: ReactNode; cla
 )
 
 /** Marco de pantalla. En escritorio se ve como un móvil centrado (como el mockup). */
-export function Screen({ children, dark = false, className = '' }: { children: ReactNode; dark?: boolean; className?: string }) {
+/**
+ * Pantalla. Todas las pantallas rojas llevan de fondo los dibujitos de pandas y cervezas (ChatDoodles):
+ * `isolate` + `-z-10` los deja detrás del contenido pero encima del rojo. `plain`: sin dibujos (p. ej. el chat,
+ * que es blanco y pone los dibujos en su propia tarjeta roja). Distribución al azar distinta en cada pantalla.
+ */
+export function Screen({
+  children,
+  dark = false,
+  plain = false,
+  className = '',
+}: {
+  children: ReactNode
+  dark?: boolean
+  plain?: boolean
+  className?: string
+}) {
+  const [seed] = useState(() => Math.floor(Math.random() * 1e6))
   return (
     <main
       className={cx(
-        'flex h-full flex-col overflow-hidden text-white sm:my-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] sm:shadow-2xl',
+        'relative isolate flex h-full flex-col overflow-hidden text-white sm:my-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] sm:shadow-2xl',
         dark ? 'bg-ink' : 'bg-brand',
         className,
       )}
     >
+      {!plain && !dark && <ChatDoodles seed={seed} className="-z-10" />}
       {children}
     </main>
   )

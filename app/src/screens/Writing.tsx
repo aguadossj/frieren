@@ -80,7 +80,7 @@ export default function Writing() {
           cuando aparece un elemento fijo en el borde. Se montan al entrar y se desmontan al salir. */}
       <div aria-hidden className="fixed inset-x-0 top-0 z-[60] h-[4px] bg-white sm:hidden" />
       <div aria-hidden className="fixed inset-x-0 bottom-0 z-[60] h-[6px] bg-white sm:hidden" />
-    <Screen className="bg-white!">
+    <Screen plain className="bg-white!">
       <header className="flex min-h-[40px] shrink-0 items-center gap-2.5 bg-white px-3 pt-2.5 pb-1 text-ink">
         <span className="flex size-[32px] shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-extrabold text-white">
           {groupInitials(room.chat.title)}
