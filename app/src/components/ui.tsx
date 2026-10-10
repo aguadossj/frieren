@@ -195,7 +195,7 @@ export function Avatar({
   ring = false,
   roomCode,
 }: {
-  player: Pick<Player, 'name' | 'color'> & { id?: string }
+  player: Pick<Player, 'name' | 'color'> & { id?: string; emoji?: string | null }
   size?: number
   ring?: boolean
   /** Código de sala cuando aún no estás dentro (pantalla de unirse); si no, el de la sala actual. */

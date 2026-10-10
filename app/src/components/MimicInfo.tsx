@@ -55,12 +55,9 @@ export default function MimicInfo({ onClose, moreHref }: { onClose: () => void; 
         <div className="my-auto pt-12 pb-3 [@media(max-height:700px)]:pt-11">
           {/* Tarjeta blanca, como las del mazo, que se despliega y flota sobre el rojo */}
           <div className="origin-top animate-unfold rounded-[36px] bg-white px-7 pt-7 pb-6 text-ink shadow-[0_22px_50px_rgba(90,0,0,0.28)] [@media(max-height:700px)]:px-6 [@media(max-height:700px)]:pt-5 [@media(max-height:700px)]:pb-5">
-            <div className="flex items-center gap-4">
-              <span className="mimic-bob relative flex size-[88px] shrink-0 items-center justify-center rounded-full bg-ink ring-[6px] ring-brand/15 [@media(max-height:700px)]:size-[68px]">
-                <RobotFace size={64} />
-              </span>
-              <span className="rounded-full bg-brand/10 px-3 py-1 text-[13px] font-extrabold tracking-[0.14em] text-brand">MIMIC · AI</span>
-            </div>
+            <span className="mimic-bob flex size-[88px] items-center justify-center rounded-full bg-ink [@media(max-height:700px)]:size-[68px]">
+              <RobotFace size={64} />
+            </span>
             <h2 id="mimic-title" className="mt-5 text-[34px] leading-[1.04] font-black tracking-[-0.035em] [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-[30px]">
               {m.title}
             </h2>

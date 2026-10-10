@@ -124,6 +124,7 @@ const en = {
   joinRoom: 'Join room',
   joining: 'Joining',
   changeCode: 'Change code',
+  nameTaken: 'That name is already taken. Pick another one.',
   // Sala
   leaveRoom: 'Leave room',
   checkingRoom: 'Checking room…',
@@ -278,6 +279,7 @@ const es: typeof en = {
   joinRoom: 'Entrar',
   joining: 'Entrando',
   changeCode: 'Cambiar código',
+  nameTaken: 'Ese nombre ya está cogido. Elige otro.',
   leaveRoom: 'Salir de la sala',
   checkingRoom: 'Comprobando sala…',
   copyLink: 'Compartir invitación',

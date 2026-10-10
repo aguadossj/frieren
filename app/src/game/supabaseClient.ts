@@ -36,6 +36,7 @@ const ERRORS: Record<Lang, Record<string, string>> = {
     writer_cannot_vote: "It's your round. Just watch them guess.",
     not_writing_phase: 'Too late, time is up.',
     not_voting_phase: 'Voting is closed.',
+    name_taken: 'That name is already taken in this room.',
     unknown: 'Something went wrong. Try again.',
   },
   es: {
@@ -54,6 +55,7 @@ const ERRORS: Record<Lang, Record<string, string>> = {
     writer_cannot_vote: 'Es tu ronda. Mira cómo intentan adivinar.',
     not_writing_phase: 'Tarde, se acabó el tiempo.',
     not_voting_phase: 'La votación está cerrada.',
+    name_taken: 'Ese nombre ya está cogido en esta sala.',
     unknown: 'Algo ha fallado. Vuelve a intentarlo.',
   },
 }
@@ -280,11 +282,14 @@ export function createSupabaseClient(): GameClient {
     },
     async checkRoom(code) {
       try {
-        const r = await rpc<{ ok: boolean; reason: string | null; players?: number; color?: string | null }>('check_room', { p_code: code })
+        const r = await rpc<{ ok: boolean; reason: string | null; players?: number; color?: string | null; taken_avatars?: string[]; taken_names?: string[] }>(
+          'check_room',
+          { p_code: code },
+        )
         if (!r.ok) return { ok: false, message: friendly(r.reason ?? 'room_not_found') }
         // `color` viene de la migración check_room_color; sin ella, el siguiente color en orden según cuántos hay
         const guess = typeof r.players === 'number' ? PLAYER_COLORS[r.players % PLAYER_COLORS.length] : undefined
-        return { ok: true, color: r.color ?? guess }
+        return { ok: true, color: r.color ?? guess, takenAvatars: r.taken_avatars ?? [], takenNames: r.taken_names ?? [] }
       } catch {
         // Si la función aún no está desplegada o falla la red, no bloqueamos: join_room vuelve a comprobarlo
         return { ok: true }
