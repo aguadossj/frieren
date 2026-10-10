@@ -45,7 +45,7 @@
   to { transform: translateY(0); }
 }
 /* Amago de la primera tarjeta del setup: enseña que se desliza */
-@keyframes nudge {
+@keyframes swipe-hint {
   0%, 100% { transform: translateX(0) rotate(0); }
   25% { transform: translateX(-26px) rotate(-2deg); }
   60% { transform: translateX(26px) rotate(2deg); }

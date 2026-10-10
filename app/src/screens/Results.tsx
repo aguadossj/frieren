@@ -106,6 +106,7 @@ function pandaLine(room: Room, meId: string | undefined, leadChanged: boolean, n
   if (liar && liarPlayer && liar.voterIds.length >= 2) return `${name(liarPlayer)} fooled ${liar.voterIds.length} people. Should we be worried?`
   if (finished) return `That’s it. ${name(now[0])} takes the crown.`
   if (lastNext) return 'Last round. Everything can still change.'
+  if (now[1] && now[0].score === now[1].score) return `${name(now[0])} and ${obj(now[1])} are tied at the top. Tense.`
   if (now[1] && now[0].score - now[1].score <= 200) return `Only ${now[0].score - now[1].score} points between ${name(now[0])} and ${obj(now[1])}.`
   return `${name(now[0])} is running away with it.`
 }

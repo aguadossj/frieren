@@ -140,7 +140,7 @@ export default function SwipeDeck({ cards, onAnswer }: { cards: SwipeCard[]; onA
             }}
           >
             {/* Amago en la primera tarjeta para enseñar el gesto */}
-            <div className="h-full" style={index === 0 && !dragging && !dx ? { animation: 'nudge 1.4s ease-in-out 1.3s 2' } : undefined}>
+            <div className="h-full" style={index === 0 && !dragging && !dx ? { animation: 'swipe-hint 1.4s ease-in-out 1.3s 2' } : undefined}>
               <div className="relative flex h-full origin-top animate-unfold flex-col overflow-hidden rounded-[36px] bg-white px-7 pt-7 pb-7 text-ink">
                 {/* Pliegue del papel que se desvanece al desdoblarse */}
                 <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-black/25" style={{ animation: 'crease 0.9s ease-out both' }} />
