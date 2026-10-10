@@ -185,6 +185,13 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
         </section>
       </div>
 
+      {/* Las 4 capturas montadas y ya decodificadas (invisibles): al cambiar de página salen al instante */}
+      <div className="pointer-events-none absolute size-px overflow-hidden opacity-0" aria-hidden="true">
+        {SHOTS.map((shot) => (
+          <img key={shot} src={`/howto/${lang}-${shot}.webp`} alt="" decoding="sync" fetchPriority="high" />
+        ))}
+      </div>
+
       <div className="shrink-0 px-5 pt-3 pb-6">
         <button
           onClick={next}
@@ -236,7 +243,7 @@ function IPhone({ src, tilt = 0, className = '' }: { src: string; tilt?: number;
               </svg>
             </span>
           </div>
-          <img src={src} alt="" draggable={false} className="pointer-events-none min-h-0 w-full flex-1 object-cover object-top" />
+          <img src={src} alt="" draggable={false} decoding="sync" fetchPriority="high" className="pointer-events-none min-h-0 w-full flex-1 object-cover object-top" />
           {/* Barra de inicio */}
           <span className="absolute bottom-[1.6cqw] left-1/2 h-[1.3cqw] w-[34cqw] -translate-x-1/2 rounded-full bg-black/80" />
         </div>
