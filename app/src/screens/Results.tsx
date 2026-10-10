@@ -4,7 +4,7 @@ import { Avatar, AwardCard, Button, Footer, Icon, Screen, TimeBar, TopBar, TopNo
 import { useGame } from '../game/useGame'
 import { MIMIC_AUTHOR_ID, PHASE_SECONDS } from '../game/types'
 import type { Player, RoundResult, Room } from '../game/types'
-import { useLang, useT } from '../i18n'
+import { fmt, signed, useLang, useT } from '../i18n'
 import { avatarFor, textOn } from '../lib/avatars'
 
 type Strings = ReturnType<typeof useT>
@@ -34,7 +34,7 @@ export function Reveal() {
           <div className="min-w-0 text-[32px] leading-none font-black tracking-[-0.03em] whitespace-nowrap">
             {real.voterIds.length === 0 ? t.nobodyGotIt : fooled === 0 ? t.tooEasy : t.fooled(fooled)}
           </div>
-          <div className={`shrink-0 rounded-full px-4 py-2 text-[18px] font-black tabular-nums ${myPoints ? 'bg-white text-good' : 'bg-white/15 text-white'}`}>
+          <div className={`shrink-0 rounded-full px-4 py-2 text-[18px] font-black tabular-nums ${myPoints > 0 ? 'bg-white text-good' : myPoints < 0 ? 'bg-ink text-white' : 'bg-white/15 text-white'}`}>
             {t.youPoints(myPoints)}
           </div>
         </div>
@@ -178,8 +178,8 @@ export function Leaderboard() {
                 <div className={`relative flex h-full items-center gap-2.5 pr-4 pl-1.5 ${light ? '[text-shadow:0_1px_3px_rgba(0,0,0,0.6)]' : '[text-shadow:0_1px_2px_rgba(0,0,0,0.25)]'}`}>
                   <Avatar player={p} size={46} ring />
                   <span className="min-w-0 flex-1 truncate text-[18px] font-extrabold">{p.id === me?.id ? t.you : p.name}</span>
-                  {settled && gained > 0 && <span className="animate-pop text-[14px] font-extrabold text-white/85">+{gained}</span>}
-                  <span className="text-[19px] font-black tabular-nums">{score.toLocaleString('en')}</span>
+                  {settled && gained !== 0 && <span className="animate-pop text-[14px] font-extrabold text-white/85">{signed(gained)}</span>}
+                  <span className="text-[19px] font-black tabular-nums">{fmt(score)}</span>
                 </div>
               </div>
             </div>
