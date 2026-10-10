@@ -1,4 +1,4 @@
-URL de la demo: **proyecto Vercel de Mario** (`app/.vercel` en su portátil; poner aquí la URL de producción en cuanto exista).
+URL de la demo: **https://frieren-bfq.pages.dev** (Cloudflare Pages, deploy automático en cada push a `main`; ver `DEPLOY.md`).
 La antigua `app-azure-sigma-64.vercel.app` (equipo `ferrer-labs`) queda **retirada**: no se despliega ahí ni se imprime en el QR.
 
 # Typing… — your friends fake your replies. Spot the real one.
