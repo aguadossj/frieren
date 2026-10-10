@@ -171,7 +171,7 @@ export function createMockClient(): GameClient {
     const textOf = (id: string) => submissions[id] ?? '…'
     // Siempre incluimos la mía si soy impostor, para poder ver que no se puede votar.
     const impostors = shuffle(players.filter((p) => p.id !== writer).map((p) => p.id))
-    const chosen = impostors.slice(0, MAX_VOTE_OPTIONS - 1)
+    const chosen = impostors.slice(0, MAX_VOTE_OPTIONS - 2) // el mock no tiene bot Mimic: real + 4 impostores
     options = shuffle([
       { id: 'real', text: textOf(writer), authorId: writer, isReal: true },
       ...chosen.map((id) => ({ id: `a-${id}`, text: textOf(id), authorId: id, isReal: false })),
