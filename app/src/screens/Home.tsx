@@ -244,8 +244,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
           ) : (
             <SwipeDeck
               cards={cards}
-              intro={t.quickOnes}
-              how={t.swipeHint}
+              lead={t.swipeIf}
               onAnswer={(id, yes) => {
                 answers.current[id] = yes
                 if (id === 'together' && yes) locate()
