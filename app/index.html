@@ -12,6 +12,10 @@
     <title>Typing…</title>
   </head>
   <body>
+    <!-- Safari (iOS 26) tiñe sus barras con el background-color de elementos FIJOS reales en los bordes
+         (ignora theme-color y los pseudo-elementos). Ver src/index.css → .safari-tint -->
+    <div class="safari-tint safari-tint-top" aria-hidden="true"></div>
+    <div class="safari-tint safari-tint-bottom" aria-hidden="true"></div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
