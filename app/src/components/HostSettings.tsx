@@ -47,7 +47,8 @@ const ROUNDS: (number | null)[] = [null, 3, 4, 5, 6]
 export function SettingsGear({ onRed = false }: { onRed?: boolean }) {
   const { room, me, game } = useGame()
   const [open, setOpen] = useState(false)
-  if (!room || !me?.isHost || room.phase === 'final') return null
+  // Solo en la sala de espera (antes de empezar); en las rondas y al final no aparece
+  if (!room || !me?.isHost || room.phase !== 'lobby') return null
 
   return (
     <>

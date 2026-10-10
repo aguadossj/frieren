@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import type { Player } from '../game/types'
 import { shareInvite } from './QR'
-import { SettingsGear } from './HostSettings'
 import ChatDoodles from './ChatDoodles'
 import { setLang, useLang, useT } from '../i18n'
 
@@ -116,7 +115,6 @@ export function TopBar({ title, subtitle, right, avatar }: { title: ReactNode; s
         {subtitle && <div className="truncate text-[15px] font-semibold text-brand">{subtitle}</div>}
       </div>
       {right}
-      <SettingsGear />
     </header>
   )
 }

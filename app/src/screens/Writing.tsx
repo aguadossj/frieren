@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Avatar, Bubble, Icon, Screen, TimeBar, TypingDots, groupInitials } from '../components/ui'
 import ChatDoodles from '../components/ChatDoodles'
-import { SettingsGear } from '../components/HostSettings'
 import { useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH, PHASE_SECONDS } from '../game/types'
 import { focusWithoutScroll, retintSafariBars } from '../lib/viewport'
@@ -26,6 +25,16 @@ export default function Writing() {
     return () => clearTimeout(b)
   }, [intro])
 
+  // Mensajes del chat de uno en uno, cada MESSAGE_GAP_MS, cuando se va la presentación; al final el "typing…"
+  // del writer y la pista. (Antes iban con animation-delay y, al quitarse la presentación, salían todos de golpe.)
+  const total = room?.chat?.messages.length ?? 0
+  const [shown, setShown] = useState(0) // mensajes visibles; total + 1 = también el "typing…"
+  useEffect(() => {
+    if (intro !== 'gone' || shown > total) return
+    const id = setTimeout(() => setShown((n) => n + 1), shown === 0 ? 150 : MESSAGE_GAP_MS)
+    return () => clearTimeout(id)
+  }, [intro, shown, total])
+
   // Que Safari repinte sus barras con los colores del chat al entrar (y con los de la siguiente pantalla al salir)
   // Solo el chat es blanco: página y barras de Safari en blanco mientras esté abierto, rojo al salir
   useEffect(() => {
@@ -48,7 +57,7 @@ export default function Writing() {
     const el = list.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
   }
-  useEffect(() => toBottom(), [mine])
+  useEffect(() => toBottom(), [mine, shown])
   useEffect(() => {
     if (!typing) return
     // el teclado tarda ~250 ms en subir y encoger la lista
@@ -67,8 +76,7 @@ export default function Writing() {
   const isWriter = writer.id === me.id
   const sent = room.submittedIds.includes(me.id) || mine !== null
   const playerOf = (id: string) => room.players.find((p) => p.id === id)
-  const step = 0.35 // s entre mensajes al entrar
-  const delay0 = intro === 'gone' ? 0 : INTRO_MS / 1000 // los mensajes entran cuando se va la presentación
+  const allIn = shown > total // ya han salido todos los mensajes
   const hint = isWriter ? t.hintWriter(writer.name) : t.hintFaker(writer.name)
 
   // Layout tipo WhatsApp para aprovechar la pantalla del móvil:
@@ -88,18 +96,17 @@ export default function Writing() {
         </span>
         <div className="min-w-0 flex-1 truncate text-[16px] leading-tight font-extrabold">{room.chat.title}</div>
         <TimeBar endsAt={room.phaseEndsAt} totalSeconds={room.settings?.writing_seconds ?? PHASE_SECONDS.writing} className="w-[38%] shrink-0" />
-        <SettingsGear />
       </header>
 
       {/* Tarjeta roja del chat con dibujitos blancos de fondo (fijos: no se mueven al hacer scroll) */}
       <div className="relative mx-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] bg-brand">
         <ChatDoodles seed={room.roundIndex + 1} />
       <div ref={list} className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3 pt-3 pb-3">
-        {room.chat.messages.map((m, i) => {
+        {room.chat.messages.slice(0, shown).map((m, i) => {
           const author = playerOf(m.playerId)
           const firstOfRun = i === 0 || room.chat!.messages[i - 1].playerId !== m.playerId
           return (
-            <div key={i} className={`animate-rise ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`} style={{ animationDelay: `${delay0 + i * step}s` }}>
+            <div key={i} className={`animate-rise ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
               <Bubble className="max-w-[85%] rounded-[20px] px-4 py-2 text-[17px]">
                 {firstOfRun && (
                   <div className="text-[13px] leading-tight font-extrabold" style={{ color: author?.color }}>
@@ -113,7 +120,8 @@ export default function Writing() {
         })}
 
         {/* Lo que escribe el writer va a la derecha: "typing…" y luego tu respuesta */}
-        <div className="mt-2.5 flex animate-rise flex-col items-end" style={{ animationDelay: `${delay0 + room.chat.messages.length * step}s` }}>
+        {(allIn || mine) && (
+        <div className="mt-2.5 flex animate-rise flex-col items-end">
           {mine ? (
             <>
               <Bubble dark className="max-w-[85%] animate-pop rounded-[20px] px-4 py-2 text-[17px]">{mine}</Bubble>
@@ -128,9 +136,10 @@ export default function Writing() {
             </Bubble>
           )}
         </div>
+        )}
 
         {/* Pista como nota del sistema (antes era una caja negra grande abajo) */}
-        {!sent && (
+        {!sent && allIn && (
           <div className="mt-3 self-center rounded-full bg-black/25 px-3.5 py-1.5 text-center text-[14px] font-extrabold text-white">
             {hint}
           </div>
@@ -191,6 +200,7 @@ export default function Writing() {
 }
 
 const INTRO_MS = 5000
+const MESSAGE_GAP_MS = 500 // separación entre mensajes del chat al aparecer
 
 /** Al empezar cada ronda: fondo oscurecido y SOLO a quién hay que imitar (avatar + "Imita a" + nombre grande). */
 function RoundIntro({ writer, isWriter, leaving }: { writer: { name: string; color: string }; isWriter: boolean; leaving: boolean }) {
