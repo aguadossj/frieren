@@ -13,6 +13,19 @@ export default function Lobby() {
   const missing = MIN_PLAYERS - room.players.length
   const host = room.players.find((p) => p.isHost)
   const situation = typeof room.setup?.situation === 'string' ? room.setup.situation : null
+  // Lugar detectado (si el host compartió la ubicación): barrio/ciudad + 2 sitios cercanos
+  // del "calle, barrio, ciudad" enseñamos solo el barrio (o la ciudad si no hay barrio)
+  const place = typeof room.setup?.place === 'string' ? (room.setup.place.split(', ').slice(-2)[0] ?? null) : null
+  const nearby = Array.isArray(room.setup?.nearby) ? room.setup.nearby.slice(0, 2).map((n) => String(n).replace(/ \([^)]*\)$/, '')) : []
+  const placeChip = place && (
+    <p className="flex max-w-full items-start gap-1.5 rounded-[18px] bg-ink px-4 py-1.5 text-[14px] leading-snug font-bold">
+      <Icon name="pin" size={15} className="mt-0.5 shrink-0" />
+      <span className="line-clamp-2">
+        {place}
+        {nearby.length > 0 && <span className="text-white/60"> · {t.near}: {nearby.join(', ')}</span>}
+      </span>
+    </p>
+  )
 
   // Tocar el código abre el menú de compartir del móvil con la invitación (texto + código + enlace)
   const copy = async () => {
@@ -50,7 +63,9 @@ export default function Lobby() {
         <LangToggle />
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pt-2">
+      {/* Zona central con UN solo scroll (QR/bienvenida + jugadores). Antes la lista tenía su propio scroll y en
+          móviles bajos se quedaba con altura ~0 entre el QR y el botón: no se veía nadie ni se podía deslizar. */}
+      <div className="flex min-h-0 flex-1 touch-pan-y flex-col gap-4 overflow-y-auto overscroll-contain px-5 pt-2 pb-3 [-webkit-overflow-scrolling:touch]">
         {me.isHost ? (
           <div className="flex shrink-0 flex-col items-center gap-3">
             <QR code={room.code} size={150} />
@@ -59,6 +74,7 @@ export default function Lobby() {
             {situation && (
               <p className="line-clamp-2 max-w-full rounded-[18px] bg-white/15 px-4 py-1.5 text-center text-[14px] font-bold">“{situation}”</p>
             )}
+            {placeChip}
             {room.mimic && <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">{t.aiHiding}</p>}
           </div>
         ) : (
@@ -77,11 +93,12 @@ export default function Lobby() {
             {situation && (
               <p className="line-clamp-2 max-w-full rounded-[18px] bg-white/15 px-4 py-1.5 text-[14px] font-bold">“{situation}”</p>
             )}
+            {placeChip}
             {room.mimic && <p className="rounded-full bg-ink px-4 py-1.5 text-[14px] font-bold">{t.aiHiding}</p>}
           </div>
         )}
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2.5">
+        <div className="flex shrink-0 flex-col gap-2.5">
           <div className="flex shrink-0 items-center justify-between px-1">
             <Eyebrow>{t.players(room.players.length)}</Eyebrow>
             <div className="flex -space-x-2">
@@ -90,7 +107,7 @@ export default function Lobby() {
               ))}
             </div>
           </div>
-          <ul className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-contain pb-2">
+          <ul className="flex flex-col gap-2.5">
             {room.players.map((p) => (
               <li key={p.id} className="animate-rise">
                 <Row className={`min-h-[60px] ${p.id === me.id && !me.isHost ? 'outline-[3px] outline-ink outline-solid' : ''}`}>

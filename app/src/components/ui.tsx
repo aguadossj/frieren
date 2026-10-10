@@ -20,6 +20,7 @@ const ICONS = {
   share: 'M12 3v12M7 8l5-5 5 5M5 14v6h14v-6',
   replay: 'M4 4v6h6M4.6 15a8 8 0 1 0 1.8-8.3L4 10',
   code: 'M9 4L7 20M17 4l-2 16M4 9h16M3 15h16',
+  pin: 'M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
 } as const
 
 export function Icon({ name, size = 20, className = '' }: { name: keyof typeof ICONS; size?: number; className?: string }) {
@@ -106,7 +107,18 @@ export const TopNote = ({ children }: { children: ReactNode }) => (
  * Barra de tiempo: fina y alargada, se va acortando y desvaneciendo hasta llegar a 0.
  * Se anima con requestAnimationFrame (suave, no a saltos de 1 s). Los últimos 5 s parpadea.
  */
-export function TimeBar({ endsAt, totalSeconds, className = '' }: { endsAt: number | null; totalSeconds: number; className?: string }) {
+export function TimeBar({
+  endsAt,
+  totalSeconds,
+  className = '',
+  onRed = false,
+}: {
+  endsAt: number | null
+  totalSeconds: number
+  className?: string
+  /** Sobre fondo rojo: pista blanca translúcida y relleno blanco (en vez de gris/negro sobre blanco). */
+  onRed?: boolean
+}) {
   const [left, setLeft] = useState(1)
   useEffect(() => {
     if (!endsAt) return
@@ -127,10 +139,10 @@ export function TimeBar({ endsAt, totalSeconds, className = '' }: { endsAt: numb
       aria-valuemin={0}
       aria-valuemax={totalSeconds}
       aria-valuenow={Math.ceil(left * totalSeconds)}
-      className={cx('h-[6px] overflow-hidden rounded-full bg-neutral-100', className)}
+      className={cx('h-[6px] overflow-hidden rounded-full', onRed ? 'bg-white/25' : 'bg-neutral-100', className)}
     >
       <div
-        className={cx('h-full rounded-full bg-ink', urgent && 'animate-pulse')}
+        className={cx('h-full rounded-full', onRed ? 'bg-white' : 'bg-ink', urgent && 'animate-pulse')}
         style={{ width: `${left * 100}%`, opacity: 0.3 + 0.7 * left }}
       />
     </div>

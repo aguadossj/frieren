@@ -11,6 +11,8 @@
   --animate-pop: pop 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
   --animate-rise: rise 0.4s ease-out both;
   --animate-nudge: nudge 0.45s ease-in-out both;
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-fade-out: fade-out 0.3s ease-in both;
   --animate-unfold: unfold 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
   --animate-flip: flip 0.55s cubic-bezier(0.3, 1.2, 0.5, 1) both;
   --animate-panda: panda 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
@@ -113,6 +115,18 @@ button:disabled { cursor: default; }
 input { font-size: 16px; }
 
 /* Falta una respuesta en el formulario: sacudida corta para señalarla */
+@keyframes intro-bar {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
 @keyframes nudge {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-8px); }

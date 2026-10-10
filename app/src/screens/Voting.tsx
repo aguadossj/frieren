@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Avatar, Button, Footer, Icon, Screen, TimerPill, TopBar } from '../components/ui'
-import { useCountdown, useGame } from '../game/useGame'
+import { Avatar, Button, Footer, Icon, Screen, TimeBar, TopBar } from '../components/ui'
+import { useGame } from '../game/useGame'
+import { PHASE_SECONDS } from '../game/types'
 import { useT } from '../i18n'
 
 const LETTERS = 'ABCDEF'
@@ -8,7 +9,6 @@ const LETTERS = 'ABCDEF'
 export default function Voting() {
   const { room, me, game } = useGame()
   const t = useT()
-  const seconds = useCountdown(room?.phaseEndsAt ?? null)
   const [picked, setPicked] = useState<string | null>(null)
   if (!room?.chat || !me) return null
 
@@ -22,7 +22,10 @@ export default function Voting() {
 
   return (
     <Screen>
-      <TopBar title={t.whichIsReal(writer.name)} right={<TimerPill seconds={seconds} />} />
+      <TopBar
+        title={t.whichIsReal(writer.name)}
+        right={<TimeBar endsAt={room.phaseEndsAt} totalSeconds={room.settings?.voting_seconds ?? PHASE_SECONDS.voting} className="w-[30%] shrink-0" />}
+      />
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 px-5 pt-4 pb-3">
         {/* Lo que se pregunta, como en el chat */}

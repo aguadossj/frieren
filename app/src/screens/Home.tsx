@@ -1,18 +1,45 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { retintSafariBars } from '../lib/viewport'
 import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
 import { getLang, useT } from '../i18n'
+import { describePlace, knownPosition } from '../lib/place'
+import type { PlaceContext } from '../lib/place'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
 
 // El QR de la sala apunta a ?room=CODE: entramos directamente a la página de unirse.
-const codeFromUrl = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? ''
+// Se lee UNA vez y se borra de la URL: así, al volver al menú tras una partida, Home es la de siempre
+// (antes reabría "unirse" con el código de la partida anterior).
+let pendingCode = (() => {
+  const params = new URLSearchParams(location.search)
+  const code = params.get('room')?.toUpperCase() ?? ''
+  if (code) {
+    params.delete('room')
+    const rest = params.toString()
+    history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash)
+  }
+  return code
+})()
 
 type Page = 'start' | 'create' | 'join'
 
 export default function Home() {
+  const [codeFromUrl] = useState(() => pendingCode)
   const [page, setPage] = useState<Page>(codeFromUrl ? 'join' : 'start')
+
+  // Home siempre "limpia", también al volver de una partida: sin restos del chat (fondo blanco, teclado),
+  // sin foco en ningún campo, página arriba del todo y barras de Safari recalculadas.
+  useEffect(() => {
+    pendingCode = '' // el código del QR solo sirve para la primera vez
+    const root = document.documentElement
+    delete root.dataset.page
+    root.dataset.keyboard = 'closed'
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    window.scrollTo(0, 0)
+    retintSafariBars()
+  }, [])
 
   if (page === 'create') return <NamePage onBack={() => setPage('start')} />
   if (page === 'join') return <JoinPage initialCode={codeFromUrl} onBack={() => setPage('start')} />
@@ -82,8 +109,9 @@ function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void 
 
 // Preguntas sí/no del setup (mazo tipo Tinder). Van a `setup` como contexto libre para la IA;
 // `mimic` activa el bot impostor en `settings`.
-const CARD_ICONS = { know: GLYPHS.people, adults: GLYPHS.age, spicy: GLYPHS.flame, mimic: GLYPHS.robot }
-const CARD_IDS = ['know', 'adults', 'spicy', 'mimic'] as const
+const CARD_ICONS = { together: GLYPHS.pin, know: GLYPHS.people, adults: GLYPHS.age, spicy: GLYPHS.flame, mimic: GLYPHS.robot }
+// `together` = estáis todos en el mismo sitio → se pide la ubicación para personalizar los chats
+const CARD_IDS = ['together', 'know', 'adults', 'spicy', 'mimic'] as const
 
 const MAX_SITUATION = 120
 
@@ -97,10 +125,25 @@ function NamePage({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false)
   const answers = useRef<Record<string, boolean>>({})
 
+  // Ubicación: el permiso se pide al ENTRAR en la web (main.tsx). Aquí, si el host desliza "sí" en "estáis juntos",
+  // se usa esa posición y se traduce a calle, barrio y sitios cercanos mientras contesta el resto de tarjetas.
+  const placeLookup = useRef<Promise<PlaceContext | null> | null>(null)
+  const [lookingAround, setLookingAround] = useState(false)
+  const locate = () => {
+    placeLookup.current = knownPosition().then((pos) => (pos ? describePlace(pos.lat, pos.lon, getLang()) : null))
+  }
+
   const create = async () => {
     setBusy(true)
     const a = answers.current
     try {
+      // Esperar al contexto del lugar como mucho 10 s más; si no llega, se crea la sala sin él
+      let place: PlaceContext | null = null
+      if (placeLookup.current) {
+        setLookingAround(true)
+        place = await Promise.race([placeLookup.current, new Promise<null>((r) => setTimeout(() => r(null), 10000))])
+        setLookingAround(false)
+      }
       await game.createRoom(name)
       await game.saveSetup({
         ...(situation.trim() && { situation: situation.trim() }),
@@ -110,6 +153,10 @@ function NamePage({ onBack }: { onBack: () => void }) {
         spicy: a.spicy ? 'yes' : 'no',
         // Con menores, el backend apaga el contenido picante
         ...(!a.adults && { age: 'mixed' }),
+        together: a.together ? 'yes' : 'no',
+        ...(place?.place && { place: place.place }),
+        ...(place && place.nearby.length > 0 && { nearby: place.nearby }),
+        ...(place && { local_time: place.local_time }),
       })
       if (a.mimic) await game.updateSettings({ mimic: true })
     } finally {
@@ -120,6 +167,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
   const submit = () => {
     if (!name.trim() || busy) return
     answers.current = {}
+    placeLookup.current = null
     setStep('swipe')
   }
 
@@ -144,7 +192,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
               <div className="flex h-[52px] w-[70px] items-center justify-center rounded-full bg-white">
                 <TypingDots />
               </div>
-              <p className="text-[19px] font-extrabold">{t.openingRoom}</p>
+              <p className="text-[19px] font-extrabold">{lookingAround ? t.lookingAround : t.openingRoom}</p>
             </div>
           ) : (
             <SwipeDeck
@@ -152,6 +200,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
               intro={t.quickOnes}
               onAnswer={(id, yes) => {
                 answers.current[id] = yes
+                if (id === 'together' && yes) locate()
                 if (id === cards[cards.length - 1].id) void create()
               }}
             />
@@ -227,6 +276,26 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [shake, setShake] = useState(false)
+  // Comprobación del código ANTES de pedir el nombre (check_room): existe, no ha empezado, no está llena
+  const [checking, setChecking] = useState(false)
+  const [codeError, setCodeError] = useState<string | null>(null)
+
+  const checkCode = async (v: string) => {
+    setChecking(true)
+    setCodeError(null)
+    const res = await game.checkRoom(v)
+    setChecking(false)
+    if (res.ok) return setStep('name')
+    setStep('code')
+    setCodeError(res.message ?? null)
+    setShake(true)
+    setTimeout(() => setShake(false), 500)
+  }
+
+  // Si vienes del QR/enlace, comprobamos ese código al entrar
+  useEffect(() => {
+    if (fromQr) void checkCode(initialCode)
+  }, [])
 
   const back = (
     <button
@@ -263,14 +332,22 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
             <h1 className="mt-2 text-[44px] leading-[1.02] font-black tracking-[-0.035em]">{t.gotACode}</h1>
             <p className="mt-2 text-[18px] font-semibold text-white/85">{t.gotACodeSub}</p>
           </div>
-          <CodeTiles
-            label={t.roomCode}
-            value={code}
-            onChange={(v) => {
-              setCode(v)
-              if (v.length === CODE_LENGTH) setTimeout(() => setStep('name'), 280)
-            }}
-          />
+          <div className={shake ? 'animate-nudge' : ''}>
+            <CodeTiles
+              label={t.roomCode}
+              value={code}
+              onChange={(v) => {
+                setCode(v)
+                setCodeError(null)
+                if (v.length === CODE_LENGTH) setTimeout(() => void checkCode(v), 280)
+              }}
+            />
+          </div>
+          {(checking || codeError) && (
+            <p className="-mt-4 animate-rise text-center text-[16px] font-bold" role={codeError ? 'alert' : 'status'}>
+              {checking ? t.checkingRoom : codeError}
+            </p>
+          )}
         </Body>
       </Screen>
     )
