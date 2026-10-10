@@ -16,6 +16,9 @@ export interface AiConfig {
   apiKey: string
   model: string // p. ej. openai/gpt-oss-120b
   timeoutMs?: number
+  // Cómo pedir JSON al proveedor. 'json_schema' (Groq, vLLM, OpenAI) es lo más fiable; 'json_object' o 'none'
+  // para modelos/proveedores sin salida estructurada (p. ej. Hermes 3 en algunos hosts): el esquema va en el prompt.
+  jsonMode?: 'json_schema' | 'json_object' | 'none'
 }
 
 export interface Setup {
@@ -708,13 +711,31 @@ export async function callModel<T>(
   if (!response.ok) throw new AiError('provider_status', `${response.status} ${await response.text().catch(() => '')}`)
   try {
     const data = await response.json()
-    return { json: JSON.parse(data.choices?.[0]?.message?.content ?? 'null') as T, usage: data.usage ?? {} }
+    return { json: parseJsonReply(data.choices?.[0]?.message?.content) as T, usage: data.usage ?? {} }
   } catch {
     throw new AiError('invalid_output', 'not_json')
   }
 }
 
+/** JSON de la respuesta; tolera ```json … ``` o texto alrededor (modelos sin salida estructurada). */
+export function parseJsonReply(content: unknown): unknown {
+  const text = typeof content === 'string' ? content.trim() : ''
+  try {
+    return JSON.parse(text)
+  } catch {
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start === -1 || end <= start) throw new Error('no_json')
+    return JSON.parse(text.slice(start, end + 1))
+  }
+}
+
 async function send(config: AiConfig, system: string, user: string, schemaName: string, schema: unknown, timeoutMs: number) {
+  const mode = config.jsonMode ?? 'json_schema'
+  const instructions =
+    mode === 'json_schema'
+      ? system
+      : `${system}\n\nReply with ONLY one JSON object that matches this JSON Schema. No text before or after it:\n${JSON.stringify(schema)}`
   try {
     return await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
@@ -723,11 +744,17 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
       body: JSON.stringify({
         model: config.model,
         ...(config.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
-        temperature: 1,
-        max_completion_tokens: 4000,
-        response_format: { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } },
+        // Los modelos pequeños (p. ej. Hermes 3 8B) se desordenan con temperatura 1.
+        temperature: config.model.includes('gpt-oss') ? 1 : 0.8,
+        // max_tokens lo entiende cualquier servidor compatible (vLLM, OpenRouter…); Groq acepta ambos.
+        ...(mode === 'json_schema' ? { max_completion_tokens: 4000 } : { max_tokens: 1500 }),
+        ...(mode === 'json_schema'
+          ? { response_format: { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } } }
+          : mode === 'json_object'
+            ? { response_format: { type: 'json_object' } }
+            : {}),
         messages: [
-          { role: 'system', content: system },
+          { role: 'system', content: instructions },
           { role: 'user', content: user },
         ],
       }),

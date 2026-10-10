@@ -8,7 +8,8 @@
 //   del bot y la entrega con public.submit_bot_answer; registra con public.log_ai_generation. Sin round_id la devuelve.
 // - Prueba directa: GenerateRoundInput -> devuelve GenerateRoundOutput sin guardar nada.
 //
-// Secretos: AI_API_KEY, GENERATE_ROUND_SECRET; opcionales AI_BASE_URL (Groq por defecto) y AI_MODEL.
+// Secretos: AI_API_KEY, GENERATE_ROUND_SECRET; opcionales AI_BASE_URL (Groq por defecto), AI_MODEL y
+// AI_JSON_MODE (json_schema | json_object | none) para proveedores o modelos sin salida estructurada.
 // SUPABASE_URL y la clave de servicio los pone Supabase.
 
 import { AiError, generateRound, parseInput } from './core.ts'
@@ -63,6 +64,8 @@ Deno.serve(async (request: Request) => {
     baseUrl: Deno.env.get('AI_BASE_URL') ?? 'https://api.groq.com/openai/v1',
     model: Deno.env.get('AI_MODEL') ?? 'openai/gpt-oss-120b',
     timeoutMs: 12000, // la sala espera como mucho 12 s en `generating`
+    // json_schema (por defecto) | json_object | none: para modelos sin salida estructurada, como Hermes 3 en algunos hosts
+    jsonMode: (Deno.env.get('AI_JSON_MODE') ?? 'json_schema') as 'json_schema' | 'json_object' | 'none',
   }
 
   const body = await request.json().catch(() => null)
