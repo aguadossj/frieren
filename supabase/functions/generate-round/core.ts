@@ -20,6 +20,8 @@ export interface AiConfig {
   // Cómo pedir JSON al proveedor. 'json_schema' (Groq, vLLM, OpenAI) es lo más fiable; 'json_object' o 'none'
   // para modelos/proveedores sin salida estructurada (p. ej. Hermes 3 en algunos hosts): el esquema va en el prompt.
   jsonMode?: 'json_schema' | 'json_object' | 'none'
+  // Solo para probar prompts (prompt-lab.mjs): sustituye SYSTEM_PROMPT de las rondas. La partida nunca lo pone.
+  systemPrompt?: string
 }
 
 export interface Setup {
@@ -96,6 +98,8 @@ export interface GenerateRoundOutput {
   output_tokens: number | null
   latency_ms: number
   attempts: number
+  theme_id?: string // para métricas y el laboratorio de prompts
+  format_id?: string
 }
 
 export const PROMPT_VERSION = 'round-v9'
@@ -274,7 +278,52 @@ export function pickTheme(input: Pick<GenerateRoundInput, 'setup' | 'memory'>, e
   const allowed = THEMES.filter((t) => !(noSpicy(input.setup) && t.adult))
   const fresh = allowed.filter((t) => !used.has(t.id))
   const pool = fresh.length > 0 ? fresh : allowed
-  return pool[Math.floor(Math.random() * pool.length)]
+  // Si el host pidió picante, la mitad de las rondas van a un tema picante (solo hay 3 de 18).
+  const adult = pool.filter((t) => t.adult)
+  if (input.setup.spicy === 'yes' && adult.length > 0 && Math.random() < 0.5) return pickOne(adult)
+  return pickOne(pool)
+}
+
+// Formato de cada ronda: QUÉ se comparte en el chat (una captura, un Bizum…). Lo elige el código para que los chats
+// no salgan todos iguales; el modelo lo usa si encaja con la situación.
+export interface Format {
+  id: string
+  en: string
+  es: string
+}
+export const FORMATS: Format[] = [
+  { id: 'plain', en: 'no special format: just the conversation', es: 'sin formato especial: solo la conversación' },
+  { id: 'screenshot', en: 'someone shares a screenshot of something the writer wrote or posted', es: 'alguien comparte una captura de algo que escribió o publicó el writer' },
+  { id: 'payment', en: 'a Venmo / bank transfer from or to the writer with a suspicious note', es: 'un Bizum del writer o al writer con un concepto sospechoso' },
+  { id: 'voice_note', en: 'a voice note the writer sent at a strange hour (describe what it says)', es: 'un audio que mandó el writer a una hora rara (contad qué dice)' },
+  { id: 'poll', en: 'someone creates a poll about the writer', es: 'alguien crea una encuesta sobre el writer' },
+  { id: 'location', en: "the writer's live location is somewhere it should not be", es: 'la ubicación en tiempo real del writer está donde no debería' },
+  { id: 'story', en: 'a story or post the writer just published', es: 'una story o un post que acaba de subir el writer' },
+  { id: 'wrong_chat', en: 'the writer sent a message to the wrong chat', es: 'el writer mandó un mensaje al chat equivocado' },
+  { id: 'order', en: 'something the writer ordered online just arrived', es: 'acaba de llegar algo que pidió el writer por internet' },
+  { id: 'listing', en: 'the writer is selling something weird second hand', es: 'el writer está vendiendo algo rarísimo en Wallapop' },
+  { id: 'photo', en: 'someone just sent a photo of the writer (describe it)', es: 'alguien acaba de mandar una foto del writer (describidla)' },
+  { id: 'seen', en: "the writer left someone on 'seen' or was online at a suspicious time", es: "el writer dejó a alguien en visto o estaba en línea a una hora sospechosa" },
+]
+export const pickFormat = (): Format => (Math.random() < 0.25 ? FORMATS[0] : pickOne(FORMATS.slice(1)))
+
+/** Lo que eligió el host, en claro: el prompt lo pone por delante de todo lo demás. */
+export function roomBrief(setup: Setup, format: Format) {
+  const lang = setup.lang === 'es' ? 'es' : 'en'
+  const clean = isClean(setup)
+  return {
+    host_says: SITUATIONS[setup.situation ?? ''] ?? setup.situation ?? null,
+    everyone_is_an_adult: !clean,
+    spicy: clean || setup.spicy === 'no' ? 'no' : setup.spicy === 'yes' ? 'yes' : 'mild',
+    content: clean
+      ? "there may be minors: completely clean and family-friendly. No dating, crushes, exes, flirting, drinking, night parties or comments on anyone's looks"
+      : setup.spicy === 'no'
+        ? 'adults who asked for NOTHING spicy: no flirting, crushes, dating, exes, hookups, sex or drinking jokes'
+        : setup.spicy === 'yes'
+          ? 'adults who asked for SPICY: flirting, crushes, exes, hookups, walks of shame, drinking and wild nights are welcome. Cheeky innuendo is fine; never explicit or graphic'
+          : 'adults: cheeky is fine, never explicit',
+    format_this_round: format[lang],
+  }
 }
 
 // Detección de idioma barata: palabras funcionales y signos propios del castellano.
@@ -518,7 +567,7 @@ export function mergeMemory(
 
 // ───────────────────────── Prompt ─────────────────────────
 
-const SYSTEM_PROMPT = `You run "Typing…", a party game played on phones by real friends.
+export const SYSTEM_PROMPT = `You run "Typing…", a party game played on phones by real friends.
 Each round you write a short fake group chat starring the players. It ends with a question to one player, the WRITER.
 The writer answers for real; everyone else tries to imitate the writer's reply; then they vote for the real one.
 You also keep the game's memory: what you have learned about how each player really texts.
@@ -647,11 +696,12 @@ export function buildAudience(setup: Setup) {
   }
 }
 
-function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme) {
+function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme, format: Format) {
   const memory = input.memory ?? {}
   const evidence = computeEvidence(input.players, input.history)
   const lang = input.setup.lang === 'es' ? 'es' : 'en'
   return {
+    room: roomBrief(input.setup, format),
     language: LANGUAGES[lang].name,
     language_notes: LANGUAGES[lang].notes,
     texting_targets: TEXTING[lang],
@@ -924,23 +974,26 @@ export async function generateRound(input: GenerateRoundInput, config: AiConfig)
     prompt_version: PROMPT_VERSION,
     latency_ms: Date.now() - started,
     attempts,
+    theme_id: theme.id,
+    format_id: format.id,
   })
   const theme = pickTheme(input)
+  const format = pickFormat()
   try {
-    return done(await generateOnce(input, config, theme), 1)
+    return done(await generateOnce(input, config, theme, format), 1)
   } catch (error) {
     const retryable =
       error instanceof AiError &&
       (error.code === 'invalid_output' || (error.code === 'provider_status' && error.message.startsWith('400')))
     const left = deadline - Date.now()
     if (!retryable || left < 2500) throw error
-    return done(await generateOnce(input, { ...config, timeoutMs: left }, theme), 2)
+    return done(await generateOnce(input, { ...config, timeoutMs: left }, theme, format), 2)
   }
 }
 
 type Attempt = Pick<GenerateRoundOutput, 'chat' | 'memory' | 'input_tokens' | 'output_tokens'>
 
-async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme): Promise<Attempt> {
+async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme, format: Format): Promise<Attempt> {
   const handles = new Map(input.players.map((p, i) => [p.id, `P${i}`]))
   const handleToId = Object.fromEntries([...handles].map(([id, handle]) => [handle, id]))
   const handleOf = (id: string) => handles.get(id) ?? 'gone' // jugadores que ya se fueron
@@ -950,8 +1003,8 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
 
   const { json, usage } = await callModel<ModelOutput>(
     config,
-    SYSTEM_PROMPT,
-    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme))}`,
+    config.systemPrompt ?? SYSTEM_PROMPT,
+    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme, format))}`,
     'round',
     buildSchema([...handles.values()]),
   )
