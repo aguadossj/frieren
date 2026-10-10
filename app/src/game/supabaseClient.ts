@@ -131,6 +131,7 @@ export function createSupabaseClient(): GameClient {
       result: s.result ?? null,
       setup,
       settings: s.settings as RoomSettings,
+      mimic: Boolean(s.mimic),
     }
   }
 

@@ -19,6 +19,7 @@ create extension if not exists pg_net;
 
 -- GenerateRoundInput (ver core.ts) para una ronda. Historial: rondas anteriores con respuestas;
 -- votos y 😂 solo de las ya puntuadas (la N+1 se pide al empezar la votación de la N).
+-- Sin las respuestas del bot Mimic (`is_bot`, player_id nulo): no son de ningún jugador.
 create or replace function game.ai_round_input(p_round_id uuid) returns jsonb
 language plpgsql stable set search_path = ''
 as $$
@@ -55,7 +56,7 @@ begin
                      'player_id', a.player_id,
                      'text', a.text,
                      'fooled', case when sc.scored then (select count(*) from game.votes v where v.answer_id = a.id) end)))
-              from game.answers a where a.round_id = r.id and not a.is_real), '[]'::jsonb),
+              from game.answers a where a.round_id = r.id and not a.is_real and not a.is_bot), '[]'::jsonb),
           'found_by', case when sc.scored then (
             select count(*) from game.votes v join game.answers a on a.id = v.answer_id
              where v.round_id = r.id and a.is_real) end,
@@ -63,7 +64,7 @@ begin
             select coalesce(jsonb_object_agg(x.player_id, x.n), '{}'::jsonb)
               from (select a.player_id, count(*) as n
                       from game.reactions re join game.answers a on a.id = re.answer_id
-                     where a.round_id = r.id group by a.player_id) x) end
+                     where a.round_id = r.id and not a.is_bot group by a.player_id) x) end
         )) as item
         from game.rounds r
         cross join lateral (select exists (select 1 from game.round_scores s where s.round_id = r.id) as scored) sc
