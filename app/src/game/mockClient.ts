@@ -218,18 +218,23 @@ export function createMockClient(): GameClient {
     recordVotesForAi(result)
     players = players.map((p) => ({ ...p, score: p.score + (result!.points[p.id] ?? 0) }))
     setPhase('reveal', PHASE_SECONDS.reveal, () => {
-      setPhase('leaderboard', PHASE_SECONDS.leaderboard, () => {
-        if (roundIndex + 1 < totalRounds) {
-          roundIndex += 1
-          startWriting()
-        } else {
-          setPhase('final', null)
-          emit()
-        }
-      })
+      // La clasificación espera a que alguien pulse "Next round" (skipPhase). Si el host es un bot, pulsa él.
+      setPhase('leaderboard', null)
+      if (!players.find((p) => p.id === meId)?.isHost) later(5000, nextRound)
       emit()
     })
     emit()
+  }
+
+  function nextRound() {
+    if (phase !== 'leaderboard') return
+    if (roundIndex + 1 < totalRounds) {
+      roundIndex += 1
+      startWriting()
+    } else {
+      setPhase('final', null)
+      emit()
+    }
   }
 
   // ── IA ronda a ronda (mismo flujo que SPEC › IA): ronda 1 al pulsar Start, ronda N+1 al empezar la
@@ -389,6 +394,7 @@ export function createMockClient(): GameClient {
       if (timer) clearTimeout(timer)
       if (phase === 'writing') startVoting()
       else if (phase === 'voting') startReveal()
+      else if (phase === 'leaderboard') nextRound()
     },
     async endGame() {
       setPhase('final', null)

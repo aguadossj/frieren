@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import SwipeDeck from '../components/SwipeDeck'
+import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, Screen, TextInput, TypingDots } from '../components/ui'
 import { useGame } from '../game/useGame'
@@ -113,10 +113,10 @@ function Start({ code, setCode, onCreate, onJoin }: { code: string; setCode: (c:
 // Preguntas sí/no del setup (mazo tipo Tinder). Van a `setup` como contexto libre para la IA;
 // `mimic` activa el bot impostor en `settings`.
 const CARDS: SwipeCard[] = [
-  { id: 'know', question: 'Do you all know each other well?', no: 'Not really', yes: 'Besties' },
-  { id: 'adults', question: 'Is everyone over 18?', no: 'No', yes: 'Yes' },
-  { id: 'spicy', question: 'Can the chats get spicy?', no: 'Keep it clean', yes: 'Spicy' },
-  { id: 'mimic', question: 'Let an AI hide among your answers?', hint: 'Vote for it and you lose points.', no: 'No AI', yes: 'Bring it' },
+  { id: 'know', question: 'Do you all know each other well?', no: 'Not really', yes: 'Besties', icon: GLYPHS.people },
+  { id: 'adults', question: 'Is everyone over 18?', no: 'No', yes: 'Yes', icon: GLYPHS.age },
+  { id: 'spicy', question: 'Can the chats get spicy?', no: 'Keep it clean', yes: 'Spicy', icon: GLYPHS.flame },
+  { id: 'mimic', question: 'Let an AI hide among your answers?', hint: 'Vote for it and you lose points.', no: 'No AI', yes: 'Bring it', icon: GLYPHS.robot },
 ]
 
 const MAX_SITUATION = 120
@@ -174,7 +174,7 @@ function NamePage({ mode, code = '', onBack }: { mode: 'create' | 'join'; code?:
     return (
       <Screen>
         <AppHeader left={back} />
-        <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-4 pb-6">
+        <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden px-4 pt-1 pb-6">
           {busy ? (
             <div className="flex flex-1 animate-pop flex-col items-center justify-center gap-4">
               <div className="flex h-[52px] w-[70px] items-center justify-center rounded-full bg-white">

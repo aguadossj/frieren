@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import PandaHost from '../components/Panda'
-import { Avatar, AwardCard, Footer, Icon, Screen, TopBar, TopNote } from '../components/ui'
+import { Avatar, AwardCard, Button, Footer, Icon, Screen, TopBar, TopNote } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
 import { MIMIC_AUTHOR_ID } from '../game/types'
 import type { Player, Room } from '../game/types'
@@ -113,7 +113,7 @@ function pandaLine(room: Room, meId: string | undefined, leadChanged: boolean, n
 const ROW = 72 // alto de fila + hueco, para recolocar con animación
 
 export function Leaderboard() {
-  const { room, me } = useGame()
+  const { room, me, game } = useGame()
   const seconds = useCountdown(room?.phaseEndsAt ?? null)
   // Primero se pintan en el orden de antes de la ronda; luego se recolocan y las barras crecen.
   const [settled, setSettled] = useState(false)
@@ -129,13 +129,15 @@ export function Leaderboard() {
   const before = [...room.players].sort((a, b) => prevScore(b) - prevScore(a))
   const top = Math.max(1, now[0]?.score ?? 1)
   const order = settled ? now : before
+  const last = room.roundIndex + 1 >= room.totalRounds
+  const host = room.players.find((p) => p.isHost)
 
   return (
     <Screen>
       <TopBar
         title="Standings"
         subtitle={`After round ${room.roundIndex + 1} of ${room.totalRounds}`}
-        right={<TopNote>{room.roundIndex + 1 >= room.totalRounds ? 'Final' : `Next in ${seconds}`}</TopNote>}
+        right={room.roundIndex + 1 >= room.totalRounds ? <TopNote>Final round</TopNote> : undefined}
       />
 
       <div className="relative mx-5 mt-5 shrink-0" style={{ height: now.length * ROW }}>
@@ -170,6 +172,22 @@ export function Leaderboard() {
 
       <div className="flex-1" />
       <PandaHost text={pandaLine(room, me?.id, before[0] && prevScore(before[0]) > 0 && before[0].id !== now[0]?.id, now)} />
+      <Footer className="pt-0">
+        {me?.isHost ? (
+          <Button onClick={() => void game.skipPhase()} className="flex items-center justify-center gap-3">
+            {last ? 'See final results' : `Start round ${room.roundIndex + 2}`}
+            <Icon name="arrowRight" size={22} />
+          </Button>
+        ) : (
+          <div className="flex h-[66px] items-center justify-center gap-3 rounded-full bg-white/15 text-[18px] font-bold">
+            <span className="size-2.5 animate-pulse rounded-full bg-white" />
+            Waiting for {host?.name ?? 'the host'}…
+          </div>
+        )}
+        {room.phaseEndsAt && seconds > 0 && (
+          <p className="-mt-1 text-center text-[14px] font-semibold text-white/70">Starts by itself in {seconds}s</p>
+        )}
+      </Footer>
     </Screen>
   )
 }
