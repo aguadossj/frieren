@@ -102,9 +102,9 @@ export default function Writing() {
         )}
       </div>
 
-      <div className={`shrink-0 bg-white px-3 ${typing ? 'pt-2 pb-2' : 'pt-2 pb-4'}`}>
+      <div className={`shrink-0 bg-white px-2.5 ${typing ? 'pt-1.5 pb-1.5' : 'pt-1.5 pb-3'}`}>
         {sent ? (
-          <div className="flex h-[48px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[16px] font-extrabold text-ink">
+          <div className="flex h-[38px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[15px] font-extrabold text-ink">
             <Icon name="check" size={18} className="text-good" />
             Waiting for others {room.submittedIds.length}/{room.players.length}
           </div>
@@ -122,7 +122,7 @@ export default function Writing() {
             }}
           >
             <input
-              className="h-[46px] min-w-0 flex-1 rounded-full bg-neutral-100 px-5 text-[17px] text-ink outline-none placeholder:text-neutral-400"
+              className="h-[38px] min-w-0 flex-1 rounded-full bg-neutral-100 px-4 text-[16px] text-ink outline-none placeholder:text-neutral-400"
               placeholder={`Message as ${writer.name}`}
               maxLength={MAX_ANSWER_LENGTH}
               value={text}
@@ -138,9 +138,9 @@ export default function Writing() {
               aria-label="Send"
               onMouseDown={(e) => e.preventDefault() /* no cerrar el teclado al tocar enviar */}
               disabled={!text.trim()}
-              className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50"
+              className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50"
             >
-              <Icon name="arrowRight" size={22} className="-rotate-90" />
+              <Icon name="arrowRight" size={18} className="-rotate-90" />
             </button>
           </form>
         )}
