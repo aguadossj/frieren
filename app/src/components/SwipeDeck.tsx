@@ -59,7 +59,9 @@ export default function SwipeDeck({ cards, intro, onAnswer }: { cards: SwipeCard
 
   // Flechas del teclado (escritorio)
   const answerRef = useRef(answer)
-  answerRef.current = answer
+  useEffect(() => {
+    answerRef.current = answer
+  })
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight') answerRef.current(true)

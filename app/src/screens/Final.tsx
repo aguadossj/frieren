@@ -12,11 +12,11 @@ const PODIUM = [
 
 export default function Final() {
   const { room, me, game } = useGame()
+  const t = useT()
   if (!room) return null
 
   const ranking = [...room.players].sort((a, b) => b.score - a.score)
   const winner = ranking[0]
-  const t = useT()
   const label = (p: Player) => (p.id === me?.id ? t.you : p.name)
 
   const share = () => {
