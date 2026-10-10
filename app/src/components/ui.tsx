@@ -257,23 +257,25 @@ export function groupInitials(title: string) {
   return (words[words.length - 1] ?? '?').slice(0, 2).toUpperCase()
 }
 
-/** Selector de idioma EN/ES (se recuerda en el móvil). `dark` = sobre fondo blanco. */
+/** Selector de idioma EN/ES directamente sobre el fondo (sin caja): el elegido en blanco y subrayado. */
 export function LangToggle({ className = '' }: { className?: string }) {
   const lang = useLang()
   return (
-    <div role="group" aria-label="Language" className={cx('flex h-[44px] shrink-0 items-center gap-0.5 rounded-full bg-white/18 p-1', className)}>
-      {(['en', 'es'] as const).map((l) => (
-        <button
-          key={l}
-          onClick={() => setLang(l)}
-          aria-pressed={lang === l}
-          className={cx(
-            'h-full min-w-[44px] rounded-full px-3 text-[15px] font-black uppercase transition',
-            lang === l ? 'bg-white text-brand' : 'text-white/80',
-          )}
-        >
-          {l}
-        </button>
+    <div role="group" aria-label="Language" className={cx('flex shrink-0 items-center text-[15px] font-black', className)}>
+      {(['en', 'es'] as const).map((l, i) => (
+        <span key={l} className="flex items-center">
+          {i > 0 && <span className="text-white/35">·</span>}
+          <button
+            onClick={() => setLang(l)}
+            aria-pressed={lang === l}
+            className={cx(
+              'h-[44px] min-w-[40px] px-2 uppercase transition',
+              lang === l ? 'text-white underline decoration-[3px] underline-offset-[6px]' : 'text-white/55',
+            )}
+          >
+            {l}
+          </button>
+        </span>
       ))}
     </div>
   )
