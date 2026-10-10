@@ -2,7 +2,8 @@
  * "Cómo se juega": pantalla completa con 4 páginas que se pasan una a una (botón, deslizar o ← →).
  * Cada página enseña una captura REAL del juego (app/public/howto/{es|en}-*.webp, sacadas de una partida de verdad)
  * dentro de un móvil, con un título y una frase.
- * Sale solo la primera vez que alguien abre la web (se recuerda en localStorage) y desde el botón "Cómo jugar" de la portada.
+ * Sale solo la primera vez que alguien entra en la web, por donde entre (portada o enlace/QR de una sala), y luego
+ * desde el botón "Cómo jugar" de la portada. Se recuerda en localStorage y en una cookie.
  */
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
@@ -14,19 +15,42 @@ const SHOTS = ['chat', 'vote', 'reveal', 'standings'] as const
 const SWIPE = 70 // px para que la carta salga volando
 const FLY_MS = 300
 
+const COOKIE = 'typing_seen=1'
+
+/**
+ * ¿Ha entrado ya alguna vez en la web? Se mira en dos sitios (localStorage y una cookie de 1 año): si cualquiera
+ * de los dos lo recuerda, no se vuelve a enseñar. Si el navegador no deja guardar nada, tampoco se enseña
+ * (mejor eso que salir en cada visita).
+ */
 export function seenHowTo(): boolean {
+  let stored = false
+  let canStore = false
   try {
-    return localStorage.getItem(SEEN_KEY) === '1'
+    stored = localStorage.getItem(SEEN_KEY) === '1'
+    canStore = true
   } catch {
-    return true // sin almacenamiento (modo privado raro): mejor no molestar en cada visita
+    /* sin localStorage */
   }
+  try {
+    if (document.cookie.split('; ').includes(COOKIE)) stored = true
+    if (navigator.cookieEnabled) canStore = true
+  } catch {
+    /* sin cookies */
+  }
+  return stored || !canStore
 }
 
+/** Se marca al ENSEÑARLO (primera visita), no al cerrarlo: recargar ya no lo vuelve a sacar. */
 function markSeen() {
   try {
     localStorage.setItem(SEEN_KEY, '1')
   } catch {
-    /* sin almacenamiento: no pasa nada */
+    /* sin localStorage */
+  }
+  try {
+    document.cookie = `${COOKIE}; max-age=${60 * 60 * 24 * 365}; path=/; SameSite=Lax`
+  } catch {
+    /* sin cookies */
   }
 }
 
@@ -58,6 +82,8 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
       }
     }, FLY_MS)
   }
+
+  useEffect(markSeen, [])
 
   // Precargar las 4 capturas para que el paso de página sea instantáneo
   useEffect(() => {
