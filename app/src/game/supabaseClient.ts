@@ -169,12 +169,12 @@ export function createSupabaseClient(): GameClient {
     }
   }
 
-  function leaveLocally(error: string | null = null) {
+  function leaveLocally(error: string | null = null, removed: GameState['removed'] = null) {
     stopSync()
     roomId = null
     lastVersion = -1
     writeRoomId(null)
-    state = { room: null, meId: null, error, pending: null }
+    state = { room: null, meId: null, error, pending: null, removed }
     emit()
   }
 
@@ -184,8 +184,8 @@ export function createSupabaseClient(): GameClient {
     try {
       const s = await rpc<ServerRoom>('get_room_state', { p_room_id: roomId })
       if (seq !== requestSeq) return // llegó una respuesta más nueva
-      if (s.kicked) return leaveLocally(ERRORS[getLang()].kicked)
-      if (s.rejected) return leaveLocally(ERRORS[getLang()].rejected)
+      if (s.kicked) return leaveLocally(ERRORS[getLang()].kicked, 'kicked')
+      if (s.rejected) return leaveLocally(ERRORS[getLang()].rejected, 'rejected')
       if (s.left) return leaveLocally()
       if (s.pending) {
         // Sala con aprobación: esperando al host (sin ver nada de la sala). Mientras esperas no puedes escuchar el

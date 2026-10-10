@@ -4,7 +4,7 @@ import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import HowToPlay, { preloadHowTo, seenHowTo } from '../components/HowToPlay'
 import MimicInfo from '../components/MimicInfo'
 import type { SwipeCard } from '../components/SwipeDeck'
-import { AppHeader, Avatar, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
+import { AppHeader, Avatar, Body, Button, ConfirmDialog, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
 import { getLang, useLang, useT } from '../i18n'
 import { LEGAL, LEGAL_PAGES, LEGAL_PATHS } from '../content/legal'
 import { describePlace, knownPosition } from '../lib/place'
@@ -34,6 +34,10 @@ export default function Home() {
   const [page, setPage] = useState<Page>(codeFromUrl ? 'join' : 'start')
   // "Cómo se juega": solo la primera vez que se abre la web (luego, desde el botón de la portada)
   const [howTo, setHowTo] = useState(() => !seenHowTo())
+  // Si vienes de que el host te eche (o no te deje entrar), se avisa una vez al llegar aquí
+  const { removed } = useGame()
+  const [removedSeen, setRemovedSeen] = useState(false)
+  const t = useT()
   // Capturas de "Cómo se juega" precargadas siempre en segundo plano (en la primera visita ya van desde index.html)
   const lang = useLang()
   useEffect(() => {
@@ -65,6 +69,15 @@ export default function Home() {
     <>
       {current}
       {howTo && <HowToPlay onClose={() => setHowTo(false)} />}
+      {removed && !removedSeen && !howTo && (
+        <ConfirmDialog
+          title={removed === 'kicked' ? t.removedKicked : t.removedRejected}
+          body={t.removedBody}
+          confirm={t.removedOk}
+          onConfirm={() => setRemovedSeen(true)}
+          onCancel={() => setRemovedSeen(true)}
+        />
+      )}
     </>
   )
 }
@@ -232,6 +245,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
             <SwipeDeck
               cards={cards}
               intro={t.quickOnes}
+              how={{ no: t.swipeHowNo, yes: t.swipeHowYes }}
               onAnswer={(id, yes) => {
                 answers.current[id] = yes
                 if (id === 'together' && yes) locate()
@@ -289,9 +303,11 @@ function NamePage({ onBack }: { onBack: () => void }) {
                 placeholder={t.situationPlaceholder}
                 className={`w-full resize-none rounded-[28px] bg-white px-6 py-4 text-[17px] leading-snug font-semibold text-ink outline-none placeholder:font-medium placeholder:text-neutral-400 ${situationMissing ? 'animate-nudge ring-4 ring-ink' : ''}`}
               />
-              <span className={`text-[14px] font-semibold ${situationMissing ? 'font-extrabold text-white' : 'text-white/70'}`} role={situationMissing ? 'alert' : undefined}>
-                {situationMissing ? t.situationRequired : t.situationHint}
-              </span>
+              {situationMissing && (
+                <span className="text-[14px] font-extrabold text-white" role="alert">
+                  {t.situationRequired}
+                </span>
+              )}
           </label>
         </Body>
 

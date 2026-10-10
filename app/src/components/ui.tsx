@@ -116,7 +116,7 @@ export function TopBar({ title, subtitle, right, avatar }: { title: ReactNode; s
       {avatar}
       <div className="min-w-0 flex-1">
         <div className="line-clamp-2 text-[20px] leading-tight font-extrabold">{title}</div>
-        {subtitle && <div className="truncate text-[15px] font-semibold text-brand">{subtitle}</div>}
+        {subtitle && <div className="line-clamp-2 text-[15px] leading-tight font-semibold text-brand">{subtitle}</div>}
       </div>
       {right}
       <GameMenu />
@@ -350,7 +350,7 @@ export function ConfirmDialog({
   title: string
   body?: string
   confirm: string
-  cancel: string
+  cancel?: string // sin `cancel`: aviso con un solo botón
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -375,10 +375,12 @@ export function ConfirmDialog({
           {title}
         </h2>
         {body && <p className="mt-1.5 text-[17px] leading-snug font-semibold text-neutral-500">{body}</p>}
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <button onClick={onCancel} className="h-[56px] rounded-full bg-neutral-100 text-[18px] font-extrabold transition active:scale-[0.97]">
-            {cancel}
-          </button>
+        <div className={`mt-5 grid gap-3 ${cancel ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {cancel && (
+            <button onClick={onCancel} className="h-[56px] rounded-full bg-neutral-100 text-[18px] font-extrabold transition active:scale-[0.97]">
+              {cancel}
+            </button>
+          )}
           <button onClick={onConfirm} className="h-[56px] rounded-full bg-brand text-[18px] font-extrabold text-white transition active:scale-[0.97]">
             {confirm}
           </button>

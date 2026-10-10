@@ -12,7 +12,7 @@ export default function Lobby() {
   const t = useT()
   const [copied, setCopied] = useState(false)
   const [confirmLeave, setConfirmLeave] = useState(false)
-  const [kicking, setKicking] = useState<string | null>(null) // jugador con el "¿Echar?" a la vista
+  const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null) // "¿Echar a X?" abierto
   if (!room || !me) return null
   const missing = MIN_PLAYERS - room.players.length
   const host = room.players.find((p) => p.isHost)
@@ -63,6 +63,19 @@ export default function Lobby() {
           confirm={t.leaveConfirm}
           onCancel={() => setConfirmLeave(false)}
           onConfirm={() => void game.leave()}
+        />
+      )}
+      {kickTarget && (
+        <ConfirmDialog
+          title={t.kickTitle(kickTarget.name)}
+          body={t.kickBody}
+          cancel={t.kickNo}
+          confirm={t.kickYes}
+          onCancel={() => setKickTarget(null)}
+          onConfirm={() => {
+            void game.kick(kickTarget.id)
+            setKickTarget(null)
+          }}
         />
       )}
       {/* Sin cabecera: atrás e idioma flotando arriba */}
@@ -135,24 +148,14 @@ export default function Lobby() {
                     {p.id === me.id && <span className="text-neutral-400"> ({t.youLower})</span>}
                   </span>
                   {p.isHost && <span className="text-[15px] text-neutral-400">{t.hostTag}</span>}
-                  {/* El host puede echar a alguien: 1.º toque → "¿Echar?", 2.º toque → fuera */}
+                  {/* El host puede echar a alguien: la ✕ abre "¿Echar a X?" */}
                   {me.isHost && p.id !== me.id && (
                     <button
-                      onClick={() => {
-                        if (kicking === p.id) {
-                          setKicking(null)
-                          void game.kick(p.id)
-                        } else {
-                          setKicking(p.id)
-                          setTimeout(() => setKicking((k) => (k === p.id ? null : k)), 3000)
-                        }
-                      }}
+                      onClick={() => setKickTarget({ id: p.id, name: p.name })}
                       aria-label={t.kick(p.name)}
-                      className={`flex h-[40px] shrink-0 items-center justify-center rounded-full text-[15px] font-extrabold transition-all duration-200 active:scale-95 ${
-                        kicking === p.id ? 'bg-brand px-4 text-white' : 'w-[40px] bg-neutral-100 text-neutral-500'
-                      }`}
+                      className="-mr-1 flex size-[44px] shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 transition active:scale-90 active:bg-brand active:text-white"
                     >
-                      {kicking === p.id ? t.kickConfirm : <Icon name="x" size={16} />}
+                      <Icon name="x" size={18} />
                     </button>
                   )}
                 </Row>

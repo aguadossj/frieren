@@ -36,7 +36,17 @@ export const GLYPHS = {
   ),
 }
 
-export default function SwipeDeck({ cards, intro, onAnswer }: { cards: SwipeCard[]; intro: string; onAnswer: (id: string, yes: boolean) => void }) {
+export default function SwipeDeck({
+  cards,
+  intro,
+  how,
+  onAnswer,
+}: {
+  cards: SwipeCard[]
+  intro: string
+  how: { no: string; yes: string } // instrucción fija: izquierda = no, derecha = sí
+  onAnswer: (id: string, yes: boolean) => void
+}) {
   const [index, setIndex] = useState(0)
   const [dx, setDx] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -79,7 +89,16 @@ export default function SwipeDeck({ cards, intro, onAnswer }: { cards: SwipeCard
   const no = Math.min(1, Math.max(0, -offset / THRESHOLD))
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col gap-4">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-3">
+      {/* Cómo se contesta, siempre a la vista: izquierda = no, derecha = sí */}
+      <div className="grid shrink-0 grid-cols-2 gap-2 text-[15px] font-extrabold">
+        <span className="flex h-[40px] items-center justify-center gap-1.5 rounded-full bg-ink text-white">
+          <Arrow dir="left" /> {how.no}
+        </span>
+        <span className="flex h-[40px] items-center justify-center gap-1.5 rounded-full bg-white text-good">
+          {how.yes} <Arrow dir="right" />
+        </span>
+      </div>
       {/* Respuestas dadas, como burbujas enviadas */}
       <div className="flex min-h-[34px] shrink-0 flex-wrap items-center justify-end gap-1.5">
         {given.length === 0 ? (
@@ -210,3 +229,9 @@ export default function SwipeDeck({ cards, intro, onAnswer }: { cards: SwipeCard
     </div>
   )
 }
+
+const Arrow = ({ dir }: { dir: 'left' | 'right' }) => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d={dir === 'left' ? 'M19 12H5M11 6l-6 6 6 6' : 'M5 12h14M13 6l6 6-6 6'} />
+  </svg>
+)

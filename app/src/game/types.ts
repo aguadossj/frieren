@@ -132,6 +132,8 @@ export interface GameState {
   error: string | null
   /** Sala con aprobación: he pedido entrar y espero a que el host me acepte (room = null mientras tanto). */
   pending?: { code: string; hostName: string | null } | null
+  /** Te acaban de sacar de la sala: el host te ha echado o no te ha dejado entrar (para avisarte en la portada). */
+  removed?: 'kicked' | 'rejected' | null
 }
 
 /** Solicitud para entrar en una sala con aprobación (solo la ve el host). */
