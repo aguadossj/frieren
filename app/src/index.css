@@ -47,10 +47,14 @@
   to { transform: translateY(0); }
 }
 /* Amago de la primera tarjeta del setup: enseña que se desliza */
-/* "Cómo se juega": el móvil de la página que entra aparece con un pequeño salto */
-@keyframes howto-pop {
-  from { transform: translateY(28px) scale(0.92); opacity: 0.3; }
-  to { transform: translateY(0) scale(1); opacity: 1; }
+/* "Cómo se juega": la página siguiente entra por la derecha y la anterior por la izquierda */
+@keyframes howto-in-right {
+  from { transform: translateX(80px) scale(0.94); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
+}
+@keyframes howto-in-left {
+  from { transform: translateX(-80px) scale(0.94); opacity: 0; }
+  to { transform: translateX(0) scale(1); opacity: 1; }
 }
 @keyframes swipe-hint {
   0%, 100% { transform: translateX(0) rotate(0); }

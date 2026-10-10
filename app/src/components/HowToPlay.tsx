@@ -1,5 +1,5 @@
 /**
- * "Cómo se juega": pantalla completa con 4 páginas en fila que se pasan deslizando a los lados (o botón / ← →).
+ * "Cómo se juega": pantalla completa con 4 páginas. Deslizar a la derecha avanza y a la izquierda vuelve (o botón / ← →).
  * Cada página enseña una captura REAL del juego (app/public/howto/{es|en}-*.webp, sacadas de una partida de verdad)
  * dentro de un móvil, con un título y una frase.
  * Sale solo la primera vez que alguien entra en la web, por donde entre (portada o enlace/QR de una sala), y luego
@@ -12,6 +12,7 @@ import { Icon } from './ui'
 
 const SEEN_KEY = 'typing.howto.seen'
 const SHOTS = ['chat', 'vote', 'reveal', 'standings'] as const
+const SWIPE = 50 // px de deslizamiento para cambiar de página
 
 const COOKIE = 'typing_seen=1'
 
@@ -58,7 +59,8 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
   const pages = t.howPages
   const [page, setPage] = useState(0)
   const [leaving, setLeaving] = useState(false)
-  const pager = useRef<HTMLDivElement>(null)
+  const [dir, setDir] = useState<1 | -1>(1)
+  const startX = useRef<number | null>(null)
   const last = page === pages.length - 1
 
   useEffect(markSeen, [])
@@ -68,11 +70,10 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
     setLeaving(true)
     setTimeout(onClose, 250)
   }
-  /** Ir a una página: el carrusel se desplaza solo (el dedo hace lo mismo deslizando). */
   const go = (to: number) => {
-    const el = pager.current
-    if (!el || to < 0 || to >= pages.length) return
-    el.scrollTo({ left: -to * el.clientWidth, behavior: 'smooth' }) // rtl: hacia la izquierda es negativo
+    if (to < 0 || to >= pages.length || to === page) return
+    setDir(to > page ? 1 : -1)
+    setPage(to)
   }
   const next = () => (last ? close() : go(page + 1))
 
@@ -115,45 +116,50 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      {/* Páginas en fila: se pasan deslizando el dedo a un lado u otro, como pestañas (scroll-snap nativo) */}
+      {/* Una página cada vez. Deslizar el dedo a la DERECHA avanza y a la IZQUIERDA vuelve; la animación va como
+          siempre: la siguiente entra por la derecha y la anterior por la izquierda. */}
       <div
-        ref={pager}
-        dir="rtl" // se avanza deslizando hacia la derecha: la página siguiente entra por la izquierda
-        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        onScroll={(e) => {
-          const el = e.currentTarget
-          const i = Math.round(Math.abs(el.scrollLeft) / el.clientWidth)
-          if (i !== page) setPage(Math.max(0, Math.min(pages.length - 1, i)))
+        className="flex min-h-0 flex-1 touch-pan-y flex-col select-none"
+        onPointerDown={(e) => {
+          startX.current = e.clientX
+        }}
+        onPointerUp={(e) => {
+          if (startX.current === null) return
+          const dx = e.clientX - startX.current
+          startX.current = null
+          if (dx > SWIPE) next()
+          else if (dx < -SWIPE) go(page - 1)
+        }}
+        onPointerCancel={() => {
+          startX.current = null
         }}
       >
-        {pages.map((p, i) => (
-          <section key={p.title} dir="ltr" className="flex w-full shrink-0 snap-center snap-always flex-col" aria-hidden={i !== page}>
-            {/* Móvil grande "con zoom": se ve la parte de arriba de la pantalla y el resto se funde con el fondo */}
-            <div className="relative min-h-0 flex-1 overflow-hidden">
-              <div className="flex justify-center px-8 pt-5">
-                <div
-                  key={i === page ? 'on' : 'off'}
-                  className="w-[min(78vw,330px)]"
-                  style={i === page ? { animation: 'howto-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.15) both' } : undefined}
-                >
-                  <Phone src={`/howto/${lang}-${SHOTS[i]}.webp`} style={{ rotate: i % 2 ? '2.5deg' : '-2.5deg' }} />
-                </div>
+        <section
+          key={page}
+          className="flex min-h-0 flex-1 flex-col"
+          style={{ animation: `${dir === 1 ? 'howto-in-right' : 'howto-in-left'} 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both` }}
+        >
+          {/* Móvil grande "con zoom": se ve la parte de arriba de la pantalla y el resto se funde con el fondo */}
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div className="flex justify-center px-8 pt-5">
+              <div className="w-[min(78vw,330px)]">
+                <Phone src={`/howto/${lang}-${SHOTS[page]}.webp`} style={{ rotate: page % 2 ? '2.5deg' : '-2.5deg' }} />
               </div>
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-ink via-ink/80 to-transparent" />
             </div>
-            <div className="shrink-0 px-6 pt-2 text-center">
-              <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
-                {i + 1} / {pages.length}
-              </div>
-              <h2 id={i === page ? 'howto-title' : undefined} className="mt-1 text-[32px] leading-[1.05] font-black tracking-[-0.03em] [@media(max-height:700px)]:text-[27px]">
-                {p.title}
-              </h2>
-              <p className="mx-auto mt-2 min-h-[48px] max-w-[330px] text-[17px] leading-snug font-semibold text-white/75 [@media(max-height:700px)]:text-[15px]">
-                {p.body}
-              </p>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-ink via-ink/80 to-transparent" />
+          </div>
+          <div className="shrink-0 px-6 pt-2 text-center">
+            <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
+              {page + 1} / {pages.length}
             </div>
-          </section>
-        ))}
+            <h2 id="howto-title" className="mt-1 text-[32px] leading-[1.05] font-black tracking-[-0.03em] [@media(max-height:700px)]:text-[27px]">
+              {pages[page].title}
+            </h2>
+            <p className="mx-auto mt-2 min-h-[48px] max-w-[330px] text-[17px] leading-snug font-semibold text-white/75 [@media(max-height:700px)]:text-[15px]">
+              {pages[page].body}
+            </p>
+          </div>
+        </section>
       </div>
 
       <div className="shrink-0 px-5 pt-3 pb-6">
