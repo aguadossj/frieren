@@ -1,6 +1,6 @@
 // Engranaje de ajustes del host (solo lo ve el host). Cambia los ajustes de la partida en directo:
 // se guardan con `game.updateSettings` y aplican desde la siguiente fase (las rondas, solo en el lobby).
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLang } from '../i18n'
 import { useGame } from '../game/useGame'
@@ -145,8 +145,8 @@ function Chip({ active, disabled, onClick, children }: { active: boolean; disabl
     <button
       disabled={disabled}
       onClick={onClick}
-      className={`h-[44px] min-w-[60px] rounded-full px-4 text-[16px] font-extrabold transition active:scale-95 disabled:opacity-40 ${
-        active ? 'bg-brand text-white' : 'bg-neutral-100 text-ink'
+      className={`h-[44px] min-w-[60px] rounded-full px-4 text-[16px] font-extrabold transition-[background-color,color,transform] duration-300 ease-[cubic-bezier(0.3,1.35,0.5,1)] active:scale-95 disabled:opacity-40 ${
+        active ? 'scale-105 bg-brand text-white shadow-[0_3px_10px_rgba(238,43,43,0.3)]' : 'bg-neutral-100 text-ink'
       }`}
     >
       {children}
@@ -154,16 +154,32 @@ function Chip({ active, disabled, onClick, children }: { active: boolean; disabl
   )
 }
 
+/** Interruptor Sí/No: la pastilla negra se desliza con un pequeño rebote. Cambia al instante (sin esperar al servidor). */
 function Toggle({ label, value, on, off, onChange }: { label: string; value: boolean; on: string; off: string; onChange: (v: boolean) => void }) {
+  const [shown, setShown] = useState(value)
+  useEffect(() => setShown(value), [value])
+  const pick = (v: boolean) => {
+    if (v === shown) return
+    setShown(v)
+    navigator.vibrate?.(8)
+    onChange(v)
+  }
   return (
     <div className="mt-5 flex items-center justify-between gap-4">
       <span className="text-[16px] leading-snug font-bold">{label}</span>
-      <div className="flex shrink-0 rounded-full bg-neutral-100 p-1">
+      <div role="radiogroup" aria-label={label} className="relative grid shrink-0 grid-cols-2 rounded-full bg-neutral-100 p-1">
+        <span
+          aria-hidden="true"
+          className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-ink shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.3,1.35,0.5,1)]"
+          style={{ transform: shown ? 'translateX(0)' : 'translateX(100%)' }}
+        />
         {[true, false].map((v) => (
           <button
             key={String(v)}
-            onClick={() => onChange(v)}
-            className={`h-[36px] min-w-[52px] rounded-full px-3 text-[15px] font-extrabold transition ${value === v ? 'bg-ink text-white' : 'text-neutral-500'}`}
+            role="radio"
+            aria-checked={shown === v}
+            onClick={() => pick(v)}
+            className={`relative z-10 h-[36px] min-w-[56px] rounded-full px-3 text-[15px] font-extrabold transition-colors duration-300 active:scale-95 ${shown === v ? 'text-white' : 'text-neutral-500'}`}
           >
             {v ? on : off}
           </button>

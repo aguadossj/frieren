@@ -15,6 +15,7 @@ import type { Lang } from '../i18n'
 
 const ROOM_KEY = 'typing.roomId'
 const POLL_MS = 5000
+const PENDING_POLL_MS = 1500 // esperando a que el host te deje entrar
 
 const PACK_TO_VIBE: Record<Pack, string> = { uni: 'uni', spicy: 'spicy', dating: 'exes', moral: 'ethics' }
 const VIBE_TO_PACK: Record<string, Pack> = { uni: 'uni', spicy: 'spicy', exes: 'dating', ethics: 'moral' }
@@ -105,6 +106,7 @@ export function createSupabaseClient(): GameClient {
   let roomId: string | null = readRoomId()
   let channel: RealtimeChannel | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
+  let pendingTimer: ReturnType<typeof setTimeout> | null = null
   let phaseTimer: ReturnType<typeof setTimeout> | null = null
   let requestSeq = 0
   let lastVersion = -1
@@ -186,12 +188,21 @@ export function createSupabaseClient(): GameClient {
       if (s.rejected) return leaveLocally(ERRORS[getLang()].rejected)
       if (s.left) return leaveLocally()
       if (s.pending) {
-        // Sala con aprobación: esperando al host (sin ver nada de la sala)
+        // Sala con aprobación: esperando al host (sin ver nada de la sala). Mientras esperas no puedes escuchar el
+        // canal de la sala (es solo para jugadores dentro), así que se pregunta cada 1,5 s para entrar en cuanto te acepten.
         state = { ...state, room: null, meId: s.meId, pending: { code: s.code, hostName: s.hostName ?? null } }
+        if (pendingTimer) clearTimeout(pendingTimer)
+        pendingTimer = setTimeout(() => void refresh(), PENDING_POLL_MS)
         return emit()
       }
+      const wasPending = state.pending !== null
       lastVersion = s.version
       state = { ...state, room: toRoom(s), meId: s.meId, pending: null }
+      // Recién aceptado: conectarse ya al canal de la sala (mientras esperabas no se podía)
+      if (wasPending && roomId && channel?.state !== 'joined') {
+        const id = roomId
+        setTimeout(() => void startSync(id), 0)
+      }
       emit()
       schedulePhaseTimer()
     } catch (e) {
@@ -239,6 +250,8 @@ export function createSupabaseClient(): GameClient {
   }
 
   function stopSync() {
+    if (pendingTimer) clearTimeout(pendingTimer)
+    pendingTimer = null
     if (channel) void db.removeChannel(channel)
     channel = null
     if (pollTimer) clearInterval(pollTimer)

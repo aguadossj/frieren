@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Avatar, Button, Eyebrow, Footer, Icon, LangToggle, Row, Screen } from '../components/ui'
+import { Avatar, Button, ConfirmDialog, Eyebrow, Footer, Icon, LangToggle, Row, Screen } from '../components/ui'
 import QR, { shareInvite } from '../components/QR'
 import { SettingsGear } from '../components/HostSettings'
 import { PendingRequests } from '../components/PendingRequests'
@@ -11,6 +11,8 @@ export default function Lobby() {
   const { room, me, game, error } = useGame()
   const t = useT()
   const [copied, setCopied] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [kicking, setKicking] = useState<string | null>(null) // jugador con el "¿Echar?" a la vista
   if (!room || !me) return null
   const missing = MIN_PLAYERS - room.players.length
   const host = room.players.find((p) => p.isHost)
@@ -52,11 +54,21 @@ export default function Lobby() {
   )
 
   return (
-    <Screen>
+    <Screen className="relative">
+      {confirmLeave && (
+        <ConfirmDialog
+          title={t.leaveTitle}
+          body={t.leaveBody}
+          cancel={t.leaveStay}
+          confirm={t.leaveConfirm}
+          onCancel={() => setConfirmLeave(false)}
+          onConfirm={() => void game.leave()}
+        />
+      )}
       {/* Sin cabecera: atrás e idioma flotando arriba */}
       <div className="flex shrink-0 items-center justify-between px-4 pt-3">
         <button
-          onClick={() => void game.leave()}
+          onClick={() => setConfirmLeave(true)}
           aria-label={t.leaveRoom}
           className="flex size-[44px] items-center justify-center rounded-full bg-white/18 active:scale-90"
         >
@@ -123,6 +135,26 @@ export default function Lobby() {
                     {p.id === me.id && <span className="text-neutral-400"> ({t.youLower})</span>}
                   </span>
                   {p.isHost && <span className="text-[15px] text-neutral-400">{t.hostTag}</span>}
+                  {/* El host puede echar a alguien: 1.º toque → "¿Echar?", 2.º toque → fuera */}
+                  {me.isHost && p.id !== me.id && (
+                    <button
+                      onClick={() => {
+                        if (kicking === p.id) {
+                          setKicking(null)
+                          void game.kick(p.id)
+                        } else {
+                          setKicking(p.id)
+                          setTimeout(() => setKicking((k) => (k === p.id ? null : k)), 3000)
+                        }
+                      }}
+                      aria-label={t.kick(p.name)}
+                      className={`flex h-[40px] shrink-0 items-center justify-center rounded-full text-[15px] font-extrabold transition-all duration-200 active:scale-95 ${
+                        kicking === p.id ? 'bg-brand px-4 text-white' : 'w-[40px] bg-neutral-100 text-neutral-500'
+                      }`}
+                    >
+                      {kicking === p.id ? t.kickConfirm : <Icon name="x" size={16} />}
+                    </button>
+                  )}
                 </Row>
               </li>
             ))}
