@@ -56,6 +56,13 @@
   from { transform: translateX(-80px) scale(0.94); opacity: 0; }
   to { transform: translateX(0) scale(1); opacity: 1; }
 }
+/* ¿Qué es Mimic?: su respuesta se gira y enseña "AI"; luego salta el −100 */
+@keyframes mimic-flip {
+  from { transform: rotateX(0); }
+  to { transform: rotateX(180deg); }
+}
+.mimic-flip { animation: mimic-flip 0.7s cubic-bezier(0.3, 1.25, 0.5, 1) 1s both; }
+.mimic-minus { animation: pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) 1.6s both; }
 @keyframes swipe-hint {
   0%, 100% { transform: translateX(0) rotate(0); }
   25% { transform: translateX(-26px) rotate(-2deg); }

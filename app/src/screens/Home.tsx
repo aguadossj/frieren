@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { retintSafariBars } from '../lib/viewport'
 import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
-import HowToPlay, { seenHowTo } from '../components/HowToPlay'
+import HowToPlay, { preloadHowTo, seenHowTo } from '../components/HowToPlay'
 import MimicInfo from '../components/MimicInfo'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Avatar, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
@@ -33,6 +33,12 @@ export default function Home() {
   const [page, setPage] = useState<Page>(codeFromUrl ? 'join' : 'start')
   // "Cómo se juega": solo la primera vez que se abre la web (luego, desde el botón de la portada)
   const [howTo, setHowTo] = useState(() => !seenHowTo())
+  // Capturas de "Cómo se juega" precargadas siempre en segundo plano (en la primera visita ya van desde index.html)
+  const lang = useLang()
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200))
+    idle(() => preloadHowTo(lang))
+  }, [lang])
 
   // Home siempre "limpia", también al volver de una partida: sin restos del chat (fondo blanco, teclado),
   // sin foco en ningún campo, página arriba del todo y barras de Safari recalculadas.
@@ -180,7 +186,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
     }
   }
 
-  // "¿Qué está pasando ahora?" es obligatorio: sin él no se puede seguir (la IA lo necesita para los chats)
+  // "¿Qué estáis haciendo ahora?" es obligatorio: sin él no se puede seguir (la IA lo necesita para los chats)
   const [situationMissing, setSituationMissing] = useState(false)
   const situationRef = useRef<HTMLTextAreaElement>(null)
   const MIN_SITUATION = 3

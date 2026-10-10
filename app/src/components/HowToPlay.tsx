@@ -20,8 +20,8 @@ const SHOTS = ['chat', 'vote', 'reveal', 'standings'] as const
 type Frame = { mode: 'full'; tilt: number } | { mode: 'zoom'; focus: number; tilt: number }
 const FRAMES: Frame[] = [
   { mode: 'full', tilt: -3 }, // chat: todo el chat y la respuesta a medio escribir
-  { mode: 'zoom', focus: 0.3, tilt: 2 }, // votación: las opciones
-  { mode: 'zoom', focus: 0.27, tilt: -2 }, // revelación: titular y resultados
+  { mode: 'zoom', focus: 0.3, tilt: 1.5 }, // votación: las opciones
+  { mode: 'zoom', focus: 0.27, tilt: -1.5 }, // revelación: titular y resultados
   { mode: 'full', tilt: 3 }, // clasificación: barras y panda
 ]
 const PHONE_RATIO = 2.2 // alto / ancho del iPhone dibujado (marco + barra de estado + captura)
@@ -51,6 +51,23 @@ export function seenHowTo(): boolean {
   return stored || !canStore
 }
 
+const preloaded = new Set<string>()
+
+/**
+ * Descarga y decodifica en segundo plano las 4 capturas de un idioma (una sola vez por idioma), para que al abrir
+ * "Cómo se juega" (primera visita o botón "Cómo jugar") salgan al instante y no en blanco.
+ */
+export function preloadHowTo(lang: string) {
+  if (preloaded.has(lang)) return
+  preloaded.add(lang)
+  for (const shot of SHOTS) {
+    const img = new Image()
+    img.decoding = 'async'
+    img.src = `/howto/${lang}-${shot}.webp`
+    img.decode?.().catch(() => {})
+  }
+}
+
 /** Se marca al ENSEÑARLO (primera visita), no al cerrarlo: recargar ya no lo vuelve a sacar. */
 function markSeen() {
   try {
@@ -75,15 +92,15 @@ export default function HowToPlay({ onClose }: { onClose: () => void }) {
     const frame = FRAMES[i]
     const src = `/howto/${lang}-${SHOTS[i]}.webp`
     return frame.mode === 'full' ? (
-      <div className="flex h-full items-center justify-center px-8 py-4">
-        <IPhone src={src} tilt={frame.tilt} className="h-full max-h-[540px]" />
+      <div className="flex h-full items-center justify-center px-5 py-2">
+        <IPhone src={src} tilt={frame.tilt} className="h-full max-h-[620px]" />
       </div>
     ) : (
       <>
         {/* Zoom: el móvil más ancho que la pantalla, desplazado para que la zona clave quede en el centro */}
         <div
-          className="absolute left-1/2 w-[min(108vw,430px)] -translate-x-1/2"
-          style={{ top: `calc(50% - ${frame.focus * PHONE_RATIO} * min(108vw, 430px))` }}
+          className="absolute left-1/2 w-[min(94vw,400px)] -translate-x-1/2"
+          style={{ top: `calc(50% - ${frame.focus * PHONE_RATIO} * min(94vw, 400px))` }}
         >
           <IPhone src={src} tilt={frame.tilt} className="w-full" />
         </div>
