@@ -257,6 +257,8 @@ export function createSupabaseClient(): GameClient {
       try {
         await ensureSession()
         const r = await rpc<{ room_id: string }>('create_room', { p_name: name, p_emoji: emoji ?? null })
+        // Idioma del host como contexto de la sala: la IA escribe los chats y el bot en ese idioma.
+        await rpc('save_setup', { p_room_id: r.room_id, p_answers: { lang: getLang() } }).catch(() => {})
         setState({ error: null })
         await startSync(r.room_id)
       } catch (e) {
@@ -280,7 +282,7 @@ export function createSupabaseClient(): GameClient {
         if (options.groupType) answers.who = options.groupType
         return rpc('save_setup', { ...roomArgs(), p_answers: answers })
       }),
-    saveSetup: (answers) => act(() => rpc('save_setup', { ...roomArgs(), p_answers: answers })),
+    saveSetup: (answers) => act(() => rpc('save_setup', { ...roomArgs(), p_answers: { lang: getLang(), ...answers } })),
     updateSettings: (settings) => act(() => rpc('update_settings', { ...roomArgs(), p_settings: settings })),
     getSetupQuestions: () => rpc<SetupQuestion[]>('get_setup_questions').catch(() => []),
     kick: (playerId) => act(() => rpc('kick_player', { ...roomArgs(), p_player_id: playerId })),

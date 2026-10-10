@@ -4,12 +4,15 @@
 // Siempre: cabecera `x-generate-secret: <GENERATE_ROUND_SECRET>`.
 // - Desde la base (migración 3, pg_net): { round_id, input } -> genera y guarda con las RPC
 //   public.ai_complete_round / public.ai_fail_round (service role). Responde { outcome }.
+// - Bot Mimic (migración style_and_mimic): { mode: 'mimic', round_id, context, examples } -> genera la respuesta
+//   del bot y la entrega con public.submit_bot_answer; registra con public.log_ai_generation. Sin round_id la devuelve.
 // - Prueba directa: GenerateRoundInput -> devuelve GenerateRoundOutput sin guardar nada.
 //
 // Secretos: AI_API_KEY, GENERATE_ROUND_SECRET; opcionales AI_BASE_URL (Groq por defecto) y AI_MODEL.
 // SUPABASE_URL y la clave de servicio los pone Supabase.
 
 import { AiError, generateRound, parseInput } from './core.ts'
+import { MIMIC_PROMPT_VERSION, generateMimic } from './mimic.ts'
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -64,6 +67,37 @@ Deno.serve(async (request: Request) => {
 
   const body = await request.json().catch(() => null)
   const roundId = typeof body?.round_id === 'string' ? body.round_id : null
+
+  // ── Bot Mimic ──
+  if (body?.mode === 'mimic') {
+    const started = Date.now()
+    const roomId = typeof body?.context?.room_id === 'string' ? body.context.room_id : null
+    try {
+      if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
+      // La escritura dura ~25 s y espera al bot como mucho 10 s tras contestar todos: tiene que ser rápido.
+      const output = await generateMimic(body.context, body.examples, { ...config, timeoutMs: 8000 })
+      if (!roundId) return json(200, output)
+      const accepted = await rpc('submit_bot_answer', { p_round_id: roundId, p_text: output.answer })
+      await rpc('log_ai_generation', {
+        p_room_id: output.room_id, p_round_id: roundId, p_provider: 'openai-compatible', p_model: output.model,
+        p_prompt_version: output.prompt_version, p_status: 'ok', p_input_tokens: output.input_tokens,
+        p_output_tokens: output.output_tokens, p_latency_ms: output.latency_ms, p_error: accepted ? null : 'not_accepted',
+      }).catch((e) => console.error('mimic log', e))
+      return json(200, { outcome: accepted ? 'submitted' : 'not_needed' })
+    } catch (error) {
+      const code = error instanceof AiError ? error.code : 'provider_failed'
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('mimic', roundId, code, message)
+      if (roundId && roomId) {
+        await rpc('log_ai_generation', {
+          p_room_id: roomId, p_round_id: roundId, p_provider: 'openai-compatible', p_model: config.model,
+          p_prompt_version: MIMIC_PROMPT_VERSION, p_status: failStatus(code), p_input_tokens: null,
+          p_output_tokens: null, p_latency_ms: Date.now() - started, p_error: `${code}: ${message}`,
+        }).catch((e) => console.error('mimic log', e))
+      }
+      return json(roundId ? 200 : STATUS[code as AiError['code']] ?? 500, { outcome: 'failed', error: code })
+    }
+  }
 
   // ── Desde la base: generar y guardar ──
   if (roundId) {
