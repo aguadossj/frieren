@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
@@ -227,6 +227,26 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [shake, setShake] = useState(false)
+  // Comprobación del código ANTES de pedir el nombre (check_room): existe, no ha empezado, no está llena
+  const [checking, setChecking] = useState(false)
+  const [codeError, setCodeError] = useState<string | null>(null)
+
+  const checkCode = async (v: string) => {
+    setChecking(true)
+    setCodeError(null)
+    const res = await game.checkRoom(v)
+    setChecking(false)
+    if (res.ok) return setStep('name')
+    setStep('code')
+    setCodeError(res.message ?? null)
+    setShake(true)
+    setTimeout(() => setShake(false), 500)
+  }
+
+  // Si vienes del QR/enlace, comprobamos ese código al entrar
+  useEffect(() => {
+    if (fromQr) void checkCode(initialCode)
+  }, [])
 
   const back = (
     <button
@@ -263,14 +283,22 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
             <h1 className="mt-2 text-[44px] leading-[1.02] font-black tracking-[-0.035em]">{t.gotACode}</h1>
             <p className="mt-2 text-[18px] font-semibold text-white/85">{t.gotACodeSub}</p>
           </div>
-          <CodeTiles
-            label={t.roomCode}
-            value={code}
-            onChange={(v) => {
-              setCode(v)
-              if (v.length === CODE_LENGTH) setTimeout(() => setStep('name'), 280)
-            }}
-          />
+          <div className={shake ? 'animate-nudge' : ''}>
+            <CodeTiles
+              label={t.roomCode}
+              value={code}
+              onChange={(v) => {
+                setCode(v)
+                setCodeError(null)
+                if (v.length === CODE_LENGTH) setTimeout(() => void checkCode(v), 280)
+              }}
+            />
+          </div>
+          {(checking || codeError) && (
+            <p className="-mt-4 animate-rise text-center text-[16px] font-bold" role={codeError ? 'alert' : 'status'}>
+              {checking ? t.checkingRoom : codeError}
+            </p>
+          )}
         </Body>
       </Screen>
     )

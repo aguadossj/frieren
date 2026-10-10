@@ -95,6 +95,7 @@ const en = {
   changeCode: 'Change code',
   // Sala
   leaveRoom: 'Leave room',
+  checkingRoom: 'Checking room…',
   copyLink: 'Share invite',
   linkCopied: 'Invite copied',
   inviteText: (code: string) => `Join my Typing… game! 💬 Room code: ${code}`,
@@ -211,6 +212,7 @@ const es: typeof en = {
   joining: 'Entrando',
   changeCode: 'Cambiar código',
   leaveRoom: 'Salir de la sala',
+  checkingRoom: 'Comprobando sala…',
   copyLink: 'Compartir invitación',
   linkCopied: 'Invitación copiada',
   inviteText: (code) => `¡Uníos a mi partida de Typing…! 💬 Código: ${code}`,
