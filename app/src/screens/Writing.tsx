@@ -12,15 +12,6 @@ export default function Writing() {
   const [typing, setTyping] = useState(false) // input con foco ⇒ teclado abierto
   const list = useRef<HTMLDivElement>(null)
 
-  // Marca la pantalla de chat (index.css: barra inferior de Safari roja como la barra de escribir)
-  useEffect(() => {
-    const html = document.documentElement
-    html.dataset.pageBg = 'chat'
-    return () => {
-      delete html.dataset.pageBg
-    }
-  }, [])
-
   // Bajar al último mensaje dentro de la lista (no scrollIntoView: en iOS desplaza toda la página)
   const toBottom = (smooth = true) => {
     const el = list.current
@@ -51,8 +42,7 @@ export default function Writing() {
   // Layout tipo WhatsApp para aprovechar la pantalla del móvil:
   // cabecera mínima (solo nombre del grupo + tiempo) · chat rojo con el nombre DENTRO de la burbuja ·
   // pista como nota pequeña al final del chat · abajo solo la barra de escribir.
-  // Cabecera blanca arriba, chat y barra de escribir rojos abajo; el fondo de la página sigue el mismo corte
-  // (index.css, data-page-bg=chat) para que Safari tiña su barra de arriba blanca y la de abajo roja.
+  // Pantalla blanca; solo el chat es una tarjeta roja. Bordes blancos ⇒ Safari pinta sus barras en blanco.
   return (
     <Screen className="bg-white!">
       <header className="flex min-h-[60px] shrink-0 items-center gap-3 bg-white px-4 py-2.5 text-ink">
@@ -63,7 +53,7 @@ export default function Writing() {
         <TimerPill seconds={seconds} />
       </header>
 
-      <div ref={list} className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain bg-brand px-3 pt-3 pb-3">
+      <div ref={list} className="mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-[28px] bg-brand px-3 pt-3 pb-3">
         {room.chat.messages.map((m, i) => {
           const author = playerOf(m.playerId)
           const firstOfRun = i === 0 || room.chat!.messages[i - 1].playerId !== m.playerId
@@ -106,9 +96,9 @@ export default function Writing() {
         )}
       </div>
 
-      <div className={`shrink-0 bg-brand px-3 ${typing ? 'pt-1 pb-2' : 'pt-1 pb-4'}`}>
+      <div className={`shrink-0 bg-white px-3 ${typing ? 'pt-2 pb-2' : 'pt-2 pb-4'}`}>
         {sent ? (
-          <div className="flex h-[48px] items-center justify-center gap-2 rounded-full bg-white text-[16px] font-extrabold text-ink">
+          <div className="flex h-[48px] items-center justify-center gap-2 rounded-full bg-neutral-100 text-[16px] font-extrabold text-ink">
             <Icon name="check" size={18} className="text-good" />
             Waiting for others {room.submittedIds.length}/{room.players.length}
           </div>
@@ -126,7 +116,7 @@ export default function Writing() {
             }}
           >
             <input
-              className="h-[46px] min-w-0 flex-1 rounded-full bg-white px-5 text-[17px] text-ink outline-none placeholder:text-neutral-400"
+              className="h-[46px] min-w-0 flex-1 rounded-full bg-neutral-100 px-5 text-[17px] text-ink outline-none placeholder:text-neutral-400"
               placeholder={`Message as ${writer.name}`}
               maxLength={MAX_ANSWER_LENGTH}
               value={text}
@@ -142,7 +132,7 @@ export default function Writing() {
               aria-label="Send"
               onMouseDown={(e) => e.preventDefault() /* no cerrar el teclado al tocar enviar */}
               disabled={!text.trim()}
-              className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-ink text-white transition active:scale-90 disabled:opacity-50"
+              className="flex size-[46px] shrink-0 items-center justify-center rounded-full bg-brand text-white transition active:scale-90 disabled:opacity-50"
             >
               <Icon name="arrowRight" size={22} className="-rotate-90" />
             </button>

@@ -55,30 +55,10 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 html[data-keyboard='open'] #root { padding-bottom: 0; }
-/* Color de las barras de Safari (iOS 26). Reglas (no documentadas por Apple, medidas por la comunidad):
-   Safari mira elementos position:fixed que ocupen ≥80% del ancho, ≥3px de alto y estén a ≤4px del borde,
-   y usa su background-color. Por eso: dos franjas reales (no pseudo-elementos) encima de todo.
-   Arriba siempre blanco; abajo blanco, o rojo en el chat (barra de escribir roja). Solo móvil. */
-.safari-tint { display: none; }
-@media (max-width: 767px) {
-  .safari-tint {
-    display: block;
-    position: fixed;
-    left: 0;
-    right: 0;
-    height: 4px;
-    z-index: 1000;
-    pointer-events: none;
-  }
-  .safari-tint-top { top: 0; background-color: #fff; }
-  .safari-tint-bottom { bottom: 0; background-color: var(--tint-bottom, #fff); }
-  html[data-page-bg='chat'] { --tint-bottom: var(--color-brand); }
-}
+/* Página blanca en móvil: Safari (iOS 26) tiñe sus barras con lo que hay en los bordes, así que bordes blancos
+   ⇒ barras blancas. Las pantallas pintan en rojo solo sus zonas importantes (p. ej. el chat). */
 @media (max-width: 639px) {
-  /* #root también es fijo y toca los bordes: con fondo explícito no "transparenta" el rojo de la pantalla */
   #root { background-color: #fff; }
-  /* Chat con teclado: lo que asoma bajo la app (detrás de la barra ˄ ˅ ✓) rojo como la barra de escribir */
-  html[data-page-bg='chat'][data-keyboard='open'] body { background: var(--color-brand); }
 }
 
 /* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
