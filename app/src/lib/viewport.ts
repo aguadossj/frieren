@@ -44,7 +44,10 @@ export function trackVisualViewport() {
         return
       }
       // 1) Primero deshacemos el scroll que iOS hace para enseñar el input (nuestro layout ya cabe)…
-      if (window.scrollY !== 0) window.scrollTo(0, 0)
+      //    SOLO mientras se escribe en un campo. Si no, dejamos el rebote nativo de iOS en paz: corregirlo
+      //    "peleaba" con el gesto (pantalla que se movía) y rompía "deslizar hacia abajo para recargar".
+      const typing = isField(document.activeElement)
+      if (typing && window.scrollY > 0) window.scrollTo(0, 0)
       // 2) …y DESPUÉS leemos la posición del área visible. Antes se leía antes de deshacer el scroll:
       //    #root se quedaba desplazado hacia abajo y la pantalla se veía en blanco (pantalla del nombre).
       setVar('--vv-h', `${Math.round(vv.height)}px`)

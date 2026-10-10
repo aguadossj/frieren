@@ -74,15 +74,14 @@ html, body, #root { height: 100%; }
 /* Fondo de la PÁGINA rojo en todas las pantallas (también bajo el notch y la barra de inicio del iPhone);
    Safari tiñe sus barras con este color. */
 html { background-color: var(--color-brand); }
-/* La PÁGINA no hace scroll ni rebota (en iOS el rebote movía toda la pantalla y peleaba con el ajuste del teclado).
-   Solo hacen scroll las zonas de cada pantalla que lo necesitan. El scroll por código (retintSafariBars) sigue funcionando. */
-html { overflow: hidden; overscroll-behavior: none; }
+/* La página SÍ puede rebotar: así funciona "deslizar hacia abajo para recargar" en el móvil. El rebote ya no pelea
+   con el ajuste del teclado porque viewport.ts solo corrige el scroll mientras se escribe en un campo.
+   Las zonas con scroll de cada pantalla llevan overscroll-contain para que su scroll no arrastre la página. */
 body {
   margin: 0;
   background: var(--color-brand);
   color: #fff;
   font-family: var(--font-sans);
-  overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
