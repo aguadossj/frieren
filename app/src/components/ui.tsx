@@ -3,7 +3,6 @@
 
 import { useState } from 'react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
-import { PHASE_SECONDS } from '../game/types'
 import type { Player } from '../game/types'
 import { joinUrl } from './QR'
 
@@ -55,68 +54,10 @@ export function AppHeader({ code, left }: { code?: string; left?: ReactNode }) {
   )
 }
 
-export type RoundStep = 'writing' | 'voting' | 'reveal'
-const STEPS: { id: RoundStep; label: string }[] = [
-  { id: 'writing', label: 'Write' },
-  { id: 'voting', label: 'Vote' },
-  { id: 'reveal', label: 'Reveal' },
-]
-
-/** Bloque blanco superior de una ronda: cabecera + ronda, pasos (Write · Vote · Reveal), reloj y barra de tiempo. */
-export function RoundHeader({ code, step, round, total, seconds }: { code: string; step: RoundStep; round: number; total: number; seconds: number }) {
-  const current = STEPS.findIndex((s) => s.id === step)
-  const progress = Math.min(100, (seconds / PHASE_SECONDS[step]) * 100)
-  return (
-    <header className="shrink-0 bg-white text-ink">
-      <AppHeader code={code} />
-      <div className="flex items-center justify-between gap-2 px-5 pb-3">
-        <span className="shrink-0 leading-none font-extrabold tabular-nums">
-          <span className="block text-[11px] tracking-[0.14em] text-neutral-400">ROUND</span>
-          <span className="text-[17px]">
-            {round}/{total}
-          </span>
-        </span>
-        <ol className="flex items-center gap-1 rounded-full bg-neutral-100 p-1">
-          {STEPS.map((s, i) => (
-            <li
-              key={s.id}
-              className={cx(
-                'flex items-center gap-0.5 rounded-full px-2.5 py-1 text-[13px] font-extrabold transition',
-                i === current ? 'bg-ink text-white' : i < current ? 'text-ink' : 'text-neutral-400',
-              )}
-            >
-              {i < current && <Icon name="check" size={11} className="-ml-0.5" />}
-              {s.label}
-            </li>
-          ))}
-        </ol>
-        <span className={cx('w-[40px] shrink-0 text-right text-[16px] font-extrabold tabular-nums', seconds <= 5 && 'animate-pulse text-brand')}>
-          0:{String(seconds).padStart(2, '0')}
-        </span>
-      </div>
-      <div className="h-[5px] bg-neutral-100">
-        <div
-          className={cx('h-full transition-[width] duration-1000 ease-linear', seconds <= 5 ? 'bg-brand' : 'bg-ink')}
-          style={{ width: `${progress}%` }}
-        />
-      </div>
-    </header>
-  )
-}
-
 /** Etiqueta pequeña en mayúsculas sobre un título ("NEW ROOM", "ROOM CODE"). */
 export const Eyebrow = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
   <div className={cx('text-[13px] font-extrabold tracking-[0.16em] uppercase opacity-80', className)}>{children}</div>
 )
-
-/** Tarjeta blanca de contenido. */
-export function Card({ children, className = '', style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
-  return (
-    <div style={style} className={cx('rounded-[28px] bg-white p-5 text-ink', className)}>
-      {children}
-    </div>
-  )
-}
 
 /** Marco de pantalla. En escritorio se ve como un móvil centrado (como el mockup). */
 export function Screen({ children, dark = false }: { children: ReactNode; dark?: boolean }) {
@@ -147,7 +88,7 @@ export function TopBar({ title, subtitle, right, avatar }: { title: ReactNode; s
     <header className="flex min-h-[72px] shrink-0 items-center gap-3 bg-white px-6 py-3 text-ink">
       {avatar}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[20px] leading-tight font-extrabold">{title}</div>
+        <div className="line-clamp-2 text-[20px] leading-tight font-extrabold">{title}</div>
         {subtitle && <div className="truncate text-[15px] font-semibold text-brand">{subtitle}</div>}
       </div>
       {right}

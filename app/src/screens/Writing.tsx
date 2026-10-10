@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bubble, Icon, RolePill, RoundHeader, Screen, TypingDots, groupInitials } from '../components/ui'
+import { Bubble, Icon, RolePill, Screen, SectionLabel, TimerPill, TopBar, TypingDots, groupInitials } from '../components/ui'
 import { useCountdown, useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH } from '../game/types'
 
@@ -22,20 +22,21 @@ export default function Writing() {
 
   return (
     <Screen>
-      <RoundHeader code={room.code} step="writing" round={room.roundIndex + 1} total={room.totalRounds} seconds={seconds} />
+      <TopBar
+        avatar={
+          <span className="flex size-[50px] shrink-0 items-center justify-center rounded-full bg-brand text-[18px] font-extrabold text-white">
+            {groupInitials(room.chat.title)}
+          </span>
+        }
+        title={room.chat.title}
+        subtitle={mine ? `${room.players.length} members` : `${writer.name} is typing…`}
+        right={<TimerPill seconds={seconds} />}
+      />
 
-      {/* Barra del chat de grupo */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-white/20 px-5 py-3">
-        <span className="flex size-[44px] shrink-0 items-center justify-center rounded-full bg-white text-[16px] font-extrabold text-brand">
-          {groupInitials(room.chat.title)}
-        </span>
-        <div className="min-w-0 leading-tight">
-          <div className="truncate text-[19px] font-extrabold">{room.chat.title}</div>
-          <div className="text-[14px] font-semibold text-white/80">{room.players.length} members</div>
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-5 pt-4 pb-4">
+      <div className="flex flex-1 flex-col gap-2 overflow-y-auto px-5 pb-4">
+        <SectionLabel>
+          ROUND {room.roundIndex + 1} OF {room.totalRounds}
+        </SectionLabel>
         {room.chat.messages.map((m, i) => (
           <div key={i} className="animate-rise" style={{ animationDelay: `${i * step}s` }}>
             <div className="mb-1 pl-1 text-[15px] font-extrabold">{nameOf(m.playerId)}</div>
