@@ -2,7 +2,10 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 
-export const joinUrl = (code: string) => `${location.origin}/?room=${code}`
+// VITE_JOIN_URL fija la dirección del QR y de las invitaciones (p. ej. http://2.28.17.241.nip.io cuando las IP de
+// Cloudflare están bloqueadas); sin ella, la misma web en la que estás.
+export const joinUrl = (code: string) =>
+  `${((import.meta.env.VITE_JOIN_URL as string | undefined) || location.origin).replace(/\/$/, '')}/?room=${code}`
 
 /** Enlace público del juego (lo que se comparte al acabar). En local seguiría siendo la web pública, no tu IP. */
 export const PUBLIC_URL = ((import.meta.env.VITE_PUBLIC_URL as string | undefined) ?? 'https://frieren-bfq.pages.dev').replace(/\/$/, '')
