@@ -1,4 +1,4 @@
--- ⚠️ PENDIENTE: NO aplicada todavía en Supabase. Al aplicarla con el MCP, renombrar con la versión que asigne Supabase.
+-- Aplicada a mano en el SQL Editor de Supabase (sáb 10 oct ~03:30): no figura en el historial de migraciones del proyecto.
 -- Typing… · Migración 3: contexto libre para la IA en `save_setup` y `play_again`.
 --
 -- - `save_setup` sigue validando las preguntas del catálogo (game.setup_questions), y además acepta
