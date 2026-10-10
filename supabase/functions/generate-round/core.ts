@@ -1,6 +1,7 @@
 // Núcleo de la IA de Typing…: genera el chat de UNA ronda y actualiza la memoria de la sala ("aprendizaje").
 // TS puro: sin Deno.*, sin process.env, sin paquetes. Lo usan la Edge Function (index.ts) y el mock en local
-// (plugin de Vite en app/vite.config.ts). Proveedor: cualquier API compatible con OpenAI (Groq por defecto).
+// (plugin de Vite en app/vite.config.ts). Proveedor: cualquier API compatible con OpenAI (por defecto Hermes 3 70B
+// en OpenRouter para rondas y Mimic, Groq para los borradores; ver index.ts).
 //
 // Flujo (SPEC.md › IA): ronda 1 al pulsar Start; ronda N+1 en segundo plano al empezar la votación de la N.
 // Por eso la última ronda del historial puede venir sin votos (`fooled`, `found_by`, `laughs` opcionales).
@@ -12,9 +13,9 @@
 //    dónde llevar la partida. Salen de la misma llamada que el chat, con tamaños limitados y filtrados en código.
 
 export interface AiConfig {
-  baseUrl: string // p. ej. https://api.groq.com/openai/v1
+  baseUrl: string // p. ej. https://openrouter.ai/api/v1 o https://api.groq.com/openai/v1
   apiKey: string
-  model: string // p. ej. openai/gpt-oss-120b
+  model: string // p. ej. nousresearch/hermes-3-llama-3.1-70b u openai/gpt-oss-120b
   timeoutMs?: number
   // Cómo pedir JSON al proveedor. 'json_schema' (Groq, vLLM, OpenAI) es lo más fiable; 'json_object' o 'none'
   // para modelos/proveedores sin salida estructurada (p. ej. Hermes 3 en algunos hosts): el esquema va en el prompt.
@@ -97,7 +98,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v7'
+export const PROMPT_VERSION = 'round-v8'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -571,6 +572,7 @@ FIELDS:
 - "lines": 3 to 6 short messages. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
   "text" is only what they type: never start it with the sender's name or "name:". Max 60 characters each.
+  Nobody ever says their own name: a message that mentions a player is sent by someone else.
 - The LAST message is addressed to the writer by name: a question or a direct demand ("Laura explain", "Laura what did you do").
 - Follow the audience (group, know_each_other, content, vibes, topic, extra_context). From round 2 on, call back a
   running joke or something a player said when it fits, and follow the steer. If the writer has been easy to spot
@@ -704,13 +706,55 @@ function mentions(text: string, name: string): boolean {
     .some((word) => word.length >= 2 && new RegExp(`(^|[^\\p{L}])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}])`, 'u').test(lower))
 }
 
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/**
+ * ¿El texto nombra a esta persona? El nombre entero o una palabra suya de 3+ letras, como palabra suelta
+ * ("Pau" sí en "Pau explica", no en "pausa"). Más estricto que `mentions`, que acepta palabras de 2 letras.
+ */
+export function namesPerson(text: string, name: string): boolean {
+  const words = [name, ...name.split(/\s+/).filter((w) => w.length >= 3)].filter(Boolean)
+  return words.some((w) => new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRe(w)}($|[^\\p{L}\\p{N}])`, 'iu').test(text))
+}
+
+/**
+ * Nadie se nombra a sí mismo ("Nico! qué has hecho" enviado por Nico): ese mensaje pasa a otro jugador que no
+ * salga en el texto: mejor alguien distinto del mensaje anterior y que ya hable en el chat. Devuelve null si no hay
+ * nadie posible (se reintenta).
+ * `nameOf`: handle -> nombre; `senders`: handles que pueden enviar (nunca el writer).
+ */
+export function fixSelfReferences<T extends { from: string; text: string }>(
+  lines: T[],
+  nameOf: Record<string, string>,
+  senders: string[],
+): T[] | null {
+  lines.forEach((line, i) => {
+    if (!namesPerson(line.text, nameOf[line.from] ?? '')) return
+    const free = senders.filter((h) => h !== line.from && !namesPerson(line.text, nameOf[h] ?? ''))
+    const fresh = free.filter((h) => h !== lines[i - 1]?.from)
+    const speaking = (h: string) => lines.some((l) => l.from === h)
+    line.from = fresh.find(speaking) ?? fresh[0] ?? free.find(speaking) ?? free[0] ?? ''
+  })
+  if (lines.some((line) => !line.from)) return null
+  return lines
+}
+
 // Arreglos baratos antes de validar, para no tirar una ronda buena por un detalle (visto en pruebas reales):
-// - el modelo a veces hace hablar al writer: esa línea pasa a otro jugador;
+// - el modelo a veces hace hablar al writer (p. ej. contesta él mismo al final): esas líneas se quitan, porque
+//   dárselas a otro le haría hablar por el writer ("nico estoy listo" enviado por Ana); si no quedan 2, pasan a otro;
 // - a veces escribe los handles internos ("P2") en el texto: se cambian por el nombre;
 // - a veces la pregunta final no nombra al writer: se le antepone el nombre.
-function repairChat(output: ModelOutput, writerName: string, otherHandles: string[], nameOf: Record<string, string>): void {
+function repairChat(
+  output: ModelOutput,
+  writerName: string,
+  writerHandle: string,
+  otherHandles: string[],
+  nameOf: Record<string, string>,
+): void {
   const lines = output?.chat?.lines
   if (!Array.isArray(lines) || lines.length === 0) return
+  const spoken = lines.filter((line) => line?.from !== writerHandle)
+  if (spoken.length >= 2 && spoken.length < lines.length) lines.splice(0, lines.length, ...spoken)
   lines.forEach((line, i) => {
     if (!line) return
     if (!otherHandles.includes(line.from)) line.from = otherHandles[i % otherHandles.length]
@@ -812,6 +856,7 @@ export function parseJsonReply(content: unknown): unknown {
 
 async function send(config: AiConfig, system: string, user: string, schemaName: string, schema: unknown, timeoutMs: number) {
   const mode = config.jsonMode ?? 'json_schema'
+  const reasoning = config.model.includes('gpt-oss')
   const instructions =
     mode === 'json_schema'
       ? system
@@ -823,16 +868,20 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
       signal: AbortSignal.timeout(timeoutMs),
       body: JSON.stringify({
         model: config.model,
-        ...(config.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
+        ...(reasoning ? { reasoning_effort: 'low' } : {}),
         // Los modelos pequeños (p. ej. Hermes 3 8B) se desordenan con temperatura 1.
-        temperature: config.model.includes('gpt-oss') ? 1 : 0.8,
-        // max_tokens lo entiende cualquier servidor compatible (vLLM, OpenRouter…); Groq acepta ambos.
-        ...(mode === 'json_schema' ? { max_completion_tokens: 4000 } : { max_tokens: 1500 }),
+        temperature: reasoning ? 1 : 0.8,
+        // gpt-oss gasta tokens razonando; el resto (Hermes…) con max_tokens, que entiende cualquier servidor compatible.
+        // 2500: la memoria de 8 jugadores + el chat no caben en 1500 y el JSON cortado no se puede leer.
+        ...(reasoning ? { max_completion_tokens: 4000 } : { max_tokens: 2500 }),
         ...(mode === 'json_schema'
           ? { response_format: { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } } }
           : mode === 'json_object'
             ? { response_format: { type: 'json_object' } }
             : {}),
+        // OpenRouter descarta en silencio los parámetros que el proveedor no admite. Con json_schema el esquema NO va
+        // en el prompt, así que si se descarta el modelo no lo ve: mejor un error (reintento / respaldo) que basura.
+        ...(mode === 'json_schema' && config.baseUrl.includes('openrouter.ai') ? { provider: { require_parameters: true } } : {}),
         messages: [
           { role: 'system', content: instructions },
           { role: 'user', content: user },
@@ -863,8 +912,9 @@ export async function generateRound(input: GenerateRoundInput, config: AiConfig)
     const retryable =
       error instanceof AiError &&
       (error.code === 'invalid_output' || (error.code === 'provider_status' && error.message.startsWith('400')))
+    // Solo si queda al menos lo que tardó el primer intento: con Hermes (~10 s) un reintento con 5 s nunca llega.
     const left = deadline - Date.now()
-    if (!retryable || left < 2500) throw error
+    if (!retryable || left < Math.max(2500, Date.now() - started)) throw error
     return done(await generateOnce(input, { ...config, timeoutMs: left }, theme), 2)
   }
 }
@@ -887,10 +937,11 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
     buildSchema([...handles.values()]),
   )
   const output = json
-  repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
+  repairChat(output, writer.name, handleOf(writer.id), otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
   if (Array.isArray(output?.chat?.lines)) {
-    output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()), lang)
     const nameOf = Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name]))
+    output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()), lang)
+    if (!fixSelfReferences(output.chat.lines, nameOf, otherHandles)) throw new AiError('invalid_output', 'self_reference')
     output.chat.title = String(output.chat.title ?? '')
       .replace(/[¿¡]/g, '')
       .replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
@@ -902,6 +953,10 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
     languageProblem([output.chat.title, ...texts], lang) ??
     copiedFrom(texts, [...(input.style_examples ?? []), ...(input.house_examples ?? []).map((ex) => ex.lines)])
   if (problem) throw new AiError('invalid_output', problem)
+  // Sin esquema estricto (json_object) el modelo puede saltarse la memoria: la ronda vale, pero que se vea en los logs.
+  if (!output.memory_update || !Array.isArray(output.memory_update.players)) {
+    console.warn('generate-round', `round ${input.round}: no memory_update from ${config.model}, memory not refreshed`)
+  }
 
   return {
     chat: {

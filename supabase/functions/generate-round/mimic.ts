@@ -3,9 +3,9 @@
 // Aprende del writer con lo que ya hay en la sala: sus respuestas reales, la memoria (estilo, datos) y qué
 // imitaciones de sus amigos engañaron a la gente. Sin nombres de otros jugadores en la salida ni pistas de que es una IA.
 
-import { AiError, LANGUAGES, callModel, copiedFrom, languageProblem, parseExamples, type AiConfig, type Memory } from './core.ts'
+import { AiError, LANGUAGES, callModel, copiedFrom, languageProblem, namesPerson, parseExamples, type AiConfig, type Memory } from './core.ts'
 
-export const MIMIC_PROMPT_VERSION = 'mimic-v3'
+export const MIMIC_PROMPT_VERSION = 'mimic-v4'
 
 interface ContextAnswer {
   player_id: string | null
@@ -56,7 +56,7 @@ How to sound like the writer:
 Length: about as long as writer.real_answers; if there are none, under 30 characters (real replies are short).
 Rules: one message, max 80 characters, written in DATA.language (follow DATA.language_notes, whatever the language
 of the examples), answer the last message directly. No quotes around it, no names of
-other players, never mention being an AI, a bot, a model or fake. Nothing offensive, nothing explicit.
+other players, never your own name (you ARE the writer: say "I", not "{writer.name}"), never mention being an AI, a bot, a model or fake. Nothing offensive, nothing explicit.
 Return JSON: {"answer": "..."}`
 
 const SCHEMA = {
@@ -137,7 +137,7 @@ export function parseMimicContext(value: unknown): RoundContext {
 export async function generateMimic(contextValue: unknown, examplesValue: unknown, config: AiConfig): Promise<MimicOutput> {
   const ctx = parseMimicContext(contextValue)
   const examples = parseExamples(examplesValue, 6)
-  const others = ctx.players.filter((p) => p.id !== ctx.writer.id).map((p) => p.name.toLowerCase())
+  const others = ctx.players.filter((p) => p.id !== ctx.writer.id).map((p) => p.name)
   const started = Date.now()
   const deadline = started + (config.timeoutMs ?? 8000)
 
@@ -156,7 +156,10 @@ export async function generateMimic(contextValue: unknown, examplesValue: unknow
     const answer = matchWriter(clip(json?.answer, 200).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim(), data.writer.real_answers)
     if (!answer || answer.length > 80) throw new AiError('invalid_output', 'length')
     if (GIVEAWAY.test(answer)) throw new AiError('invalid_output', 'giveaway')
-    if (others.some((name) => name.length >= 2 && answer.toLowerCase().includes(name))) throw new AiError('invalid_output', 'names_player')
+    // Palabra suelta, no subcadena: con una "Ana" en la sala, "mañana" o "ganas" no cuentan.
+    if (others.some((name) => namesPerson(answer, name))) throw new AiError('invalid_output', 'names_player')
+    // El writer no se nombra a sí mismo ("Ana no ha sido"): delataría al bot.
+    if (namesPerson(answer, ctx.writer.name)) throw new AiError('invalid_output', 'self_reference')
     if (copiedFrom([answer], examples)) throw new AiError('invalid_output', 'copied_example')
     if (copiedFrom([answer], earlier)) throw new AiError('invalid_output', 'repeats_writer')
     const wrong = languageProblem([answer], ctx.setup?.lang === 'es' ? 'es' : 'en')
@@ -168,8 +171,9 @@ export async function generateMimic(contextValue: unknown, examplesValue: unknow
   try {
     result = await attempt(config.timeoutMs ?? 8000)
   } catch (error) {
+    // Solo si queda al menos lo que tardó el primer intento (con Hermes, ~varios segundos).
     const left = deadline - Date.now()
-    if (!(error instanceof AiError && error.code === 'invalid_output') || left < 2000) throw error
+    if (!(error instanceof AiError && error.code === 'invalid_output') || left < Math.max(2000, Date.now() - started)) throw error
     result = await attempt(left)
   }
   return {
