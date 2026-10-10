@@ -23,8 +23,10 @@ export interface Setup {
   age?: string | null // under_18 | 18_24 | 25_34 | 35_plus | mixed
   vibes?: string[] | null // spicy | exes | ethics | uni | work | chaos
   topic?: string | null // texto libre ≤ 120
-  situation?: string | null // pantalla de crear sala: drinks | party | dinner | home | trip | break
+  situation?: string | null // texto libre de "¿Qué está pasando ahora?" (≤ 120) o un valor antiguo: drinks | party…
   know?: string | null // "¿os conocéis?": yes | no
+  /** Lugar real si el host dijo que están juntos y compartió la ubicación (nombres de OpenStreetMap, sin coordenadas). */
+  right_now?: { place: string | null; nearby: string[]; local_time: string | null; together: boolean } | null
   lang?: 'en' | 'es' // idioma del host (selector EN · ES); por defecto inglés
   extra?: Record<string, string> // otras claves libres de save_setup (solo contexto)
 }
@@ -202,7 +204,7 @@ const SITUATIONS: Record<string, string> = {
   trip: 'on a trip together right now',
   break: 'on a class or work break right now',
 }
-const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang'])
+const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang', 'place', 'nearby', 'local_time', 'together'])
 const ADULT_VIBES = new Set(['spicy', 'exes'])
 const CLEAN_AGES = new Set(['under_18', 'mixed'])
 
@@ -247,9 +249,18 @@ export function parseInput(body: unknown): GenerateRoundInput {
     age: clip(s.age, 20) || null,
     vibes: (Array.isArray(s.vibes) ? s.vibes : []).map((v) => clip(v, 20)).filter((v) => v in VIBES),
     topic: clip(s.topic, 120) || null,
-    situation: clip(s.situation, 20) || null,
+    situation: clip(s.situation, 120) || null,
     know: clip(s.know, 10) || null,
     lang: s.lang === 'es' ? 'es' : 'en',
+    right_now:
+      s.place || s.nearby || s.local_time
+        ? {
+            place: clip(s.place, 120) || null,
+            nearby: (Array.isArray(s.nearby) ? s.nearby : []).map((v) => clip(v, 40)).filter(Boolean).slice(0, 8),
+            local_time: clip(s.local_time, 40) || null,
+            together: s.together === 'yes',
+          }
+        : null,
     extra: Object.fromEntries(
       Object.entries(s)
         .filter(([key]) => !SETUP_KEYS.has(key) && /^[a-z][a-z0-9_]{0,31}$/.test(key))
@@ -411,6 +422,11 @@ the examples, the history or the player names. Follow DATA.language_notes.
 TOPIC: the chat is about DATA.theme_this_round, told as a concrete little scandal, mystery or dilemma that involves the
 writer or the group. Food is never the topic: no pizza, snacks, chips, nachos, tacos, fridges or stolen food.
 audience.where_they_are is only the backdrop (where they are right now), not the topic.
+If audience.right_now is set, they are physically together at that real spot at that local time: the theme happens
+during this exact night/day out. Read the plan from where_they_are + local_time + nearby (e.g. Saturday past midnight
+next to clubs = going out clubbing around there; lunchtime next to restaurants = eating out). Mention the time of day,
+the street or neighbourhood, or ONE real nearby place by name when it makes the chat feel like theirs (where they go
+next, who will not get in, the queue). Never invent other venues, never give addresses or house numbers.
 
 STRUCTURE: DATA.house_examples are the game's reference chats, written by the team (WRITER = the writer's name).
 Match their shape: 2 to 4 short messages that build a situation fast, then a direct, specific question to the writer
@@ -501,7 +517,9 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, 
           : input.setup.know === 'yes'
             ? 'yes: close friends, shared history and inside jokes are fair game'
             : null,
-      where_they_are: SITUATIONS[input.setup.situation ?? ''] ?? null,
+      // Botón antiguo (drinks, party…) o el texto libre que escribe el host
+      where_they_are: SITUATIONS[input.setup.situation ?? ''] ?? input.setup.situation ?? null,
+      right_now: input.setup.right_now ?? null,
       content: clean
         ? 'the group may include minors: keep it completely clean, no dating, drinking or flirting'
         : 'adults: cheeky is fine, never explicit',
