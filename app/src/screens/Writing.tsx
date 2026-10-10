@@ -107,10 +107,23 @@ export default function Writing() {
       <div ref={list} className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3 pt-3 pb-3">
         {room.chat.messages.slice(0, shown).map((m, i) => {
           const author = playerOf(m.playerId)
-          const firstOfRun = i === 0 || room.chat!.messages[i - 1].playerId !== m.playerId
+          const msgs = room.chat!.messages
+          const firstOfRun = i === 0 || msgs[i - 1].playerId !== m.playerId
+          // Si la IA pone un mensaje en boca de quien tiene este móvil, va a la derecha (como en WhatsApp: "tú")
+          if (m.playerId === me.id) {
+            return (
+              <div key={i} className={`flex animate-rise justify-end ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
+                <Bubble dark className="max-w-[80%] rounded-[20px] rounded-br-[6px] px-4 py-2 text-[17px]">
+                  {m.text}
+                </Bubble>
+              </div>
+            )
+          }
           return (
-            <div key={i} className={`animate-rise ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
-              <Bubble className="max-w-[85%] rounded-[20px] px-4 py-2 text-[17px]">
+            <div key={i} className={`flex animate-rise items-start gap-2 ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
+              {/* Foto de perfil en el primer mensaje de cada tanda; en los siguientes, hueco para que queden alineados */}
+              {firstOfRun && author ? <Avatar player={author} size={32} /> : <span className="w-[32px] shrink-0" />}
+              <Bubble className={`max-w-[78%] rounded-[20px] px-4 py-2 text-[17px] ${firstOfRun ? 'rounded-tl-[6px]' : ''}`}>
                 {firstOfRun && (
                   <div className="text-[13px] leading-tight font-extrabold" style={{ color: author ? readableOnWhite(avatarFor(room.code, author).color) : undefined }}>
                     {author?.name ?? '?'}

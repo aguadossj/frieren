@@ -245,7 +245,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
             <SwipeDeck
               cards={cards}
               intro={t.quickOnes}
-              how={{ no: t.swipeHowNo, yes: t.swipeHowYes }}
+              how={t.swipeHint}
               onAnswer={(id, yes) => {
                 answers.current[id] = yes
                 if (id === 'together' && yes) locate()
@@ -284,7 +284,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
 
           <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.2s' }}>
               <span className="flex items-baseline justify-between">
-                <Eyebrow>{t.situationLabel}</Eyebrow>
+                <span className="text-[18px] leading-tight font-extrabold">{t.situationLabel}</span>
                 <span className="text-[13px] font-bold text-white/60 tabular-nums">
                   {situation.length}/{MAX_SITUATION}
                 </span>

@@ -153,7 +153,7 @@ export default function Lobby() {
                     <button
                       onClick={() => setKickTarget({ id: p.id, name: p.name })}
                       aria-label={t.kick(p.name)}
-                      className="-mr-1 flex size-[44px] shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500 transition active:scale-90 active:bg-brand active:text-white"
+                      className="-mr-1 flex size-[44px] shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand transition active:scale-90 active:bg-brand active:text-white"
                     >
                       <Icon name="x" size={18} />
                     </button>
