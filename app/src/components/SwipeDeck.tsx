@@ -246,11 +246,11 @@ function Scribble({ flip = false }: { flip?: boolean }) {
       strokeLinecap="round"
       strokeLinejoin="round"
       className="scribble block"
-      style={flip ? { transform: 'scaleX(-1) rotate(8deg)' } : { transform: 'rotate(-4deg)' }}
+      style={flip ? { transform: 'scaleX(-1)' } : undefined}
       aria-hidden="true"
     >
-      <path pathLength={1} d="M4 38c9 2.5 22 1 33-7.5 6-4.6 10.5-11 13.5-19" />
-      <path pathLength={1} className="scribble-head" d="M39.5 14.5 50.8 9.5 54 21.5" />
+      <path pathLength={1} d="M4 30c10 5 25 5 36 1 5-1.8 10-4.4 14-7" />
+      <path pathLength={1} className="scribble-head" d="M42 23 54 24 49 35" />
     </svg>
   )
 }
