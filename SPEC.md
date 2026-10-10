@@ -44,12 +44,19 @@ idiomas que no sean inglés · historial de partidas · pantalla grande tipo TV 
   - **Identidad:** Supabase **Anonymous Sign-In** (sin cuenta). Sesión en `sessionStorage` (muere al cerrar la pestaña,
     sobrevive a recargar). Perfil: nombre ≤ 16 + emoji; `profiles.metadata` jsonb para avatar/foto/edad futuros.
   - **Esquema privado `game`** (no expuesto por la Data API, RLS activado sin políticas): `profiles`, `rooms`,
-    `room_players`, `setup_questions` (catálogo editable sin desplegar), `events` (métricas). Pendiente (migración 2):
-    `rounds`, `answers`, `votes`, `reactions`, `round_scores`, `ai_generations`.
+    `room_players`, `setup_questions` (catálogo editable sin desplegar), `events` (métricas), `rounds`, `answers`,
+    `votes`, `reactions`, `round_scores`, `ai_generations`, `fallback_chats` (13 de respaldo, por tema), `config`.
   - **API = RPC en `public`** (security definer, `search_path` vacío, solo rol `authenticated`, cada una comprueba
     `auth.uid()` y permisos). Hechas: `create_room`, `join_room`, `leave_room`, `kick_player`, `transfer_host`,
-    `save_setup`, `update_settings`, `get_setup_questions`, `get_my_active_room`, `get_room_state`.
-    Pendientes: `start_game`, `submit_answer`, `cast_vote`, `react`, `advance_phase`, `end_game`.
+    `save_setup`, `update_settings`, `get_setup_questions`, `get_my_active_room`, `get_room_state`, `start_game`,
+    `submit_answer`, `cast_vote`, `react`, `advance_phase`, `skip_phase` (host), `end_game` (host).
+  - **Motor de fases** (`game.advance`): generating → writing → voting → reveal → leaderboard → siguiente | final.
+    Avanza cuando vence el tiempo o todos han terminado; lo llama cualquier jugador y, como red de seguridad,
+    **pg_cron cada 5 s** (también cierra salas con 3 h sin actividad). Puntuación idéntica a `scoring.ts`.
+  - **`get_room_state` devuelve el contrato `Room` de `types.ts` en camelCase** (+ `meId`, `serverNow`, `setup`,
+    `settings`, `emoji`): papeleta anónima en `voting`, resultados solo desde `reveal`.
+  - Mientras `game.config.ai_enabled = false`, cada ronda usa una conversación de respaldo (sin repetir, por temas;
+    sin picante si la edad es `under_18`/`mixed`).
   - **`get_room_state(room_id)`** devuelve solo lo que ese jugador puede ver (las autorías no salen hasta `reveal`).
   - **Tiempo real:** cada cambio sube `rooms.version`; un trigger hace `realtime.send` al canal **privado** `room:<id>`
     (solo jugadores activos pueden escucharlo). El cliente, al recibirlo, vuelve a pedir `get_room_state`.
