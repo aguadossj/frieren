@@ -3,6 +3,22 @@
 // Solución: fijamos #root al área visible real (visualViewport) y anulamos ese desplazamiento.
 // Así solo encoge la lista de mensajes; cabecera y barra de escribir quedan fijas.
 
+/** Desplaza SOLO el contenedor con scroll más cercano (nunca la página) para que el campo quede visible. */
+function revealField(el: HTMLElement) {
+  let box: HTMLElement | null = el.parentElement
+  while (box && box !== document.body) {
+    const oy = getComputedStyle(box).overflowY
+    if ((oy === 'auto' || oy === 'scroll') && box.scrollHeight > box.clientHeight) break
+    box = box.parentElement
+  }
+  if (!box || box === document.body) return
+  const b = box.getBoundingClientRect()
+  const r = el.getBoundingClientRect()
+  const margin = 16
+  if (r.bottom > b.bottom - margin) box.scrollTop += r.bottom - b.bottom + margin
+  else if (r.top < b.top + margin) box.scrollTop -= b.top + margin - r.top
+}
+
 export function trackVisualViewport() {
   const vv = window.visualViewport
   const root = document.documentElement
@@ -11,17 +27,36 @@ export function trackVisualViewport() {
   const isField = (el: EventTarget | null) =>
     el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
 
+  // Solo escribir si cambia: escribir el mismo valor en cada evento provoca relayouts en cadena (parpadeo)
+  const setVar = (name: string, value: string) => {
+    if (root.style.getPropertyValue(name) !== value) root.style.setProperty(name, value)
+  }
+
   let frame = 0
   const update = () => {
     cancelAnimationFrame(frame)
     frame = requestAnimationFrame(() => {
-      root.style.setProperty('--vv-h', `${vv.height}px`)
-      root.style.setProperty('--vv-top', `${vv.offsetTop}px`)
+      // Zoom con los dedos (pinch): el área visible encoge y se mueve al desplazarte. Si siguiéramos ajustando
+      // #root a ella, cada ajuste cambia el área visible otra vez → bucle → TODO parpadea. Con zoom, layout normal.
+      if (Math.abs(vv.scale - 1) > 0.01) {
+        setVar('--vv-h', `${window.innerHeight}px`)
+        setVar('--vv-top', '0px')
+        return
+      }
+      // 1) Primero deshacemos el scroll que iOS hace para enseñar el input (nuestro layout ya cabe)…
+      //    SOLO mientras se escribe en un campo. Si no, dejamos el rebote nativo de iOS en paz: corregirlo
+      //    "peleaba" con el gesto (pantalla que se movía) y rompía "deslizar hacia abajo para recargar".
+      const typing = isField(document.activeElement)
+      if (typing && window.scrollY > 0) window.scrollTo(0, 0)
+      // 2) …y DESPUÉS leemos la posición del área visible. Antes se leía antes de deshacer el scroll:
+      //    #root se quedaba desplazado hacia abajo y la pantalla se veía en blanco (pantalla del nombre).
+      setVar('--vv-h', `${Math.round(vv.height)}px`)
+      setVar('--vv-top', `${Math.max(0, Math.round(vv.offsetTop))}px`)
       // teclado abierto ⇔ el área visible es bastante más baja que la ventana
-      root.dataset.keyboard =
-        window.innerHeight - vv.height > 120 || isField(document.activeElement) ? 'open' : 'closed'
-      // iOS desplaza la página para enseñar el input: lo deshacemos (nuestro layout ya cabe)
-      if (window.scrollY !== 0) window.scrollTo(0, 0)
+      const kb = window.innerHeight - vv.height > 120 || isField(document.activeElement) ? 'open' : 'closed'
+      if (root.dataset.keyboard !== kb) root.dataset.keyboard = kb
+      // Con el teclado ya arriba, que el campo activo quede a la vista dentro de su zona con scroll
+      if (isField(document.activeElement)) revealField(document.activeElement as HTMLElement)
     })
   }
 
@@ -33,6 +68,20 @@ export function trackVisualViewport() {
   document.addEventListener('focusout', (e) => {
     if (isField(e.target)) setTimeout(update, 50)
   })
+
+  // En TODAS las pantallas: al tocar un campo de texto, darle el foco sin que iOS desplace la página
+  // (es lo que ya hacía el chat con focusWithoutScroll). Evita el salto y la pantalla en blanco.
+  document.addEventListener(
+    'touchend',
+    (e) => {
+      const el = e.target
+      if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) return
+      if (el.disabled || el.readOnly || document.activeElement === el) return
+      e.preventDefault()
+      el.focus({ preventScroll: true })
+    },
+    { capture: true, passive: false },
+  )
 
   vv.addEventListener('resize', update)
   vv.addEventListener('scroll', update)
@@ -71,3 +120,4 @@ export function retintSafariBars() {
     spacer.remove()
   }, 60)
 }
+

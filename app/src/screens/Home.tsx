@@ -25,31 +25,38 @@ function Start({ onCreate, onJoin }: { onCreate: () => void; onJoin: () => void 
     <Screen className="relative">
       {/* EN · ES flotando sobre el fondo, sin barra ni hueco propio */}
       <LangToggle className="absolute top-2 right-3 z-10" />
-      <Body className="justify-center gap-7 pt-8">
-        <div className="text-center">
-          <div className="mx-auto mb-6 flex h-[52px] w-[70px] animate-pop items-center justify-center rounded-full bg-white">
-            <TypingDots />
+      {/* Centrado "seguro": my-auto centra si sobra sitio y, si no cabe, se desplaza normal sin cortar la parte de arriba.
+          En móviles bajos se compacta (y se ocultan los pasos) para que no haga falta scroll. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-5">
+        <div className="my-auto flex flex-col gap-7 pt-12 pb-4 [@media(max-height:700px)]:gap-5 [@media(max-height:700px)]:pt-10">
+          <div className="text-center">
+            <div className="mx-auto mb-6 flex h-[52px] w-[70px] animate-pop items-center justify-center rounded-full bg-white [@media(max-height:700px)]:mb-4">
+              <TypingDots />
+            </div>
+            <h1 className="text-[60px] leading-none font-black tracking-[-0.04em] [@media(max-height:700px)]:text-[50px]">Typing…</h1>
+            <p className="mt-4 text-[19px] leading-snug font-semibold [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:text-[17px]">
+              {t.pitch1}
+              <br />
+              {t.pitch2}
+            </p>
           </div>
-          <h1 className="text-[60px] leading-none font-black tracking-[-0.04em]">Typing…</h1>
-          <p className="mt-4 text-[19px] leading-snug font-semibold">
-            {t.pitch1}
-            <br />
-            {t.pitch2}
-          </p>
-        </div>
 
-        <ol className="flex animate-rise flex-col gap-3 rounded-[28px] bg-white/15 p-4" style={{ animationDelay: '0.15s' }}>
-          {t.steps.map(([title, line], i) => (
-            <li key={title} className="flex items-center gap-3">
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[15px] font-black text-brand">{i + 1}</span>
-              <div className="leading-tight">
-                <div className="text-[17px] font-extrabold">{title}</div>
-                <div className="text-[15px] font-medium text-white/80">{line}</div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </Body>
+          <ol
+            className="flex animate-rise flex-col gap-3 rounded-[28px] bg-white/15 p-4 [@media(max-height:620px)]:hidden [@media(max-height:700px)]:gap-2 [@media(max-height:700px)]:p-3"
+            style={{ animationDelay: '0.15s' }}
+          >
+            {t.steps.map(([title, line], i) => (
+              <li key={title} className="flex items-center gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-[15px] font-black text-brand">{i + 1}</span>
+                <div className="leading-tight">
+                  <div className="text-[17px] font-extrabold">{title}</div>
+                  <div className="text-[15px] font-medium text-white/80">{line}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </div>
 
       <Footer>
         <Button onClick={onCreate} className="flex items-center justify-between px-7">

@@ -71,15 +71,17 @@
 
 /* Base mobile-first: sin rebote, sin zoom por doble tap, respeta el notch */
 html, body, #root { height: 100%; }
-/* Fondo de la PÁGINA blanco: es lo que Safari usa para teñir sus barras (arriba/abajo) al cargar.
-   Cada pantalla pinta su propio fondo (rojo) dentro de <Screen>. */
-html { background-color: #fff; }
+/* Fondo de la PÁGINA rojo en todas las pantallas (también bajo el notch y la barra de inicio del iPhone);
+   Safari tiñe sus barras con este color. */
+html { background-color: var(--color-brand); }
+/* La página SÍ puede rebotar: así funciona "deslizar hacia abajo para recargar" en el móvil. El rebote ya no pelea
+   con el ajuste del teclado porque viewport.ts solo corrige el scroll mientras se escribe en un campo.
+   Las zonas con scroll de cada pantalla llevan overscroll-contain para que su scroll no arrastre la página. */
 body {
   margin: 0;
-  background: #fff;
+  background: var(--color-brand);
   color: #fff;
   font-family: var(--font-sans);
-  overscroll-behavior: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
@@ -98,11 +100,8 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 html[data-keyboard='open'] #root { padding-bottom: 0; }
-/* Página blanca en móvil: Safari (iOS 26) tiñe sus barras con lo que hay en los bordes, así que bordes blancos
-   ⇒ barras blancas. Las pantallas pintan en rojo solo sus zonas importantes (p. ej. el chat). */
-@media (max-width: 639px) {
-  #root { background-color: #fff; }
-}
+/* Solo el chat es blanco (también con el teclado abierto): Writing pone html[data-page='chat'] al entrar. */
+html[data-page='chat'], html[data-page='chat'] body, html[data-page='chat'] #root { background-color: #fff; }
 
 /* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
 @media (min-width: 640px) {
