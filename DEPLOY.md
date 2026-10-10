@@ -1,8 +1,10 @@
-# Deploy automático: Cloudflare (Workers con static assets)
+# Deploy automático: Cloudflare Pages
 
-**URL de producción: https://frieren.maguadomartinez.workers.dev**
+**URL de producción: https://frieren-bfq.pages.dev**
 
-> El proyecto se creó como **Worker** (no Pages). La configuración vive en `app/wrangler.jsonc`: compila con
+> Producción = proyecto de **Pages** `frieren` (variables VITE_* y NODE_VERSION en Settings → Variables and Secrets,
+> Production; tras cambiarlas hay que redesplegar). Existe también un Worker antiguo que no se usa.
+> Si se usara el Worker: La configuración vive en `app/wrangler.jsonc`: compila con
 > `npm run build` y publica `app/dist` (SPA). En el dashboard del Worker → **Settings → Build** debe estar:
 > Root directory `app`, Deploy command `npx wrangler deploy` (build command puede quedar vacío: lo hace wrangler),
 > y en **Build variables and secrets** (¡no en las variables de runtime!): `VITE_SUPABASE_URL`,
