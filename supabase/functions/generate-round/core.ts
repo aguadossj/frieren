@@ -740,12 +740,21 @@ export function fixSelfReferences<T extends { from: string; text: string }>(
 }
 
 // Arreglos baratos antes de validar, para no tirar una ronda buena por un detalle (visto en pruebas reales):
-// - el modelo a veces hace hablar al writer: esa línea pasa a otro jugador;
+// - el modelo a veces hace hablar al writer (p. ej. contesta él mismo al final): esas líneas se quitan, porque
+//   dárselas a otro le haría hablar por el writer ("nico estoy listo" enviado por Ana); si no quedan 2, pasan a otro;
 // - a veces escribe los handles internos ("P2") en el texto: se cambian por el nombre;
 // - a veces la pregunta final no nombra al writer: se le antepone el nombre.
-function repairChat(output: ModelOutput, writerName: string, otherHandles: string[], nameOf: Record<string, string>): void {
+function repairChat(
+  output: ModelOutput,
+  writerName: string,
+  writerHandle: string,
+  otherHandles: string[],
+  nameOf: Record<string, string>,
+): void {
   const lines = output?.chat?.lines
   if (!Array.isArray(lines) || lines.length === 0) return
+  const spoken = lines.filter((line) => line?.from !== writerHandle)
+  if (spoken.length >= 2 && spoken.length < lines.length) lines.splice(0, lines.length, ...spoken)
   lines.forEach((line, i) => {
     if (!line) return
     if (!otherHandles.includes(line.from)) line.from = otherHandles[i % otherHandles.length]
@@ -928,7 +937,7 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
     buildSchema([...handles.values()]),
   )
   const output = json
-  repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
+  repairChat(output, writer.name, handleOf(writer.id), otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
   if (Array.isArray(output?.chat?.lines)) {
     const nameOf = Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name]))
     output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()), lang)
