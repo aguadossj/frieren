@@ -18,7 +18,7 @@ import {
   type AiConfig,
   type Theme,
 } from './core.ts'
-import { feedbackFor, judgeChat, type JudgeChat, type JudgeConfig, type Verdict } from './judge.ts'
+import { judgeChat, type JudgeChat, type JudgeConfig, type Verdict } from './judge.ts'
 
 export const DRAFT_PROMPT_VERSION = 'draft-v1'
 
@@ -111,7 +111,6 @@ async function oneDraft(
   input: ReturnType<typeof parseDraftInput>,
   theme: Theme,
   config: AiConfig,
-  feedback?: string,
 ): Promise<{ draft: Draft; usage: { prompt_tokens?: number; completion_tokens?: number } }> {
   const lang = input.setup.lang === 'es' ? 'es' : 'en'
   const data = {
@@ -126,7 +125,7 @@ async function oneDraft(
   const { json, usage } = await callModel<{ situation: string; title: string; lines: { from: string; text: string }[] }>(
     config,
     SYSTEM_PROMPT,
-    `DATA:\n${JSON.stringify(data)}${feedback ? `\n\n${feedback}` : ''}`,
+    `DATA:\n${JSON.stringify(data)}`,
     'draft',
     SCHEMA,
   )
@@ -184,8 +183,8 @@ function judgeView(draft: Draft, lang: 'es' | 'en'): JudgeChat {
 
 /**
  * `count` borradores en paralelo, cada uno con un tema distinto; cada uno se reintenta una vez si sale mal.
- * Con juez: un borrador que no se entiende se reescribe una vez con la crítica delante, y se guardan solo los que
- * pasan. Si no pasa ninguno se guardan todos (mejor eso que hacer esperar a la sala en la ronda 1).
+ * Con juez (~1 s más): se guardan solo los que pasan, y todos si no pasa ninguno. No se reescriben: los borradores se
+ * guardan juntos y uno reescrito retrasaría ~10 s los de toda la sala (la ronda 1 tiene que estar lista al empezar).
  */
 export async function generateDrafts(
   inputValue: unknown,
@@ -200,37 +199,29 @@ export async function generateDrafts(
   for (let i = 0; i < Math.min(Math.max(count, 1), 5); i++) {
     themes.push(pickTheme({ setup: input.setup, memory: null }, themes.map((t) => t.id)))
   }
-  const write = async (theme: Theme, feedback?: string) => {
-    try {
-      return await oneDraft(input, theme, config, feedback)
-    } catch (error) {
-      if (!(error instanceof AiError) || error.code !== 'invalid_output') throw error
-      return await oneDraft(input, theme, config, feedback)
-    }
-  }
   const results = await Promise.allSettled(
     themes.map(async (theme) => {
-      const first = await write(theme)
-      if (!judge) return { ...first, verdicts: [] as Verdict[], extra: [] as (typeof first)['usage'][] }
-      const verdict = await judgeChat(judgeView(first.draft, lang), judge)
-      if (verdict.ok) return { ...first, verdicts: [verdict], extra: [] }
-      const second = await write(theme, feedbackFor(verdict)).catch(() => null)
-      if (!second) return { ...first, verdicts: [verdict], extra: [] }
-      const again = await judgeChat(judgeView(second.draft, lang), judge)
-      return { ...second, verdicts: [verdict, again], extra: [first.usage] }
+      let attempt
+      try {
+        attempt = await oneDraft(input, theme, config)
+      } catch (error) {
+        if (!(error instanceof AiError) || error.code !== 'invalid_output') throw error
+        attempt = await oneDraft(input, theme, config)
+      }
+      const verdict = judge ? await judgeChat(judgeView(attempt.draft, lang), judge) : null
+      return { ...attempt, verdict }
     }),
   )
   const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
-  const passed = ok.filter((r) => r.verdicts.length === 0 || r.verdicts[r.verdicts.length - 1].ok)
-  const usages = ok.flatMap((r) => [r.usage, ...r.extra])
+  const passed = ok.filter((r) => r.verdict?.ok ?? true)
   return {
     drafts: (passed.length ? passed : ok).map((r) => r.draft),
     model: config.model,
     prompt_version: DRAFT_PROMPT_VERSION,
-    input_tokens: usages.reduce((n, u) => n + (u.prompt_tokens ?? 0), 0),
-    output_tokens: usages.reduce((n, u) => n + (u.completion_tokens ?? 0), 0),
+    input_tokens: ok.reduce((n, r) => n + (r.usage.prompt_tokens ?? 0), 0),
+    output_tokens: ok.reduce((n, r) => n + (r.usage.completion_tokens ?? 0), 0),
     latency_ms: Date.now() - started,
     errors: results.flatMap((r) => (r.status === 'rejected' ? [String((r.reason as Error)?.message ?? r.reason)] : [])),
-    judge: ok.flatMap((r) => r.verdicts),
+    judge: ok.flatMap((r) => (r.verdict ? [r.verdict] : [])),
   }
 }
