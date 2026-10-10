@@ -16,6 +16,9 @@ export interface AiConfig {
   apiKey: string
   model: string // p. ej. openai/gpt-oss-120b
   timeoutMs?: number
+  // Cómo pedir JSON al proveedor. 'json_schema' (Groq, vLLM, OpenAI) es lo más fiable; 'json_object' o 'none'
+  // para modelos/proveedores sin salida estructurada (p. ej. Hermes 3 en algunos hosts): el esquema va en el prompt.
+  jsonMode?: 'json_schema' | 'json_object' | 'none'
 }
 
 export interface Setup {
@@ -28,6 +31,7 @@ export interface Setup {
   /** Lugar real si el host dijo que están juntos y compartió la ubicación (nombres de OpenStreetMap, sin coordenadas). */
   right_now?: { place: string | null; nearby: string[]; local_time: string | null; together: boolean } | null
   lang?: 'en' | 'es' // idioma del host (selector EN · ES); por defecto inglés
+  spicy?: 'yes' | 'no' | null // tarjeta del host: "¿picante?" (con menores el backend ya pone age = mixed)
   extra?: Record<string, string> // otras claves libres de save_setup (solo contexto)
 }
 
@@ -93,7 +97,7 @@ export interface GenerateRoundOutput {
   attempts: number
 }
 
-export const PROMPT_VERSION = 'round-v4'
+export const PROMPT_VERSION = 'round-v7'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -124,6 +128,113 @@ export const LANGUAGES = {
   },
 } as const
 
+// Medido en los fragmentos reales de game.style_examples (vista game.ai_naturalness, 10 oct 2026).
+export const TEXTING = {
+  es: {
+    median_message_length: '16 characters (about 4 words); the final question can be a bit longer',
+    messages_with_emoji: '1 in 5',
+    messages_with_laughter: '1 in 6 (JAJAJA, jajaja, jsjs)',
+    messages_starting_with_a_capital: 'about half (phones auto-capitalize)',
+    messages_with_a_comma: 'almost none (3%)',
+    opening_question_or_exclamation_marks: 'never (0%)',
+    final_period: 'never',
+  },
+  en: {
+    median_message_length: '15 characters (about 4 words); the final question can be a bit longer',
+    messages_with_emoji: '1 in 12',
+    messages_with_laughter: '1 in 12 (lol, haha, LMAO)',
+    messages_starting_with_a_capital: 'about 4 in 10',
+    messages_with_a_comma: 'almost none (2%)',
+    final_period: 'almost never (1%)',
+  },
+} as const
+
+const MAX_LINES = 6 // game.ai_complete_round acepta 2–6 mensajes
+const words = (text: string) => text.trim().split(/\s+/).filter(Boolean).length
+
+// Medido en los fragmentos reales (game.style_examples). Las reacciones y emojis salen de los más frecuentes.
+const CALIBRATION = {
+  es: {
+    capitalRate: 0.56,
+    reactionRate: 0.4, // chats con un mensaje que es solo una reacción
+    emojiRate: 0.15, // mensajes (no finales) que acaban con un emoji
+    reactions: ['JAJAJAJ', 'jajajaja', 'BAJAJAJAJ', '🤣🤣🤣', '😂😂', '💀💀', 'nooo', 'no puede ser', 'que dices', '?'],
+    emoji: ['😂', '🤣', '💀', '😳'],
+  },
+  en: {
+    capitalRate: 0.43,
+    reactionRate: 0.3,
+    emojiRate: 0.07,
+    reactions: ['LMAO', 'lol', 'haha', '💀', '😂😂', 'wha', 'nooo', 'wait what', 'nah', '?'],
+    emoji: ['😂', '💀', '😳', '🙏'],
+  },
+} as const
+
+const pickOne = <T,>(items: readonly T[]) => items[Math.floor(Math.random() * items.length)]
+const startsWithCapsWord = (text: string) => /^[A-ZÁÉÍÓÚÑ]{2,}\b/.test(text)
+
+/**
+ * Lo que el modelo sigue haciendo mal por mucho que se le pida, corregido en código con los datos reales:
+ * - sin ¿ ¡ iniciales ni punto final;
+ * - varias frases o frases con comas en un mensaje -> mensajes seguidos de la misma persona (ráfagas);
+ * - mayúscula inicial en la proporción real (los móviles ponen mayúscula la mitad de las veces);
+ * - a veces una reacción suelta ("JAJAJAJ", "💀💀", "nooo") y algún emoji, en la proporción real.
+ * `random` se puede inyectar para pruebas.
+ */
+export function naturalize(
+  lines: { from: string; text: string }[],
+  lang: 'en' | 'es' = 'en',
+  random: () => number = Math.random,
+): { from: string; text: string }[] {
+  const cal = CALIBRATION[lang]
+  const clean = (text: string) =>
+    text.replace(/[¿¡]/g, '').replace(/\s+/g, ' ').trim().replace(/(?<![.])\.$/, '').trim()
+  const out: { from: string; text: string }[] = []
+
+  lines.forEach((line, i) => {
+    const last = i === lines.length - 1
+    const text = clean(line.text)
+    // Frases separadas por . ! ? y por comas. La pregunta final no se parte: tiene que nombrar al writer.
+    const sentences = last ? [text] : text.split(/(?<=[.!?])\s+(?=\S)/).map(clean).filter(Boolean)
+    let parts = last ? sentences : sentences.flatMap((s) => s.split(/\s*[,;]\s+|\s+-\s+/).map(clean).filter(Boolean))
+    if (parts.some((p) => words(p) < 2) && parts.length > 1) parts = sentences
+    const room = MAX_LINES - (lines.length - i - 1) - out.length // deja sitio para las líneas que faltan
+    if (parts.length > 1 && parts.length <= room) parts.forEach((p) => out.push({ from: line.from, text: p }))
+    else out.push({ from: line.from, text })
+  })
+
+  // En la pregunta final no quedan comas (en mensajes reales casi no hay).
+  const final = out[out.length - 1]
+  final.text = final.text.replace(/\s*,\s*/g, ' ')
+
+  // Mayúscula inicial como en los mensajes reales; las palabras en MAYÚSCULAS se respetan.
+  for (const line of out) {
+    const first = line.text.split(/\s/)[0]
+    // Nombres como E2E o McKenzie (cifras o mayúsculas dentro) no se tocan.
+    if (!/^[a-zA-ZÁÉÍÓÚÑáéíóúñ]/.test(line.text) || startsWithCapsWord(line.text) || /\d/.test(first) || /[A-ZÁÉÍÓÚÑ]/.test(first.slice(1))) continue
+    line.text = random() < cal.capitalRate
+      ? line.text.charAt(0).toUpperCase() + line.text.slice(1)
+      : line.text.charAt(0).toLowerCase() + line.text.slice(1)
+  }
+
+  // Algún emoji al final de un mensaje (nunca en la pregunta final, ni si ya tiene).
+  for (const line of out.slice(0, -1)) {
+    if (!/[\u{1F300}-\u{1FAFF}☀-➿]/u.test(line.text) && random() < cal.emojiRate) {
+      line.text = `${line.text} ${pickOne(cal.emoji)}`
+    }
+  }
+
+  // Una reacción suelta de otra persona antes de la pregunta final.
+  const hasReaction = out.some((l) => /(ja){2,}|(ha){2,}|\blol\b|\blmao\b/i.test(l.text) || words(l.text) === 1)
+  if (!hasReaction && out.length >= 2 && out.length < MAX_LINES && random() < cal.reactionRate) {
+    const senders = [...new Set(out.map((l) => l.from))]
+    const asker = out[out.length - 1].from
+    const from = senders.find((s) => s !== asker) ?? asker
+    out.splice(out.length - 1, 0, { from, text: pickOne(cal.reactions) })
+  }
+  return out
+}
+
 // Tema de cada ronda: lo elige el código (sin repetir en la sala) para que no salga siempre lo mismo.
 export interface Theme {
   id: string
@@ -152,10 +263,14 @@ export const THEMES: Theme[] = [
   { id: 'ex', en: 'an ex just showed up again (a like, a story, a text)', es: 'un ex ha vuelto a aparecer (un like, una story, un mensaje)', adult: true },
 ]
 
-export function pickTheme(input: GenerateRoundInput): Theme {
-  const clean = Boolean(input.setup.age && CLEAN_AGES.has(input.setup.age))
-  const used = new Set(input.memory?.used_themes ?? [])
-  const allowed = THEMES.filter((t) => !(clean && t.adult))
+/** Con menores: todo limpio. */
+export const isClean = (setup: Setup) => Boolean(setup.age && CLEAN_AGES.has(setup.age))
+/** Sin temas de ligar ni fiesta: con menores o si el host dijo "nada picante". */
+export const noSpicy = (setup: Setup) => isClean(setup) || setup.spicy === 'no'
+
+export function pickTheme(input: Pick<GenerateRoundInput, 'setup' | 'memory'>, exclude: string[] = []): Theme {
+  const used = new Set([...(input.memory?.used_themes ?? []), ...exclude])
+  const allowed = THEMES.filter((t) => !(noSpicy(input.setup) && t.adult))
   const fresh = allowed.filter((t) => !used.has(t.id))
   const pool = fresh.length > 0 ? fresh : allowed
   return pool[Math.floor(Math.random() * pool.length)]
@@ -204,7 +319,7 @@ const SITUATIONS: Record<string, string> = {
   trip: 'on a trip together right now',
   break: 'on a class or work break right now',
 }
-const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang', 'place', 'nearby', 'local_time', 'together'])
+const SETUP_KEYS = new Set(['who', 'age', 'vibes', 'topic', 'situation', 'know', 'lang', 'place', 'nearby', 'local_time', 'together', 'spicy', 'adults'])
 const ADULT_VIBES = new Set(['spicy', 'exes'])
 const CLEAN_AGES = new Set(['under_18', 'mixed'])
 
@@ -243,32 +358,7 @@ export function parseInput(body: unknown): GenerateRoundInput {
   if (!Number.isInteger(round) || round < 1 || round > 10) fail('round')
   if (!Number.isInteger(total_rounds) || total_rounds < round || total_rounds > 10) fail('total_rounds')
 
-  const s = (b.setup ?? {}) as Record<string, unknown>
-  const setup: Setup = {
-    who: clip(s.who, 20) || null,
-    age: clip(s.age, 20) || null,
-    vibes: (Array.isArray(s.vibes) ? s.vibes : []).map((v) => clip(v, 20)).filter((v) => v in VIBES),
-    topic: clip(s.topic, 120) || null,
-    situation: clip(s.situation, 120) || null,
-    know: clip(s.know, 10) || null,
-    lang: s.lang === 'es' ? 'es' : 'en',
-    right_now:
-      s.place || s.nearby || s.local_time
-        ? {
-            place: clip(s.place, 120) || null,
-            nearby: (Array.isArray(s.nearby) ? s.nearby : []).map((v) => clip(v, 40)).filter(Boolean).slice(0, 8),
-            local_time: clip(s.local_time, 40) || null,
-            together: s.together === 'yes',
-          }
-        : null,
-    extra: Object.fromEntries(
-      Object.entries(s)
-        .filter(([key]) => !SETUP_KEYS.has(key) && /^[a-z][a-z0-9_]{0,31}$/.test(key))
-        .map(([key, value]) => [key, Array.isArray(value) ? value.map((v) => clip(v, 40)).join(', ') : clip(String(value ?? ''), 120)] as const)
-        .filter(([, value]) => value)
-        .slice(0, 10),
-    ),
-  }
+  const setup = parseSetup(b.setup)
 
   const history: PastRound[] = (Array.isArray(b.history) ? b.history : []).slice(-10).map((h) => ({
     round: Number(h?.round) || 0,
@@ -291,14 +381,49 @@ export function parseInput(body: unknown): GenerateRoundInput {
 
   const memory = b.memory && typeof b.memory === 'object' ? (b.memory as Partial<Memory>) : null
   const style_examples = parseExamples(b.style_examples, 5)
-  const house_examples: HouseExample[] = (Array.isArray(b.house_examples) ? b.house_examples : [])
+  const house_examples = parseHouseExamples(b.house_examples)
+  return { round, total_rounds, setup, players, writer_id, history, memory, style_examples, house_examples }
+}
+
+export function parseHouseExamples(value: unknown): HouseExample[] {
+  return (Array.isArray(value) ? value : [])
     .slice(0, 4)
     .map((ex: { title?: unknown; lines?: unknown }) => ({
       title: clip(ex?.title, 40),
       lines: parseExamples([ex?.lines], 1)[0] ?? [],
     }))
     .filter((ex) => ex.lines.length >= 2)
-  return { round, total_rounds, setup, players, writer_id, history, memory, style_examples, house_examples }
+}
+
+/** El setup de la sala (save_setup): preguntas del catálogo, tarjetas del host y contexto libre. */
+export function parseSetup(value: unknown): Setup {
+  const s = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+  return {
+    who: clip(s.who, 20) || null,
+    age: clip(s.age, 20) || null,
+    vibes: (Array.isArray(s.vibes) ? s.vibes : []).map((v) => clip(v, 20)).filter((v) => v in VIBES),
+    topic: clip(s.topic, 120) || null,
+    situation: clip(s.situation, 120) || null,
+    know: clip(s.know, 10) || null,
+    lang: s.lang === 'es' ? 'es' : 'en',
+    spicy: s.spicy === 'no' ? 'no' : s.spicy === 'yes' ? 'yes' : null,
+    right_now:
+      s.place || s.nearby || s.local_time
+        ? {
+            place: clip(s.place, 120) || null,
+            nearby: (Array.isArray(s.nearby) ? s.nearby : []).map((v) => clip(v, 40)).filter(Boolean).slice(0, 8),
+            local_time: clip(s.local_time, 40) || null,
+            together: s.together === 'yes',
+          }
+        : null,
+    extra: Object.fromEntries(
+      Object.entries(s)
+        .filter(([key]) => !SETUP_KEYS.has(key) && /^[a-z][a-z0-9_]{0,31}$/.test(key))
+        .map(([key, value]) => [key, Array.isArray(value) ? value.map((v) => clip(v, 40)).join(', ') : clip(String(value ?? ''), 120)] as const)
+        .filter(([, value]) => value)
+        .slice(0, 10),
+    ),
+  }
 }
 
 /** Ejemplos de estilo: como mucho `max` fragmentos de 2–6 líneas cortas. */
@@ -434,23 +559,25 @@ that is fun to answer for real and fun to fake ("WRITER?? explain", "WRITER what
 Never copy them; write a new situation with the same punch.
 
 STYLE: DATA.style_examples are real group chats from real people (A, B, C), in DATA.language.
-Text like they do: most messages 2 to 8 words, mostly lowercase, little punctuation, small typos are fine, at least one
-pure reaction ("JAJAJA", "nooo", "wait what", "😭"), the same person may send two messages in a row.
+DATA.texting_targets were measured on hundreds of real messages: match them. Real people send bursts of very short
+messages instead of one long sentence: split every thought into its own message, almost never use commas, never use
+opening ¿ or ¡, and drop the final period. A pure reaction ("JAJAJA", "nooo", "wait what", "😭") counts as a message.
+The same person often sends two or three messages in a row. Small typos are fine.
 The same kinds of situations they talk about are welcome; never reuse their sentences or details.
 
 FIELDS:
 - "situation": a few words naming the situation. It must differ from everything in memory.used_situations.
 - "title": a real group chat name for these people (max 24 characters, may include one emoji), not a summary of the joke.
-- "lines": 2 to 4 messages. "from" is the handle of the sender. The writer NEVER sends a message.
+- "lines": 3 to 6 short messages. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
-  "text" is only what they type: never start it with the sender's name or "name:". Max 70 characters each.
-- The LAST message is the question to the writer, using their name.
+  "text" is only what they type: never start it with the sender's name or "name:". Max 60 characters each.
+- The LAST message is addressed to the writer by name: a question or a direct demand ("Laura explain", "Laura what did you do").
 - Follow the audience (group, know_each_other, content, vibes, topic, extra_context). From round 2 on, call back a
   running joke or something a player said when it fits, and follow the steer. If the writer has been easy to spot
   (stats.spotted_by), ask something more open-ended.
 
-CONTENT: the humour comes from the situation, never from attacking someone. No insults about looks, body,
-race, religion, sexuality or health. Nothing sexually explicit.`
+CONTENT: the humour comes from the situation, never from attacking someone. Religion, politics, health, sexuality,
+race and looks are never the topic or the secret, and never the target of a joke. Nothing sexually explicit.`
 
 interface ModelOutput {
   memory_update: {
@@ -490,15 +617,40 @@ function buildSchema(allHandles: string[]) {
   })
 }
 
+/** Para quién se escribe: grupo, si se conocen, dónde están, tono y contexto libre del host. */
+export function buildAudience(setup: Setup) {
+  const clean = isClean(setup)
+  const vibes = (setup.vibes ?? []).filter((v) => !(noSpicy(setup) && ADULT_VIBES.has(v)))
+  return {
+    group: AUDIENCE[setup.who ?? ''] ?? (setup.know === 'no' ? 'people who mostly just met' : 'friends'),
+    know_each_other:
+      setup.know === 'no'
+        ? 'no: they barely know each other, so ask things anyone can answer about themselves or the moment, not shared history'
+        : setup.know === 'yes'
+          ? 'yes: close friends, shared history and inside jokes are fair game'
+          : null,
+    // Botón antiguo (drinks, party…) o el texto libre que escribe el host
+    where_they_are: SITUATIONS[setup.situation ?? ''] ?? setup.situation ?? null,
+    right_now: setup.right_now ?? null,
+    content: clean
+      ? 'the group may include minors: keep it completely clean, no dating, drinking or flirting'
+      : setup.spicy === 'no'
+        ? 'adults, but keep it light: no flirting, dating, hookups or drinking jokes'
+        : 'adults: cheeky is fine, never explicit',
+    vibes: vibes.length > 0 ? vibes.map((v) => VIBES[v]) : ['everyday group chat chaos'],
+    topic: setup.topic ?? null,
+    extra_context: setup.extra && Object.keys(setup.extra).length > 0 ? setup.extra : null,
+  }
+}
+
 function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme) {
-  const clean = Boolean(input.setup.age && CLEAN_AGES.has(input.setup.age))
-  const vibes = (input.setup.vibes ?? []).filter((v) => !(clean && ADULT_VIBES.has(v)))
   const memory = input.memory ?? {}
   const evidence = computeEvidence(input.players, input.history)
   const lang = input.setup.lang === 'es' ? 'es' : 'en'
   return {
     language: LANGUAGES[lang].name,
     language_notes: LANGUAGES[lang].notes,
+    texting_targets: TEXTING[lang],
     theme_this_round: theme[lang],
     round: input.round,
     total_rounds: input.total_rounds,
@@ -509,24 +661,7 @@ function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, 
       name: input.players.find((p) => p.id === input.writer_id)?.name,
       note: 'the last message must be a question to THIS player (not to a previous writer)',
     },
-    audience: {
-      group: AUDIENCE[input.setup.who ?? ''] ?? (input.setup.know === 'no' ? 'people who mostly just met' : 'friends'),
-      know_each_other:
-        input.setup.know === 'no'
-          ? 'no: they barely know each other, so ask things anyone can answer about themselves or the moment, not shared history'
-          : input.setup.know === 'yes'
-            ? 'yes: close friends, shared history and inside jokes are fair game'
-            : null,
-      // Botón antiguo (drinks, party…) o el texto libre que escribe el host
-      where_they_are: SITUATIONS[input.setup.situation ?? ''] ?? input.setup.situation ?? null,
-      right_now: input.setup.right_now ?? null,
-      content: clean
-        ? 'the group may include minors: keep it completely clean, no dating, drinking or flirting'
-        : 'adults: cheeky is fine, never explicit',
-      vibes: vibes.length > 0 ? vibes.map((v) => VIBES[v]) : ['everyday group chat chaos'],
-      topic: input.setup.topic ?? null,
-      extra_context: input.setup.extra && Object.keys(input.setup.extra).length > 0 ? input.setup.extra : null,
-    },
+    audience: buildAudience(input.setup),
     players: input.players.map((p) => ({
       handle: handleOf(p.id),
       name: p.name,
@@ -596,7 +731,7 @@ function repairChat(output: ModelOutput, writerName: string, otherHandles: strin
     }
   })
   const last = lines[lines.length - 1]
-  if (typeof last?.text === 'string' && last.text.includes('?') && !mentions(last.text, writerName)) {
+  if (typeof last?.text === 'string' && !mentions(last.text, writerName)) {
     // Si la pregunta va a otro jugador (p. ej. al writer de la ronda anterior), se cambia ese nombre por el del writer.
     const other = Object.values(nameOf).find((name) => name !== writerName && mentions(last.text, name))
     const word =
@@ -613,13 +748,13 @@ function repairChat(output: ModelOutput, writerName: string, otherHandles: strin
 function validateChat(output: ModelOutput, writerName: string, otherHandles: Set<string>): string | null {
   const chat = output?.chat
   if (!chat || typeof chat.title !== 'string' || !chat.title.trim() || chat.title.length > 40) return 'title'
-  if (!Array.isArray(chat.lines) || chat.lines.length < 2 || chat.lines.length > 5) return 'lines'
+  if (!Array.isArray(chat.lines) || chat.lines.length < 2 || chat.lines.length > 6) return 'lines'
   for (const line of chat.lines) {
     if (!otherHandles.has(line?.from)) return 'from'
     if (typeof line.text !== 'string' || !line.text.trim() || line.text.length > 120) return 'text'
   }
   const last = chat.lines[chat.lines.length - 1].text
-  if (!last.includes('?')) return 'last_not_question'
+  // Pregunta ("Laura qué hiciste?") u orden directa ("Laura explícate"): las dos valen, como en los chats del equipo.
   if (!mentions(last, writerName)) return 'last_not_to_writer'
   return null
 }
@@ -656,13 +791,31 @@ export async function callModel<T>(
   if (!response.ok) throw new AiError('provider_status', `${response.status} ${await response.text().catch(() => '')}`)
   try {
     const data = await response.json()
-    return { json: JSON.parse(data.choices?.[0]?.message?.content ?? 'null') as T, usage: data.usage ?? {} }
+    return { json: parseJsonReply(data.choices?.[0]?.message?.content) as T, usage: data.usage ?? {} }
   } catch {
     throw new AiError('invalid_output', 'not_json')
   }
 }
 
+/** JSON de la respuesta; tolera ```json … ``` o texto alrededor (modelos sin salida estructurada). */
+export function parseJsonReply(content: unknown): unknown {
+  const text = typeof content === 'string' ? content.trim() : ''
+  try {
+    return JSON.parse(text)
+  } catch {
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start === -1 || end <= start) throw new Error('no_json')
+    return JSON.parse(text.slice(start, end + 1))
+  }
+}
+
 async function send(config: AiConfig, system: string, user: string, schemaName: string, schema: unknown, timeoutMs: number) {
+  const mode = config.jsonMode ?? 'json_schema'
+  const instructions =
+    mode === 'json_schema'
+      ? system
+      : `${system}\n\nReply with ONLY one JSON object that matches this JSON Schema. No text before or after it:\n${JSON.stringify(schema)}`
   try {
     return await fetch(`${config.baseUrl.replace(/\/$/, '')}/chat/completions`, {
       method: 'POST',
@@ -671,11 +824,17 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
       body: JSON.stringify({
         model: config.model,
         ...(config.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
-        temperature: 1,
-        max_completion_tokens: 4000,
-        response_format: { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } },
+        // Los modelos pequeños (p. ej. Hermes 3 8B) se desordenan con temperatura 1.
+        temperature: config.model.includes('gpt-oss') ? 1 : 0.8,
+        // max_tokens lo entiende cualquier servidor compatible (vLLM, OpenRouter…); Groq acepta ambos.
+        ...(mode === 'json_schema' ? { max_completion_tokens: 4000 } : { max_tokens: 1500 }),
+        ...(mode === 'json_schema'
+          ? { response_format: { type: 'json_schema', json_schema: { name: schemaName, strict: true, schema } } }
+          : mode === 'json_object'
+            ? { response_format: { type: 'json_object' } }
+            : {}),
         messages: [
-          { role: 'system', content: system },
+          { role: 'system', content: instructions },
           { role: 'user', content: user },
         ],
       }),
@@ -729,6 +888,14 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
   )
   const output = json
   repairChat(output, writer.name, otherHandles, Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name])))
+  if (Array.isArray(output?.chat?.lines)) {
+    output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()), lang)
+    const nameOf = Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name]))
+    output.chat.title = String(output.chat.title ?? '')
+      .replace(/[¿¡]/g, '')
+      .replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
+      .trim()
+  }
   const texts = output?.chat?.lines?.map((l) => l.text) ?? []
   const problem =
     validateChat(output, writer.name, new Set(otherHandles)) ??

@@ -8,11 +8,13 @@
 //   del bot y la entrega con public.submit_bot_answer; registra con public.log_ai_generation. Sin round_id la devuelve.
 // - Prueba directa: GenerateRoundInput -> devuelve GenerateRoundOutput sin guardar nada.
 //
-// Secretos: AI_API_KEY, GENERATE_ROUND_SECRET; opcionales AI_BASE_URL (Groq por defecto) y AI_MODEL.
+// Secretos: AI_API_KEY, GENERATE_ROUND_SECRET; opcionales AI_BASE_URL (Groq por defecto), AI_MODEL y
+// AI_JSON_MODE (json_schema | json_object | none) para proveedores o modelos sin salida estructurada.
 // SUPABASE_URL y la clave de servicio los pone Supabase.
 
 import { AiError, generateRound, parseInput } from './core.ts'
 import { MIMIC_PROMPT_VERSION, generateMimic } from './mimic.ts'
+import { generateDrafts } from './drafts.ts'
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -62,11 +64,38 @@ Deno.serve(async (request: Request) => {
     apiKey: apiKey ?? '',
     baseUrl: Deno.env.get('AI_BASE_URL') ?? 'https://api.groq.com/openai/v1',
     model: Deno.env.get('AI_MODEL') ?? 'openai/gpt-oss-120b',
-    timeoutMs: 12000, // la sala espera como mucho 12 s en `generating`
+    // Ronda 1: la sala espera en `generating` (game.config generation_timeout_seconds = 20).
+    // Rondas 2+: se piden al empezar la votación anterior, hay ~25 s de margen. Ajustado a Hermes 3 70B (~10–13 s).
+    timeoutMs: 18000,
+    // json_schema (por defecto) | json_object | none: para modelos sin salida estructurada, como Hermes 3 en algunos hosts
+    jsonMode: (Deno.env.get('AI_JSON_MODE') ?? 'json_schema') as 'json_schema' | 'json_object' | 'none',
   }
 
   const body = await request.json().catch(() => null)
   const roundId = typeof body?.round_id === 'string' ? body.round_id : null
+
+  // ── Borradores de la ronda 1 (mientras la gente entra en la sala) ──
+  if (body?.mode === 'drafts') {
+    const roomId = typeof body?.room_id === 'string' ? body.room_id : null
+    try {
+      if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
+      const output = await generateDrafts(body.input, { ...config, timeoutMs: 30000 }, Number(body.count) || 3)
+      if (!roomId) return json(200, output)
+      const saved = output.drafts.length
+        ? await rpc('ai_save_drafts', { p_room_id: roomId, p_setup_hash: String(body.setup_hash ?? ''), p_drafts: output.drafts })
+        : 0
+      await rpc('log_ai_generation', {
+        p_room_id: roomId, p_round_id: null, p_provider: 'openai-compatible', p_model: output.model,
+        p_prompt_version: output.prompt_version, p_status: output.drafts.length ? 'ok' : 'error',
+        p_input_tokens: output.input_tokens, p_output_tokens: output.output_tokens, p_latency_ms: output.latency_ms,
+        p_error: output.errors.length ? output.errors.join(' | ').slice(0, 900) : null,
+      }).catch((e) => console.error('drafts log', e))
+      return json(200, { saved })
+    } catch (error) {
+      console.error('drafts', roomId, error)
+      return json(roomId ? 200 : 500, { outcome: 'failed', error: error instanceof AiError ? error.code : 'internal' })
+    }
+  }
 
   // ── Bot Mimic ──
   if (body?.mode === 'mimic') {
@@ -75,7 +104,7 @@ Deno.serve(async (request: Request) => {
     try {
       if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
       // La escritura dura ~25 s y espera al bot como mucho 10 s tras contestar todos: tiene que ser rápido.
-      const output = await generateMimic(body.context, body.examples, { ...config, timeoutMs: 8000 })
+      const output = await generateMimic(body.context, body.examples, { ...config, timeoutMs: 15000 })
       if (!roundId) return json(200, output)
       const accepted = await rpc('submit_bot_answer', { p_round_id: roundId, p_text: output.answer })
       await rpc('log_ai_generation', {
@@ -103,7 +132,8 @@ Deno.serve(async (request: Request) => {
   if (roundId) {
     try {
       if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
-      const output = await generateRound(parseInput(body.input), config)
+      const input = parseInput(body.input)
+      const output = await generateRound(input, { ...config, timeoutMs: input.round === 1 ? 18000 : 28000 })
       const outcome = await rpc('ai_complete_round', { p_round_id: roundId, p_result: output })
       return json(200, { outcome })
     } catch (error) {

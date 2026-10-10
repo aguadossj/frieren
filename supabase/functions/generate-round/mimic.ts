@@ -5,7 +5,7 @@
 
 import { AiError, LANGUAGES, callModel, copiedFrom, languageProblem, parseExamples, type AiConfig, type Memory } from './core.ts'
 
-export const MIMIC_PROMPT_VERSION = 'mimic-v1'
+export const MIMIC_PROMPT_VERSION = 'mimic-v3'
 
 interface ContextAnswer {
   player_id: string | null
@@ -53,6 +53,7 @@ How to sound like the writer:
 - reply_examples are real replies from real group chats (anonymous, often Spanish). Copy their texting feel
   (short, casual, typos, "siii", "jajaja"), never their words. If the writer has no real answers yet, sound like them.
 
+Length: about as long as writer.real_answers; if there are none, under 30 characters (real replies are short).
 Rules: one message, max 80 characters, written in DATA.language (follow DATA.language_notes, whatever the language
 of the examples), answer the last message directly. No quotes around it, no names of
 other players, never mention being an AI, a bot, a model or fake. Nothing offensive, nothing explicit.
@@ -67,6 +68,33 @@ const SCHEMA = {
 
 const clip = (value: unknown, max: number) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '')
 const GIVEAWAY = /\b(ai|a\.i\.|bot|robot|language model|chatgpt|gpt|as an assistant|i'?m fake)\b/i
+
+const EMOJI = /[\u{1F300}-\u{1FAFF}☀-➿]/u
+const EMOJI_ALL = /[\u{1F300}-\u{1FAFF}☀-➿]️?/gu
+
+/**
+ * Copia los hábitos del writer (de sus respuestas reales) en la respuesta del bot: mayúscula inicial, punto final,
+ * comas, ¿ ¡ y emojis. Sin respuestas reales usa lo medido en chats reales: sin ¿ ¡, sin comas, sin punto final.
+ */
+export function matchWriter(answer: string, real: string[]): string {
+  let out = answer.replace(/\s+/g, ' ').trim()
+  // Las respuestas reales son de una frase: si el writer contesta corto (o aún no sabemos), solo la primera.
+  const avgReal = real.length ? real.reduce((n, t) => n + t.length, 0) / real.length : 0
+  const sentences = out.split(/(?<=[.!?])\s+(?=\S)/)
+  if (sentences.length > 1 && (avgReal === 0 || avgReal <= 35)) out = sentences[0]
+  const some = (re: RegExp) => real.some((t) => re.test(t))
+  const every = (re: RegExp) => real.length > 0 && real.every((t) => re.test(t))
+  const tidy = () => (out = out.replace(/\s+/g, ' ').replace(/\s+([.!?,])/g, '$1').trim())
+  if (real.length >= 2 && !some(EMOJI)) out = out.replace(EMOJI_ALL, '')
+  if (!some(/[¿¡]/)) out = out.replace(/[¿¡]/g, '')
+  if (!some(/,/)) out = out.replace(/\s*,\s*/g, ' ')
+  tidy()
+  if (!some(/[^.]\.$/)) out = out.replace(/([^.])\.$/, '$1')
+  if (every(/[^.]\.$/) && !/[.!?…]$/.test(out)) out += '.'
+  if (every(/^[a-zñáéíóúü]/)) out = out.charAt(0).toLowerCase() + out.slice(1)
+  if (every(/^[A-ZÑÁÉÍÓÚÜ]/)) out = out.charAt(0).toUpperCase() + out.slice(1)
+  return out.replace(/\s+/g, ' ').trim()
+}
 
 function buildData(ctx: RoundContext, examples: { who: string; text: string }[][]) {
   const nameOf = (id: string | null) => ctx.players.find((p) => p.id === id)?.name ?? 'someone'
@@ -125,7 +153,7 @@ export async function generateMimic(contextValue: unknown, examplesValue: unknow
       'mimic',
       SCHEMA,
     )
-    const answer = clip(json?.answer, 200).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim()
+    const answer = matchWriter(clip(json?.answer, 200).replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim(), data.writer.real_answers)
     if (!answer || answer.length > 80) throw new AiError('invalid_output', 'length')
     if (GIVEAWAY.test(answer)) throw new AiError('invalid_output', 'giveaway')
     if (others.some((name) => name.length >= 2 && answer.toLowerCase().includes(name))) throw new AiError('invalid_output', 'names_player')
