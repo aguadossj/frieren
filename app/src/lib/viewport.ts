@@ -71,3 +71,4 @@ export function retintSafariBars() {
     spacer.remove()
   }, 60)
 }
+

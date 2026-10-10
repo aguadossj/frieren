@@ -71,12 +71,12 @@
 
 /* Base mobile-first: sin rebote, sin zoom por doble tap, respeta el notch */
 html, body, #root { height: 100%; }
-/* Fondo de la PÁGINA blanco: es lo que Safari usa para teñir sus barras (arriba/abajo) al cargar.
-   Cada pantalla pinta su propio fondo (rojo) dentro de <Screen>. */
-html { background-color: #fff; }
+/* Fondo de la PÁGINA rojo en todas las pantallas (también bajo el notch y la barra de inicio del iPhone);
+   Safari tiñe sus barras con este color. */
+html { background-color: var(--color-brand); }
 body {
   margin: 0;
-  background: #fff;
+  background: var(--color-brand);
   color: #fff;
   font-family: var(--font-sans);
   overscroll-behavior: none;
@@ -98,11 +98,8 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 html[data-keyboard='open'] #root { padding-bottom: 0; }
-/* Página blanca en móvil: Safari (iOS 26) tiñe sus barras con lo que hay en los bordes, así que bordes blancos
-   ⇒ barras blancas. Las pantallas pintan en rojo solo sus zonas importantes (p. ej. el chat). */
-@media (max-width: 639px) {
-  #root { background-color: #fff; }
-}
+/* Teclado abierto (solo pasa al escribir): fondo blanco para que no asome una franja roja sobre el teclado. */
+html[data-keyboard='open'], html[data-keyboard='open'] body, html[data-keyboard='open'] #root { background-color: #fff; }
 
 /* En escritorio, el juego va en un "móvil" sobre fondo oscuro, como el mockup */
 @media (min-width: 640px) {

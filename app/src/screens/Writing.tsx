@@ -53,15 +53,10 @@ export default function Writing() {
   // Layout tipo WhatsApp para aprovechar la pantalla del móvil:
   // cabecera mínima (solo nombre del grupo + tiempo) · chat rojo con el nombre DENTRO de la burbuja ·
   // pista como nota pequeña al final del chat · abajo solo la barra de escribir.
-  // Pantalla blanca; solo el chat es una tarjeta roja. Bordes blancos ⇒ Safari pinta sus barras en blanco.
+  // Fondo rojo como el resto de pantallas; cabecera y barra de escribir en blanco.
   return (
     <>
-      {/* Barras de Safari blancas SOLO en el chat. Safari (iOS 26) elige el color de sus barras al cargar (en Home,
-          que es roja) y solo lo recalcula cuando APARECE un elemento fijo nuevo en los bordes (como un modal).
-          Estas dos franjas se montan al entrar al chat y se desmontan al salir: blanco arriba y abajo. */}
-      <div aria-hidden className="fixed inset-x-0 top-0 z-[60] h-[4px] bg-white sm:hidden" />
-      <div aria-hidden className="fixed inset-x-0 bottom-0 z-[60] h-[6px] bg-white sm:hidden" />
-    <Screen className="bg-white!">
+    <Screen>
       <header className="flex min-h-[40px] shrink-0 items-center gap-2.5 bg-white px-3 pt-2.5 pb-1 text-ink">
         <span className="flex size-[32px] shrink-0 items-center justify-center rounded-full bg-brand text-[13px] font-extrabold text-white">
           {groupInitials(room.chat.title)}
