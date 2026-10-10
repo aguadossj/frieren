@@ -54,28 +54,28 @@ function rng(seed: number) {
 
 const W = 400
 const H = 900
-const TARGET = 150 // cuántos dibujos intentamos meter
-const GAP = 6 // separación mínima entre dibujos (en unidades del viewBox)
 
 type Doodle = { d: string; x: number; y: number; r: number; s: number }
 
 /**
  * Posiciones aleatorias de verdad (no en rejilla): se lanzan puntos al azar y se aceptan si no se
- * solapan con los ya puestos. La distancia se mide "dando la vuelta" en horizontal, así el dibujo
- * encaja consigo mismo al repetirlo de lado a lado (necesario para que se pueda desplazar sin cortes).
+ * solapan con los ya puestos. La distancia se mide "dando la vuelta" en horizontal y en vertical, así
+ * el patrón encaja consigo mismo por los cuatro lados y se puede desplazar en diagonal sin cortes.
  */
-function scatter(seed: number): Doodle[] {
+function scatter(seed: number, target: number, gap: number): Doodle[] {
   const rand = rng(seed * 7919 + 17)
   const out: (Doodle & { rad: number })[] = []
-  for (let tries = 0; tries < 6000 && out.length < TARGET; tries++) {
+  for (let tries = 0; tries < target * 45 && out.length < target; tries++) {
     const sc = 0.8 + rand() ** 1.6 * 0.95 // casi todos pequeños/medianos, algunos grandes
-    const rad = 12 * sc + GAP
+    const rad = 12 * sc + gap
     const x = rand() * W
-    const y = -10 + rand() * (H + 10)
+    const y = rand() * H
     const free = out.every((o) => {
       let dx = Math.abs(o.x - x)
       dx = Math.min(dx, W - dx) // vuelta horizontal
-      return dx * dx + (o.y - y) ** 2 >= (o.rad + rad) ** 2
+      let dy = Math.abs(o.y - y)
+      dy = Math.min(dy, H - dy) // vuelta vertical
+      return dx * dx + dy * dy >= (o.rad + rad) ** 2
     })
     if (!free) continue
     out.push({ d: ICONS[Math.floor(rand() * ICONS.length)], x, y, r: Math.round(rand() * 90 - 45), s: sc, rad })
@@ -92,19 +92,23 @@ export default function ChatDoodles({
   seed: number
   opacity?: number
   className?: string
-  /** Desplazamiento lento y continuo hacia la derecha (pantalla principal). */
+  /** Pantalla principal: más dibujos y desplazamiento lento y continuo en diagonal (izquierda y hacia abajo). */
   drift?: boolean
 }) {
-  const items = useMemo(() => scatter(seed), [seed])
-  // Cada dibujo se centra en (x, y): la caja del icono es 24×24
-  const paths = (dx: number) =>
+  const items = useMemo(() => (drift ? scatter(seed, 240, 2) : scatter(seed, 150, 6)), [seed, drift])
+  // Copias del patrón para cubrir cualquier desplazamiento: encaja consigo mismo por los cuatro lados
+  const offsets = drift
+    ? [[0, 0], [W, 0], [0, -H], [W, -H]] // se mueve a la izquierda (copia a la derecha) y hacia abajo (copia arriba)
+    : [[-W, 0], [0, 0], [W, 0], [0, -H], [0, H]]
+  const paths = offsets.flatMap(([dx, dy]) =>
     items.map((it, i) => (
       <path
-        key={`${dx}-${i}`}
+        key={`${dx}:${dy}:${i}`}
         d={it.d}
-        transform={`translate(${it.x + dx} ${it.y}) rotate(${it.r}) scale(${it.s}) translate(-12 -12)`}
+        transform={`translate(${it.x + dx} ${it.y + dy}) rotate(${it.r}) scale(${it.s}) translate(-12 -12)`}
       />
-    ))
+    )),
+  )
 
   return (
     <svg
@@ -114,19 +118,15 @@ export default function ChatDoodles({
       preserveAspectRatio="xMidYMin slice"
       style={{ opacity }}
     >
-      <g
-        className={drift ? 'doodle-drift' : undefined}
-        fill="none"
-        stroke="#fff"
-        strokeWidth={1.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {/* Tres copias (izquierda, centro, derecha): el patrón encaja consigo mismo, así que al moverse
-            hacia la derecha una anchura entera y volver a empezar no se nota el salto */}
-        {paths(-W)}
-        {paths(0)}
-        {drift ? null : paths(W)}
+      <g fill="none" stroke="#fff" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+        {drift ? (
+          // Dos animaciones independientes (horizontal y vertical) con distinta duración = diagonal suave
+          <g className="doodle-drift-x">
+            <g className="doodle-drift-y">{paths}</g>
+          </g>
+        ) : (
+          paths
+        )}
       </g>
     </svg>
   )

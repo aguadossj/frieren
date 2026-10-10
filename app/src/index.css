@@ -119,14 +119,20 @@ input { font-size: 16px; }
   from { transform: scaleX(1); }
   to { transform: scaleX(0); }
 }
-/* Dibujitos de fondo que se desplazan hacia la derecha (pantalla principal). 400 = ancho del patrón (ChatDoodles) */
-@keyframes doodle-drift {
+/* Dibujitos de fondo de la pantalla principal: se desplazan hacia la IZQUIERDA y hacia ABAJO a la vez.
+   Horizontal 400 = ancho del patrón, vertical 900 = alto (ChatDoodles). Con estas duraciones la diagonal baja ~25°. */
+@keyframes doodle-drift-x {
   from { transform: translateX(0); }
-  to { transform: translateX(400px); }
+  to { transform: translateX(-400px); }
 }
-.doodle-drift { animation: doodle-drift 70s linear infinite; will-change: transform; }
+@keyframes doodle-drift-y {
+  from { transform: translateY(0); }
+  to { transform: translateY(900px); }
+}
+.doodle-drift-x { animation: doodle-drift-x 60s linear infinite; will-change: transform; }
+.doodle-drift-y { animation: doodle-drift-y 290s linear infinite; will-change: transform; }
 @media (prefers-reduced-motion: reduce) {
-  .doodle-drift { animation: none; }
+  .doodle-drift-x, .doodle-drift-y { animation: none; }
 }
 @keyframes fade-in {
   from { opacity: 0; }
