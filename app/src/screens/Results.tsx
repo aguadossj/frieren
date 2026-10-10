@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import PandaHost from '../components/Panda'
-import { Avatar, AwardCard, Button, Footer, Icon, Screen, TopBar, TopNote } from '../components/ui'
-import { useCountdown, useGame } from '../game/useGame'
-import { MIMIC_AUTHOR_ID } from '../game/types'
+import { Avatar, AwardCard, Button, Footer, Icon, Screen, TimeBar, TopBar, TopNote } from '../components/ui'
+import { useGame } from '../game/useGame'
+import { MIMIC_AUTHOR_ID, PHASE_SECONDS } from '../game/types'
 import type { Player, RoundResult, Room } from '../game/types'
 import { useLang, useT } from '../i18n'
 
@@ -129,7 +129,6 @@ const ROW = 72 // alto de fila + hueco, para recolocar con animación
 export function Leaderboard() {
   const { room, me, game } = useGame()
   const t = useT()
-  const seconds = useCountdown(room?.phaseEndsAt ?? null)
   // Primero se pintan en el orden de antes de la ronda; luego se recolocan y las barras crecen.
   const [settled, setSettled] = useState(false)
   useEffect(() => {
@@ -199,8 +198,14 @@ export function Leaderboard() {
             {t.waitingFor(host?.name ?? t.theHost)}
           </div>
         )}
-        {room.phaseEndsAt && seconds > 0 && (
-          <p className="-mt-1 text-center text-[14px] font-semibold text-white/70">{t.startsBySelf(seconds)}</p>
+        {/* Tiempo hasta que la siguiente ronda empiece sola: barra que se vacía (sin números) */}
+        {room.phaseEndsAt && (
+          <TimeBar
+            onRed
+            endsAt={room.phaseEndsAt}
+            totalSeconds={room.settings?.leaderboard_seconds ?? PHASE_SECONDS.leaderboard}
+            className="mx-6 -mt-1"
+          />
         )}
       </Footer>
     </Screen>

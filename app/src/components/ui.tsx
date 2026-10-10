@@ -107,7 +107,18 @@ export const TopNote = ({ children }: { children: ReactNode }) => (
  * Barra de tiempo: fina y alargada, se va acortando y desvaneciendo hasta llegar a 0.
  * Se anima con requestAnimationFrame (suave, no a saltos de 1 s). Los últimos 5 s parpadea.
  */
-export function TimeBar({ endsAt, totalSeconds, className = '' }: { endsAt: number | null; totalSeconds: number; className?: string }) {
+export function TimeBar({
+  endsAt,
+  totalSeconds,
+  className = '',
+  onRed = false,
+}: {
+  endsAt: number | null
+  totalSeconds: number
+  className?: string
+  /** Sobre fondo rojo: pista blanca translúcida y relleno blanco (en vez de gris/negro sobre blanco). */
+  onRed?: boolean
+}) {
   const [left, setLeft] = useState(1)
   useEffect(() => {
     if (!endsAt) return
@@ -128,10 +139,10 @@ export function TimeBar({ endsAt, totalSeconds, className = '' }: { endsAt: numb
       aria-valuemin={0}
       aria-valuemax={totalSeconds}
       aria-valuenow={Math.ceil(left * totalSeconds)}
-      className={cx('h-[6px] overflow-hidden rounded-full bg-neutral-100', className)}
+      className={cx('h-[6px] overflow-hidden rounded-full', onRed ? 'bg-white/25' : 'bg-neutral-100', className)}
     >
       <div
-        className={cx('h-full rounded-full bg-ink', urgent && 'animate-pulse')}
+        className={cx('h-full rounded-full', onRed ? 'bg-white' : 'bg-ink', urgent && 'animate-pulse')}
         style={{ width: `${left * 100}%`, opacity: 0.3 + 0.7 * left }}
       />
     </div>
