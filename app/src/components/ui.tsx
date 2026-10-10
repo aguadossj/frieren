@@ -1,7 +1,7 @@
 // Componentes base (T2 es dueño). Estilo: design-refs/STYLE.md + design-refs/mockup.png (rojo, blanco, negro).
 // Escala del mockup: pills grandes, tipografía muy gruesa, cabecera blanca y cuerpo rojo.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
 import type { Player } from '../game/types'
 import { joinUrl } from './QR'
@@ -101,6 +101,41 @@ export function TopBar({ title, subtitle, right, avatar }: { title: ReactNode; s
 export const TopNote = ({ children }: { children: ReactNode }) => (
   <span className="shrink-0 text-[15px] font-bold text-brand">{children}</span>
 )
+
+/**
+ * Barra de tiempo: fina y alargada, se va acortando y desvaneciendo hasta llegar a 0.
+ * Se anima con requestAnimationFrame (suave, no a saltos de 1 s). Los últimos 5 s parpadea.
+ */
+export function TimeBar({ endsAt, totalSeconds, className = '' }: { endsAt: number | null; totalSeconds: number; className?: string }) {
+  const [left, setLeft] = useState(1)
+  useEffect(() => {
+    if (!endsAt) return
+    let raf = 0
+    const tick = () => {
+      const ms = Math.max(0, endsAt - Date.now())
+      setLeft(Math.min(1, ms / (totalSeconds * 1000)))
+      if (ms > 0) raf = requestAnimationFrame(tick)
+    }
+    tick()
+    return () => cancelAnimationFrame(raf)
+  }, [endsAt, totalSeconds])
+  const urgent = endsAt !== null && left * totalSeconds <= 5
+  return (
+    <div
+      role="progressbar"
+      aria-label="Time left"
+      aria-valuemin={0}
+      aria-valuemax={totalSeconds}
+      aria-valuenow={Math.ceil(left * totalSeconds)}
+      className={cx('h-[6px] overflow-hidden rounded-full bg-neutral-100', className)}
+    >
+      <div
+        className={cx('h-full rounded-full bg-ink', urgent && 'animate-pulse')}
+        style={{ width: `${left * 100}%`, opacity: 0.3 + 0.7 * left }}
+      />
+    </div>
+  )
+}
 
 export function TimerPill({ seconds, className = '' }: { seconds: number; className?: string }) {
   return (

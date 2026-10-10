@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Bubble, Icon, Screen, TimerPill, TypingDots, groupInitials } from '../components/ui'
-import { useCountdown, useGame } from '../game/useGame'
-import { MAX_ANSWER_LENGTH } from '../game/types'
+import { Bubble, Icon, Screen, TimeBar, TypingDots, groupInitials } from '../components/ui'
+import { useGame } from '../game/useGame'
+import { MAX_ANSWER_LENGTH, PHASE_SECONDS } from '../game/types'
 import { focusWithoutScroll } from '../lib/viewport'
 
 export default function Writing() {
   const { room, me, game } = useGame()
-  const seconds = useCountdown(room?.phaseEndsAt ?? null)
   const [text, setText] = useState('')
   const [mine, setMine] = useState<string | null>(null)
   const [typing, setTyping] = useState(false) // input con foco ⇒ teclado abierto
@@ -56,7 +55,7 @@ export default function Writing() {
           {groupInitials(room.chat.title)}
         </span>
         <div className="min-w-0 flex-1 truncate text-[16px] leading-tight font-extrabold">{room.chat.title}</div>
-        <TimerPill seconds={seconds} className="px-3 py-1 text-[14px]" />
+        <TimeBar endsAt={room.phaseEndsAt} totalSeconds={room.settings?.writing_seconds ?? PHASE_SECONDS.writing} className="w-[38%] shrink-0" />
       </header>
 
       <div ref={list} className="mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain rounded-[28px] bg-brand px-3 pt-3 pb-3">
