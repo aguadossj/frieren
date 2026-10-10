@@ -5,6 +5,7 @@ import { useGame } from '../game/useGame'
 import { MIMIC_AUTHOR_ID, PHASE_SECONDS } from '../game/types'
 import type { Player, RoundResult, Room } from '../game/types'
 import { useLang, useT } from '../i18n'
+import { avatarFor, textOn } from '../lib/avatars'
 
 type Strings = ReturnType<typeof useT>
 
@@ -160,6 +161,8 @@ export function Leaderboard() {
           const rank = now.findIndex((x) => x.id === p.id)
           const score = settled ? p.score : prevScore(p)
           const gained = earned[p.id] ?? 0
+          const tint = avatarFor(room.code, p).color
+          const light = textOn(tint) !== '#ffffff' // lima, amarillo…: más sombra para que el texto blanco se lea
           return (
             <div
               key={p.id}
@@ -170,9 +173,9 @@ export function Leaderboard() {
               <div className="relative h-full min-w-0 flex-1 overflow-hidden rounded-full bg-white/15">
                 <div
                   className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-1000 ease-out"
-                  style={{ background: p.color, width: `${Math.max(16, (score / top) * 100)}%` }}
+                  style={{ background: tint, width: `${Math.max(16, (score / top) * 100)}%` }}
                 />
-                <div className="relative flex h-full items-center gap-2.5 pr-4 pl-1.5 [text-shadow:0_1px_2px_rgba(0,0,0,0.25)]">
+                <div className={`relative flex h-full items-center gap-2.5 pr-4 pl-1.5 ${light ? '[text-shadow:0_1px_3px_rgba(0,0,0,0.6)]' : '[text-shadow:0_1px_2px_rgba(0,0,0,0.25)]'}`}>
                   <Avatar player={p} size={46} ring />
                   <span className="min-w-0 flex-1 truncate text-[18px] font-extrabold">{p.id === me?.id ? t.you : p.name}</span>
                   {settled && gained > 0 && <span className="animate-pop text-[14px] font-extrabold text-white/85">+{gained}</span>}

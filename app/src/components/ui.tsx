@@ -8,6 +8,8 @@ import { shareInvite } from './QR'
 import { GameMenu } from './GameMenu'
 import ChatDoodles from './ChatDoodles'
 import { setLang, useLang, useT } from '../i18n'
+import { useGame } from '../game/useGame'
+import { avatarFor } from '../lib/avatars'
 
 const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
 
@@ -186,14 +188,30 @@ export function TimerPill({ seconds, className = '' }: { seconds: number; classN
   )
 }
 
-export function Avatar({ player, size = 36, ring = false }: { player: Pick<Player, 'name' | 'color'>; size?: number; ring?: boolean }) {
+/** Avatar de panda del jugador (aleatorio por sala, ver lib/avatars.ts). Borde blanco para que destaque sobre el rojo. */
+export function Avatar({
+  player,
+  size = 36,
+  ring = false,
+}: {
+  player: Pick<Player, 'name' | 'color'> & { id?: string }
+  size?: number
+  ring?: boolean
+}) {
+  const code = useGame().room?.code ?? ''
+  const avatar = avatarFor(code, player)
+  const [broken, setBroken] = useState(false)
   return (
     <div
-      className={cx('flex shrink-0 items-center justify-center rounded-full font-extrabold text-white', ring && 'ring-[3px] ring-white')}
-      style={{ background: player.color, width: size, height: size, fontSize: size * 0.42 }}
+      className={cx('flex shrink-0 items-center justify-center overflow-hidden rounded-full font-extrabold text-white', ring ? 'ring-[3px] ring-white' : 'ring-2 ring-white')}
+      style={{ background: avatar.color, width: size, height: size, fontSize: size * 0.42 }}
       aria-hidden="true"
     >
-      {player.name.slice(0, 1).toUpperCase()}
+      {broken ? (
+        player.name.slice(0, 1).toUpperCase()
+      ) : (
+        <img src={avatar.src} alt="" width={size} height={size} draggable={false} className="size-full object-cover" onError={() => setBroken(true)} />
+      )}
     </div>
   )
 }

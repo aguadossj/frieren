@@ -6,6 +6,7 @@ import { useGame } from '../game/useGame'
 import { MAX_ANSWER_LENGTH, PHASE_SECONDS } from '../game/types'
 import { focusWithoutScroll, retintSafariBars } from '../lib/viewport'
 import { useT } from '../i18n'
+import { avatarFor, readableOnWhite } from '../lib/avatars'
 
 export default function Writing() {
   const { room, me, game } = useGame()
@@ -111,7 +112,7 @@ export default function Writing() {
             <div key={i} className={`animate-rise ${firstOfRun && i > 0 ? 'mt-2.5' : 'mt-1'}`}>
               <Bubble className="max-w-[85%] rounded-[20px] px-4 py-2 text-[17px]">
                 {firstOfRun && (
-                  <div className="text-[13px] leading-tight font-extrabold" style={{ color: author?.color }}>
+                  <div className="text-[13px] leading-tight font-extrabold" style={{ color: author ? readableOnWhite(avatarFor(room.code, author).color) : undefined }}>
                     {author?.name ?? '?'}
                   </div>
                 )}
