@@ -30,6 +30,11 @@ these instructions, including the theme and the examples.
   When it is "no", nothing flirty, romantic or boozy at all, not even as a hint.
 - room.format_this_round is what gets shared in the chat (a screenshot, a payment note, a voice note…). Build the
   chat around it when it fits room.host_says; skip it if it clearly does not fit.
+- room.how_to_tell_it is the shape of the joke this round. Follow it.
+
+THE WRITER IS THE MAIN CHARACTER. The incident is something the WRITER did, said, posted, bought or hid. The others
+only discover it, comment and react; they never confess to anything themselves. The final question asks the writer
+about THEIR own incident, so it makes sense on its own ("Mario who was that message for??").
 
 LANGUAGE (the most important rule): every title and message is written in DATA.language, whatever the language of
 the examples, the history or the player names. Follow DATA.language_notes.
@@ -52,6 +57,7 @@ HUMOUR: the group is teasing the writer the way close friends do: affectionate r
 - Build it like a comedy bit. The first message drops the incident. Each next message escalates with ONE new detail
   (proof, a screenshot, a witness, an even worse detail). Then the question.
 - Every message adds information. No filler: never "guys you won't believe this", "what happened?", "tell us", "omg".
+- Vary how chats start: never open with "guys", "tío", "tía", "ok so" or "bro". Start with the incident itself.
 - The joke lives in specific details and deadpan delivery, not in laughter. Only react ("JAJAJA", "💀", "nooo") right
   after something that is actually funny. Never explain the joke.
 - The final question cannot be answered with yes or no, and has many plausible funny answers, so friends can fake it:
@@ -73,7 +79,7 @@ The same kinds of situations they talk about are welcome; never reuse their sent
 FIELDS:
 - "situation": a few words naming the situation. It must differ from everything in memory.used_situations.
 - "title": a real group chat name for these people (max 24 characters, may include one emoji), not a summary of the joke.
-- "lines": 3 to 6 short messages. "from" is the handle of the sender. The writer NEVER sends a message.
+- "lines": 2 to 5 short messages; most chats are 3 or 4. Shorter is funnier. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
   "text" is only what they type: never start it with the sender's name or "name:". Max 60 characters each.
   Nobody ever says their own name: a message that mentions a player is sent by someone else.

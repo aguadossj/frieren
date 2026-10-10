@@ -53,8 +53,14 @@ const setupOf = (s) => ({
   ...(!s.adults && { age: 'mixed' }),
 })
 
+// SIM_MODELS="modelo1,modelo2": compara modelos, todos con el prompt candidato. Si no, candidato vs prompt actual.
+const models = (process.env.SIM_MODELS ?? '').split(',').map((m) => m.trim()).filter(Boolean)
 const jobs = SETTINGS.flatMap((setting, si) =>
-  Array.from({ length: perSetting }, (_, k) => ({ setting, variant: k === 0 ? 'current' : 'candidate', writer: players[(si + k) % 4] })),
+  Array.from({ length: perSetting }, (_, k) =>
+    models.length
+      ? { setting, variant: models[k % models.length], writer: players[(si + k) % 4] }
+      : { setting, variant: k === 0 ? 'current' : 'candidate', writer: players[(si + k) % 4] },
+  ),
 )
 
 async function generate(job) {
@@ -68,7 +74,9 @@ async function generate(job) {
   })
   const started = Date.now()
   try {
-    const out = await core.generateRound(input, { ...config, systemPrompt: job.variant === 'candidate' ? candidate : undefined })
+    const out = models.length
+      ? await core.generateRound(input, { ...config, model: job.variant, systemPrompt: candidate })
+      : await core.generateRound(input, { ...config, systemPrompt: job.variant === 'candidate' ? candidate : undefined })
     return {
       ...job,
       ok: true,
@@ -76,6 +84,7 @@ async function generate(job) {
       attempts: out.attempts,
       theme: out.theme_id,
       format: out.format_id,
+      device: out.device,
       title: out.chat.title,
       lines: out.chat.messages.map((m) => ({ who: nameOf[m.player_id], text: m.text })),
     }
@@ -98,6 +107,7 @@ const chats = shuffled.map((r, i) => ({
   variant: r.variant,
   theme: r.theme,
   format: r.format,
+  device: r.device,
   lang: r.setting.lang,
   situation: r.setting.situation,
   adults: r.setting.adults,
@@ -109,5 +119,5 @@ const chats = shuffled.map((r, i) => ({
   ms: r.ms,
   attempts: r.attempts,
 }))
-writeFileSync(join(here, 'prompt-sim-chats.json'), JSON.stringify({ model: config.model, created_at: new Date().toISOString(), chats, failed: results.filter((r) => !r.ok).map((r) => ({ variant: r.variant, situation: r.setting.situation, error: r.error })) }, null, 2))
+writeFileSync(join(here, process.env.SIM_OUT || 'prompt-sim-chats.json'), JSON.stringify({ model: config.model, created_at: new Date().toISOString(), chats, failed: results.filter((r) => !r.ok).map((r) => ({ variant: r.variant, situation: r.setting.situation, error: r.error })) }, null, 2))
 console.log(`\n${chats.length} chats ok, ${results.length - chats.length} failed`)

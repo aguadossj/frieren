@@ -100,6 +100,7 @@ export interface GenerateRoundOutput {
   attempts: number
   theme_id?: string // para métricas y el laboratorio de prompts
   format_id?: string
+  device?: string
 }
 
 export const PROMPT_VERSION = 'round-v9'
@@ -127,8 +128,8 @@ export const LANGUAGES = {
   es: {
     name: 'Spanish (Spain)',
     notes:
-      'Castellano de España, como escriben universitarios de Barcelona o Madrid: vale, tío/tía, guay, flipar, quedada, ' +
-      'finde, birra, en plan, JAJAJA. Nunca español de Latinoamérica ni tópicos mexicanos: nada de güey, chido, platicar, ' +
+      'Castellano de España, como escriben universitarios de Barcelona o Madrid. Muletillas ("tío", "tía", "en plan") como ' +
+      'mucho una vez por chat, y nunca para empezar. Nunca español de Latinoamérica ni tópicos mexicanos: nada de güey, chido, platicar, ' +
       'ahorita, órale, neta, tacos o taquerías. Ninguna palabra en inglés salvo las que se usan de verdad (story, match, like).',
   },
 } as const
@@ -154,7 +155,7 @@ export const TEXTING = {
   },
 } as const
 
-const MAX_LINES = 6 // game.ai_complete_round acepta 2–6 mensajes
+const MAX_LINES = 5 // game.ai_complete_round acepta 2–6; más de 5 se hacía largo de leer en el móvil
 const words = (text: string) => text.trim().split(/\s+/).filter(Boolean).length
 
 // Medido en los fragmentos reales (game.style_examples). Las reacciones y emojis salen de los más frecuentes.
@@ -263,7 +264,20 @@ export const THEMES: Theme[] = [
   { id: 'talent', en: 'someone claims a hidden talent nobody believes', es: 'alguien dice tener un talento oculto que nadie se cree' },
   { id: 'screenshot', en: 'a screenshot or a message sent to the wrong chat', es: 'una captura o un mensaje enviado al chat equivocado' },
   { id: 'trip', en: 'a trip or a day out where everything went wrong', es: 'un viaje o una excursión en la que todo salió mal' },
+  { id: 'hobby', en: 'the writer has a suspicious new hobby or obsession', es: 'el writer tiene un hobby u obsesión nueva muy sospechosa' },
+  { id: 'purchase', en: 'the writer is hiding something they bought', es: 'el writer esconde algo que se ha comprado' },
+  { id: 'parents', en: "the writer's mum or dad found or sent something", es: 'la madre o el padre del writer ha encontrado o mandado algo' },
+  { id: 'exposed', en: "the writer's search history, screen time or playlist got exposed", es: 'se ha filtrado el historial, el tiempo de pantalla o la playlist del writer' },
+  { id: 'spotted', en: 'the writer was spotted somewhere they said they would not be', es: 'han visto al writer en un sitio donde dijo que no iba a estar' },
+  { id: 'excuse', en: "the writer's ridiculous excuse to skip a plan", es: 'la excusa ridícula del writer para no venir a un plan' },
+  { id: 'practice', en: 'the writer has been secretly practising something', es: 'el writer lleva tiempo practicando algo en secreto' },
+  { id: 'recognised', en: 'the writer got recognised somewhere unexpected', es: 'han reconocido al writer en un sitio inesperado' },
+  { id: 'pet', en: "the writer's pet, plant or car did something absurd", es: 'la mascota, la planta o el coche del writer ha hecho algo absurdo' },
+  { id: 'bet_losing', en: 'a group bet that the writer is clearly losing', es: 'una apuesta del grupo que el writer va perdiendo claramente' },
   { id: 'crush', en: 'someone has a suspicious new crush', es: 'alguien tiene un crush nuevo muy sospechoso', adult: true },
+  { id: 'drunk_text', en: 'a drunk text the writer sent last night', es: 'un mensaje que mandó el writer borracho anoche', adult: true },
+  { id: 'dating_app', en: "the writer's dating app profile was found", es: 'alguien ha encontrado el perfil del writer en una app de ligar', adult: true },
+  { id: 'woke_up', en: 'the writer woke up somewhere unexpected', es: 'el writer se ha despertado en un sitio inesperado', adult: true },
   { id: 'night_out', en: 'where someone disappeared to on the last night out', es: 'dónde desapareció alguien la última noche de fiesta', adult: true },
   { id: 'ex', en: 'an ex just showed up again (a like, a story, a text)', es: 'un ex ha vuelto a aparecer (un like, una story, un mensaje)', adult: true },
 ]
@@ -278,9 +292,9 @@ export function pickTheme(input: Pick<GenerateRoundInput, 'setup' | 'memory'>, e
   const allowed = THEMES.filter((t) => !(noSpicy(input.setup) && t.adult))
   const fresh = allowed.filter((t) => !used.has(t.id))
   const pool = fresh.length > 0 ? fresh : allowed
-  // Si el host pidió picante, la mitad de las rondas van a un tema picante (solo hay 3 de 18).
+  // Si el host pidió picante, un tercio de las rondas van a un tema picante; el resto, cualquiera (con tono picante).
   const adult = pool.filter((t) => t.adult)
-  if (input.setup.spicy === 'yes' && adult.length > 0 && Math.random() < 0.5) return pickOne(adult)
+  if (input.setup.spicy === 'yes' && adult.length > 0 && Math.random() < 0.33) return pickOne(adult)
   return pickOne(pool)
 }
 
@@ -307,8 +321,20 @@ export const FORMATS: Format[] = [
 ]
 export const pickFormat = (): Format => (Math.random() < 0.25 ? FORMATS[0] : pickOne(FORMATS.slice(1)))
 
+// Cómo se cuenta (la estructura del chiste), también al azar: si no, todos los chats tienen la misma forma.
+export const DEVICES = [
+  'quick: only 2 or 3 messages, straight to the question',
+  'escalation: each message reveals a worse detail',
+  'fake calm: someone pretends everything is fine when it clearly is not',
+  'detectives: someone drops a clue and the others analyse it far too seriously',
+  'misunderstanding: the group has completely misread something the writer did',
+  'pattern: two people realise the writer has done this before, more than once',
+  'deadpan: one person states something absurd as if it were normal, one reaction, the question',
+]
+export const pickDevice = (): string => pickOne(DEVICES)
+
 /** Lo que eligió el host, en claro: el prompt lo pone por delante de todo lo demás. */
-export function roomBrief(setup: Setup, format: Format) {
+export function roomBrief(setup: Setup, format: Format, device = DEVICES[1]) {
   const lang = setup.lang === 'es' ? 'es' : 'en'
   const clean = isClean(setup)
   return {
@@ -323,6 +349,7 @@ export function roomBrief(setup: Setup, format: Format) {
           ? 'adults who asked for SPICY: flirting, crushes, exes, hookups, walks of shame, drinking and wild nights are welcome. Cheeky innuendo is fine; never explicit or graphic'
           : 'adults: cheeky is fine, never explicit',
     format_this_round: format[lang],
+    how_to_tell_it: device,
   }
 }
 
@@ -696,12 +723,12 @@ export function buildAudience(setup: Setup) {
   }
 }
 
-function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme, format: Format) {
+function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme, format: Format, device: string) {
   const memory = input.memory ?? {}
   const evidence = computeEvidence(input.players, input.history)
   const lang = input.setup.lang === 'es' ? 'es' : 'en'
   return {
-    room: roomBrief(input.setup, format),
+    room: roomBrief(input.setup, format, device),
     language: LANGUAGES[lang].name,
     language_notes: LANGUAGES[lang].notes,
     texting_targets: TEXTING[lang],
@@ -830,21 +857,13 @@ function repairChat(
   const last = lines[lines.length - 1]
   // Solo se arregla una PREGUNTA que no nombra al writer. Una línea final que no es pregunta ni le nombra
   // ("Oh noooo") no se convierte en "Nico Oh noooo": falla la validación y se reintenta.
-  if (typeof last?.text === 'string' && !mentions(last.text, writerName) && isQuestion(last.text)) {
-    // Si la pregunta va a otro jugador (p. ej. al writer de la ronda anterior), se cambia ese nombre por el del writer.
-    const other = Object.values(nameOf).find((name) => name !== writerName && mentions(last.text, name))
-    const word =
-      other &&
-      (last.text.toLowerCase().includes(other.toLowerCase())
-        ? other
-        : other.split(/\s+/).find((w) => w.length >= 2 && mentions(last.text, w)))
-    if (word) {
-      last.text = last.text.replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), writerName)
-    } else {
-      // "Qué ha pasado aquí?" -> "Nico qué ha pasado aquí?" (sin la mayúscula a mitad de frase de "Nico Qué…").
-      const rest = last.text.replace(/^[^\p{L}\p{N}]*/u, '')
-      last.text = `${writerName} ${startsWithCapsWord(rest) ? rest : rest.charAt(0).toLowerCase() + rest.slice(1)}`
-    }
+  // Si la pregunta va a OTRO jugador ("Nico to who??" cuando quien la lió fue Nico) NO se cambia el nombre por el del
+  // writer: la historia era de otro y la pregunta dejaría de tener sentido ("mario to who??"). Falla y se reintenta.
+  const toOther = Object.values(nameOf).some((name) => name !== writerName && namesPerson(last?.text ?? '', name))
+  if (typeof last?.text === 'string' && !mentions(last.text, writerName) && isQuestion(last.text) && !toOther) {
+    // "Qué ha pasado aquí?" -> "Nico qué ha pasado aquí?" (sin la mayúscula a mitad de frase de "Nico Qué…").
+    const rest = last.text.replace(/^[^\p{L}\p{N}]*/u, '')
+    last.text = `${writerName} ${startsWithCapsWord(rest) ? rest : rest.charAt(0).toLowerCase() + rest.slice(1)}`
   }
 }
 
@@ -920,14 +939,33 @@ export async function callModel<T>(
 export function parseJsonReply(content: unknown): unknown {
   const text = typeof content === 'string' ? content.trim() : ''
   try {
-    return JSON.parse(text)
+    return cleanStrings(JSON.parse(text))
   } catch {
     const start = text.indexOf('{')
     const end = text.lastIndexOf('}')
     if (start === -1 || end <= start) throw new Error('no_json')
-    return JSON.parse(text.slice(start, end + 1))
+    return cleanStrings(JSON.parse(text.slice(start, end + 1)))
   }
 }
+
+/**
+ * Hermes a veces rompe los caracteres en json_object: "Andr\u0000e9s" (é partida en un NUL + "e9") o códigos de
+ * color de terminal ("\u001b[36;1m"). Se rehace la letra y se quita el resto, en todas las cadenas de la respuesta.
+ */
+export function cleanText(text: string): string {
+  return text
+    .replace(/\u0000([0-9a-fA-F]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\u001b?\[[0-9;]*m/g, '')
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '')
+}
+const cleanStrings = (value: unknown): unknown =>
+  typeof value === 'string'
+    ? cleanText(value)
+    : Array.isArray(value)
+      ? value.map(cleanStrings)
+      : value && typeof value === 'object'
+        ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cleanStrings(v)]))
+        : value
 
 async function send(config: AiConfig, system: string, user: string, schemaName: string, schema: unknown, timeoutMs: number) {
   const mode = config.jsonMode ?? 'json_schema'
@@ -943,8 +981,8 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
       body: JSON.stringify({
         model: config.model,
         ...(config.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
-        // Los modelos pequeños (p. ej. Hermes 3 8B) se desordenan con temperatura 1.
-        temperature: config.model.includes('gpt-oss') ? 1 : 0.8,
+        // Los modelos pequeños (p. ej. Hermes 3 8B) se desordenan con temperatura 1; 0.95 da más variedad a Hermes 70B.
+        temperature: config.model.includes('gpt-oss') ? 1 : 0.95,
         // max_tokens lo entiende cualquier servidor compatible (vLLM, OpenRouter…); Groq acepta ambos.
         ...(mode === 'json_schema' ? { max_completion_tokens: 4000 } : { max_tokens: 1500 }),
         ...(mode === 'json_schema'
@@ -976,24 +1014,26 @@ export async function generateRound(input: GenerateRoundInput, config: AiConfig)
     attempts,
     theme_id: theme.id,
     format_id: format.id,
+    device: device.split(':')[0],
   })
   const theme = pickTheme(input)
   const format = pickFormat()
+  const device = pickDevice()
   try {
-    return done(await generateOnce(input, config, theme, format), 1)
+    return done(await generateOnce(input, config, theme, format, device), 1)
   } catch (error) {
     const retryable =
       error instanceof AiError &&
       (error.code === 'invalid_output' || (error.code === 'provider_status' && error.message.startsWith('400')))
     const left = deadline - Date.now()
     if (!retryable || left < 2500) throw error
-    return done(await generateOnce(input, { ...config, timeoutMs: left }, theme, format), 2)
+    return done(await generateOnce(input, { ...config, timeoutMs: left }, theme, format, device), 2)
   }
 }
 
 type Attempt = Pick<GenerateRoundOutput, 'chat' | 'memory' | 'input_tokens' | 'output_tokens'>
 
-async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme, format: Format): Promise<Attempt> {
+async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme, format: Format, device: string): Promise<Attempt> {
   const handles = new Map(input.players.map((p, i) => [p.id, `P${i}`]))
   const handleToId = Object.fromEntries([...handles].map(([id, handle]) => [handle, id]))
   const handleOf = (id: string) => handles.get(id) ?? 'gone' // jugadores que ya se fueron
@@ -1004,7 +1044,7 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
   const { json, usage } = await callModel<ModelOutput>(
     config,
     config.systemPrompt ?? SYSTEM_PROMPT,
-    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme, format))}`,
+    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme, format, device))}`,
     'round',
     buildSchema([...handles.values()]),
   )
