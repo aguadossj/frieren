@@ -10,11 +10,14 @@
 //
 // Secretos: AI_API_KEY, GENERATE_ROUND_SECRET; opcionales AI_BASE_URL (Groq por defecto), AI_MODEL y
 // AI_JSON_MODE (json_schema | json_object | none) para proveedores o modelos sin salida estructurada.
+// Juez de coherencia (judge.ts), opcional: JUDGE_MODEL lo enciende (p. ej. openai/gpt-oss-120b); JUDGE_BASE_URL y
+// JUDGE_API_KEY si va en otro proveedor que la generación; JUDGE_EFFORT low | medium | high. Apagarlo: borrar JUDGE_MODEL.
 // SUPABASE_URL y la clave de servicio los pone Supabase.
 
 import { AiError, generateRound, parseInput } from './core.ts'
 import { MIMIC_PROMPT_VERSION, generateMimic } from './mimic.ts'
 import { generateDrafts } from './drafts.ts'
+import { JUDGE_PROMPT_VERSION, type JudgeConfig, type Verdict } from './judge.ts'
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -53,6 +56,21 @@ async function rpc(name: string, args: Record<string, unknown>): Promise<unknown
 const failStatus = (code: AiError['code']) =>
   code === 'timeout' ? 'timeout' : code === 'invalid_output' ? 'invalid' : 'error'
 
+// Una fila de game.ai_generations por veredicto (prompt_version judge-v1): ok = pasa, invalid = el juez lo tumbó,
+// error = el juez no contestó a tiempo (el chat salió igual). Las vistas de métricas solo miran round-%.
+async function logVerdicts(roomId: string | null, roundId: string | null, verdicts: Verdict[] = []) {
+  await Promise.all(
+    verdicts.map((v) =>
+      rpc('log_ai_generation', {
+        p_room_id: roomId, p_round_id: roundId, p_provider: 'openai-compatible', p_model: v.model,
+        p_prompt_version: JUDGE_PROMPT_VERSION, p_status: v.source === 'skipped' ? 'error' : v.ok ? 'ok' : 'invalid',
+        p_input_tokens: v.input_tokens, p_output_tokens: v.output_tokens, p_latency_ms: v.latency_ms,
+        p_error: v.ok && v.source !== 'skipped' ? null : `${v.source} [${v.issues.join(', ')}] ${v.problem}`.slice(0, 900),
+      }).catch((e) => console.error('judge log', e)),
+    ),
+  )
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method !== 'POST') return json(405, { error: 'method_not_allowed' })
 
@@ -70,6 +88,16 @@ Deno.serve(async (request: Request) => {
     // json_schema (por defecto) | json_object | none: para modelos sin salida estructurada, como Hermes 3 en algunos hosts
     jsonMode: (Deno.env.get('AI_JSON_MODE') ?? 'json_schema') as 'json_schema' | 'json_object' | 'none',
   }
+  const judgeModel = Deno.env.get('JUDGE_MODEL')
+  const judge: JudgeConfig | null = judgeModel
+    ? {
+        model: judgeModel,
+        baseUrl: Deno.env.get('JUDGE_BASE_URL') ?? config.baseUrl,
+        apiKey: Deno.env.get('JUDGE_API_KEY') ?? config.apiKey,
+        effort: (Deno.env.get('JUDGE_EFFORT') ?? 'low') as JudgeConfig['effort'],
+        timeoutMs: 4000,
+      }
+    : null
 
   const body = await request.json().catch(() => null)
   const roundId = typeof body?.round_id === 'string' ? body.round_id : null
@@ -79,7 +107,7 @@ Deno.serve(async (request: Request) => {
     const roomId = typeof body?.room_id === 'string' ? body.room_id : null
     try {
       if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
-      const output = await generateDrafts(body.input, { ...config, timeoutMs: 30000 }, Number(body.count) || 3)
+      const output = await generateDrafts(body.input, { ...config, timeoutMs: 30000 }, Number(body.count) || 3, judge)
       if (!roomId) return json(200, output)
       const saved = output.drafts.length
         ? await rpc('ai_save_drafts', { p_room_id: roomId, p_setup_hash: String(body.setup_hash ?? ''), p_drafts: output.drafts })
@@ -90,6 +118,7 @@ Deno.serve(async (request: Request) => {
         p_input_tokens: output.input_tokens, p_output_tokens: output.output_tokens, p_latency_ms: output.latency_ms,
         p_error: output.errors.length ? output.errors.join(' | ').slice(0, 900) : null,
       }).catch((e) => console.error('drafts log', e))
+      await logVerdicts(roomId, null, output.judge)
       return json(200, { saved })
     } catch (error) {
       console.error('drafts', roomId, error)
@@ -133,8 +162,9 @@ Deno.serve(async (request: Request) => {
     try {
       if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
       const input = parseInput(body.input)
-      const output = await generateRound(input, { ...config, timeoutMs: input.round === 1 ? 18000 : 28000 })
+      const output = await generateRound(input, { ...config, timeoutMs: input.round === 1 ? 18000 : 28000 }, judge)
       const outcome = await rpc('ai_complete_round', { p_round_id: roundId, p_result: output })
+      await logVerdicts(null, roundId, output.judge)
       return json(200, { outcome })
     } catch (error) {
       const code = error instanceof AiError ? error.code : 'provider_failed'
@@ -153,7 +183,7 @@ Deno.serve(async (request: Request) => {
   // ── Prueba directa: entrada -> salida ──
   if (!apiKey) return json(503, { error: 'no_key' })
   try {
-    return json(200, await generateRound(parseInput(body), config))
+    return json(200, await generateRound(parseInput(body), config, judge))
   } catch (error) {
     if (error instanceof AiError) {
       console.error('generate-round', error.code, error.message)

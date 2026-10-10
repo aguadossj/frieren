@@ -11,6 +11,8 @@
 // 2. Notas del modelo: estilo real de cada jugador, datos inocuos que han contado, chistes recurrentes y hacia
 //    dónde llevar la partida. Salen de la misma llamada que el chat, con tamaños limitados y filtrados en código.
 
+import { feedbackFor, judgeChat, type JudgeChat, type JudgeConfig, type Verdict } from './judge.ts'
+
 export interface AiConfig {
   baseUrl: string // p. ej. https://api.groq.com/openai/v1
   apiKey: string
@@ -95,6 +97,8 @@ export interface GenerateRoundOutput {
   output_tokens: number | null
   latency_ms: number
   attempts: number
+  /** Veredictos del juez de coherencia (judge.ts), si está activo. Solo para el registro. */
+  judge?: Verdict[]
 }
 
 export const PROMPT_VERSION = 'round-v7'
@@ -845,33 +849,83 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
   }
 }
 
-/** Genera la ronda. Reintenta una vez si el modelo devuelve algo inválido (p. ej. hace hablar al writer). */
-export async function generateRound(input: GenerateRoundInput, config: AiConfig): Promise<GenerateRoundOutput> {
+// Tiempo mínimo para otro intento tras el juez: Hermes 3 70B tarda ~10–13 s por chat.
+const JUDGE_RETRY_MIN_MS = 12000
+
+/**
+ * Genera la ronda. Reintenta una vez si el modelo devuelve algo inválido (p. ej. hace hablar al writer).
+ * Con juez, desde la ronda 2 (la 1 la está esperando la sala): si el chat no se entiende y queda tiempo, otro intento
+ * con la crítica del juez delante. El juez nunca tumba una ronda: si no queda tiempo o falla, el chat sale igual.
+ */
+export async function generateRound(
+  input: GenerateRoundInput,
+  config: AiConfig,
+  judge: JudgeConfig | null = null,
+): Promise<GenerateRoundOutput> {
   const started = Date.now()
   const deadline = started + (config.timeoutMs ?? 8000)
-  const done = (output: Attempt, attempts: number): GenerateRoundOutput => ({
+  let attempts = 0
+  const verdicts: Verdict[] = []
+  const done = (output: Attempt): GenerateRoundOutput => ({
     ...output,
     model: config.model,
     prompt_version: PROMPT_VERSION,
     latency_ms: Date.now() - started,
     attempts,
+    ...(verdicts.length ? { judge: verdicts } : {}),
   })
   const theme = pickTheme(input)
+  const judged = async (attempt: Attempt) => {
+    const left = deadline - Date.now()
+    if (!judge || left < 1500) return null
+    const verdict = await judgeChat(judgeView(input, attempt), { ...judge, timeoutMs: Math.min(judge.timeoutMs ?? 4000, left - 500) })
+    verdicts.push(verdict)
+    return verdict
+  }
+
+  let first: Attempt
   try {
-    return done(await generateOnce(input, config, theme), 1)
+    attempts++
+    first = await generateOnce(input, config, theme)
   } catch (error) {
     const retryable =
       error instanceof AiError &&
       (error.code === 'invalid_output' || (error.code === 'provider_status' && error.message.startsWith('400')))
     const left = deadline - Date.now()
     if (!retryable || left < 2500) throw error
-    return done(await generateOnce(input, { ...config, timeoutMs: left }, theme), 2)
+    attempts++
+    first = await generateOnce(input, { ...config, timeoutMs: left }, theme)
+  }
+
+  if (!judge || input.round <= 1) return done(first)
+  const verdict = await judged(first)
+  const left = deadline - Date.now()
+  if (!verdict || verdict.ok || left < JUDGE_RETRY_MIN_MS) return done(first)
+  try {
+    attempts++
+    const second = await generateOnce(input, { ...config, timeoutMs: left }, theme, feedbackFor(verdict))
+    const again = await judged(second)
+    // El segundo se escribió con la crítica delante: se queda salvo que el juez lo vea peor (fallos de código).
+    return done(again && !again.ok && again.source === 'code' && verdict.source !== 'code' ? first : second)
+  } catch {
+    return done(first)
+  }
+}
+
+/** El chat como lo ve el juez: con nombres, no ids. */
+function judgeView(input: GenerateRoundInput, attempt: Attempt): JudgeChat {
+  const nameOf = new Map(input.players.map((p) => [p.id, p.name]))
+  return {
+    writer: nameOf.get(input.writer_id) ?? '',
+    title: attempt.chat.title,
+    lines: attempt.chat.messages.map((m) => ({ from: nameOf.get(m.player_id) ?? '?', text: m.text })),
+    players: input.players.map((p) => p.name),
   }
 }
 
 type Attempt = Pick<GenerateRoundOutput, 'chat' | 'memory' | 'input_tokens' | 'output_tokens'>
 
-async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme): Promise<Attempt> {
+async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme, feedback?: string): Promise<Attempt> {
   const handles = new Map(input.players.map((p, i) => [p.id, `P${i}`]))
   const handleToId = Object.fromEntries([...handles].map(([id, handle]) => [handle, id]))
   const handleOf = (id: string) => handles.get(id) ?? 'gone' // jugadores que ya se fueron
@@ -882,7 +936,7 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
   const { json, usage } = await callModel<ModelOutput>(
     config,
     SYSTEM_PROMPT,
-    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme))}`,
+    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme))}${feedback ? `\n\n${feedback}` : ''}`,
     'round',
     buildSchema([...handles.values()]),
   )
