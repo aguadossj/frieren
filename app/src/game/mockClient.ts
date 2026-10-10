@@ -17,6 +17,7 @@ import {
 } from './types'
 import type { Answer, Chat, GameClient, GameState, Pack, Phase, Player, Room, RoundResult, Setup, SetupQuestion } from './types'
 import { getLang } from '../i18n'
+import { randomFreeAvatar } from '../lib/avatars'
 
 /** `crypto.randomUUID` solo existe en contextos seguros (https / localhost). En el móvil por la IP local
  *  (http://192.168.x.x:5173) no está, así que usamos un id aleatorio normal. */
@@ -140,13 +141,15 @@ export function createMockClient(): GameClient {
     listeners.forEach((listener) => listener(state))
   }
 
-  function addPlayer(name: string, isHost: boolean): Player {
+  function addPlayer(name: string, isHost: boolean, emoji?: string): Player {
     const player: Player = {
       id: newId(),
       name: name.trim().slice(0, MAX_NAME_LENGTH),
       color: PLAYER_COLORS[players.length % PLAYER_COLORS.length],
       score: 0,
       isHost,
+      // Panda: el que trae el jugador o uno libre al azar (igual que join_room en Supabase)
+      emoji: emoji ?? randomFreeAvatar(players.map((p) => p.emoji ?? '')),
     }
     players = [...players, player]
     return player
@@ -342,10 +345,10 @@ export function createMockClient(): GameClient {
   }
 
   return {
-    async createRoom(name) {
+    async createRoom(name, emoji) {
       reset()
       code = randomCode()
-      meId = addPlayer(name, true).id
+      meId = addPlayer(name, true, emoji).id
       emit()
       BOT_NAMES.forEach((botName, i) =>
         later(600 * (i + 1), () => {
@@ -357,13 +360,19 @@ export function createMockClient(): GameClient {
     // Mock: cualquier código de 4 letras es una sala con bots (útil para probar sin backend)
     async checkRoom(roomCode) {
       // joinRoom del mock mete primero al host (bot) y luego a ti: te toca el segundo color
-      return /^[A-Za-z]{4}$/.test(roomCode.trim()) ? { ok: true, color: PLAYER_COLORS[1] } : { ok: false, message: 'Room not found' }
+      if (!/^[A-Za-z]{4}$/.test(roomCode.trim())) return { ok: false, message: 'Room not found' }
+      return { ok: true, color: PLAYER_COLORS[1], takenAvatars: [], takenNames: BOT_NAMES.map((n) => n.toLowerCase()) }
     },
-    async joinRoom(roomCode, name) {
+    async joinRoom(roomCode, name, emoji) {
+      if (BOT_NAMES.some((n) => n.toLowerCase() === name.trim().toLowerCase())) {
+        error = getLang() === 'es' ? 'Ese nombre ya está cogido en esta sala.' : 'That name is already taken in this room.'
+        emit()
+        return
+      }
       reset()
       code = roomCode.toUpperCase()
       addPlayer(BOT_NAMES[0], true)
-      meId = addPlayer(name, false).id
+      meId = addPlayer(name, false, emoji).id
       addPlayer(BOT_NAMES[1], false)
       addPlayer(BOT_NAMES[2], false)
       emit()

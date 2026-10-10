@@ -22,6 +22,24 @@
     <meta property="og:image:alt" content="Typing… — a group chat where your friends fake your replies" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="https://frieren-bfq.pages.dev/og.png" />
+    <!-- Primera visita: precargar ya las capturas de "Cómo se juega" (en el idioma guardado, o inglés) para que no salgan en blanco -->
+    <script>
+      (function () {
+        try {
+          var seen = localStorage.getItem('typing.howto.seen') === '1' || document.cookie.indexOf('typing_seen=1') >= 0
+          if (seen) return
+          var lang = localStorage.getItem('typing.lang') === 'es' ? 'es' : 'en'
+          ;['chat', 'vote', 'reveal', 'standings'].forEach(function (n) {
+            var l = document.createElement('link')
+            l.rel = 'preload'
+            l.as = 'image'
+            l.type = 'image/webp'
+            l.href = '/howto/' + lang + '-' + n + '.webp'
+            document.head.appendChild(l)
+          })
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

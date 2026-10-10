@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { retintSafariBars } from '../lib/viewport'
 import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
-import HowToPlay, { seenHowTo } from '../components/HowToPlay'
+import HowToPlay, { preloadHowTo, seenHowTo } from '../components/HowToPlay'
 import MimicInfo from '../components/MimicInfo'
 import type { SwipeCard } from '../components/SwipeDeck'
-import { AppHeader, Avatar, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
-import { PandaFace } from '../components/Panda'
+import { AppHeader, Avatar, Body, Button, ConfirmDialog, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
 import { getLang, useLang, useT } from '../i18n'
 import { LEGAL, LEGAL_PAGES, LEGAL_PATHS } from '../content/legal'
 import { describePlace, knownPosition } from '../lib/place'
 import type { PlaceContext } from '../lib/place'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
+import { randomFreeAvatar } from '../lib/avatars'
 
 // El QR de la sala apunta a ?room=CODE: entramos directamente a la página de unirse.
 // Se lee UNA vez y se borra de la URL: así, al volver al menú tras una partida, Home es la de siempre
@@ -34,6 +34,16 @@ export default function Home() {
   const [page, setPage] = useState<Page>(codeFromUrl ? 'join' : 'start')
   // "Cómo se juega": solo la primera vez que se abre la web (luego, desde el botón de la portada)
   const [howTo, setHowTo] = useState(() => !seenHowTo())
+  // Si vienes de que el host te eche (o no te deje entrar), se avisa una vez al llegar aquí
+  const { removed } = useGame()
+  const [removedSeen, setRemovedSeen] = useState(false)
+  const t = useT()
+  // Capturas de "Cómo se juega" precargadas siempre en segundo plano (en la primera visita ya van desde index.html)
+  const lang = useLang()
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200))
+    idle(() => preloadHowTo(lang))
+  }, [lang])
 
   // Home siempre "limpia", también al volver de una partida: sin restos del chat (fondo blanco, teclado),
   // sin foco en ningún campo, página arriba del todo y barras de Safari recalculadas.
@@ -59,6 +69,15 @@ export default function Home() {
     <>
       {current}
       {howTo && <HowToPlay onClose={() => setHowTo(false)} />}
+      {removed && !removedSeen && !howTo && (
+        <ConfirmDialog
+          title={removed === 'kicked' ? t.removedKicked : t.removedRejected}
+          body={t.removedBody}
+          confirm={t.removedOk}
+          onConfirm={() => setRemovedSeen(true)}
+          onCancel={() => setRemovedSeen(true)}
+        />
+      )}
     </>
   )
 }
@@ -161,7 +180,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
         place = await Promise.race([placeLookup.current, new Promise<null>((r) => setTimeout(() => r(null), 10000))])
         setLookingAround(false)
       }
-      await game.createRoom(name)
+      await game.createRoom(name, randomFreeAvatar())
       await game.saveSetup({
         ...(situation.trim() && { situation: situation.trim() }),
         lang: getLang(), // idioma de la partida, para que la IA escriba los chats en él
@@ -181,7 +200,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
     }
   }
 
-  // "¿Qué está pasando ahora?" es obligatorio: sin él no se puede seguir (la IA lo necesita para los chats)
+  // "¿Qué estáis haciendo ahora?" es obligatorio: sin él no se puede seguir (la IA lo necesita para los chats)
   const [situationMissing, setSituationMissing] = useState(false)
   const situationRef = useRef<HTMLTextAreaElement>(null)
   const MIN_SITUATION = 3
@@ -226,6 +245,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
             <SwipeDeck
               cards={cards}
               intro={t.quickOnes}
+              how={t.swipeHint}
               onAnswer={(id, yes) => {
                 answers.current[id] = yes
                 if (id === 'together' && yes) locate()
@@ -264,7 +284,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
 
           <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.2s' }}>
               <span className="flex items-baseline justify-between">
-                <Eyebrow>{t.situationLabel}</Eyebrow>
+                <span className="text-[18px] leading-tight font-extrabold">{t.situationLabel}</span>
                 <span className="text-[13px] font-bold text-white/60 tabular-nums">
                   {situation.length}/{MAX_SITUATION}
                 </span>
@@ -283,9 +303,11 @@ function NamePage({ onBack }: { onBack: () => void }) {
                 placeholder={t.situationPlaceholder}
                 className={`w-full resize-none rounded-[28px] bg-white px-6 py-4 text-[17px] leading-snug font-semibold text-ink outline-none placeholder:font-medium placeholder:text-neutral-400 ${situationMissing ? 'animate-nudge ring-4 ring-ink' : ''}`}
               />
-              <span className={`text-[14px] font-semibold ${situationMissing ? 'font-extrabold text-white' : 'text-white/70'}`} role={situationMissing ? 'alert' : undefined}>
-                {situationMissing ? t.situationRequired : t.situationHint}
-              </span>
+              {situationMissing && (
+                <span className="text-[14px] font-extrabold text-white" role="alert">
+                  {t.situationRequired}
+                </span>
+              )}
           </label>
         </Body>
 
@@ -320,8 +342,12 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
   // Comprobación del código ANTES de pedir el nombre (check_room): existe, no ha empezado, no está llena
   const [checking, setChecking] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
-  // Color (→ panda) que te tocará al entrar, según check_room
+  // Tu panda: uno libre de la sala elegido al confirmar el código; se entra con ESE (join_room lo guarda), así que
+  // no cambia al entrar aunque otros estén poniendo su nombre a la vez. Y los nombres que ya hay, para avisar.
   const [myColor, setMyColor] = useState<string | null>(null)
+  const [myAvatar, setMyAvatar] = useState<string | null>(null)
+  const [takenNames, setTakenNames] = useState<string[]>([])
+  const nameTaken = takenNames.includes(name.trim().toLowerCase())
 
   const checkCode = async (v: string) => {
     setChecking(true)
@@ -330,6 +356,8 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
     setChecking(false)
     if (res.ok) {
       setMyColor(res.color ?? null)
+      setMyAvatar((current) => (current && !(res.takenAvatars ?? []).includes(current) ? current : randomFreeAvatar(res.takenAvatars)))
+      setTakenNames(res.takenNames ?? [])
       return setStep('name')
     }
     setStep('code')
@@ -355,10 +383,10 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
   )
 
   const join = async () => {
-    if (!name.trim() || busy) return
+    if (!name.trim() || busy || nameTaken) return
     setBusy(true)
     try {
-      await game.joinRoom(code, name)
+      await game.joinRoom(code, name, myAvatar ?? undefined)
     } finally {
       setBusy(false)
     }
@@ -409,26 +437,21 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
           void join()
         }}
       >
-        <Body className="pt-4">
-          {/* Solo tu panda (el que tendrás en la sala) y tu nombre */}
-          <div className="my-auto flex flex-col items-center gap-8 py-4">
-            <div className={`animate-pop ${shake ? 'animate-nudge' : ''}`}>
-              {myColor ? (
-                <Avatar player={{ name: name.trim() || '?', color: myColor }} roomCode={code} size={176} ring />
-              ) : checking ? (
-                <span className="flex size-[176px] items-center justify-center rounded-full bg-white/20 ring-[3px] ring-white">
-                  <TypingDots />
-                </span>
-              ) : (
-                // Sin dato de color (servidor sin actualizar): un panda genérico
-                <span className="flex size-[176px] items-center justify-center overflow-hidden rounded-full bg-white ring-[3px] ring-white">
-                  <PandaFace size={150} />
-                </span>
-              )}
-            </div>
+        <Body className="gap-8 pt-6">
+          <div className="animate-rise">
+            <Eyebrow>{t.joinARoom}</Eyebrow>
+            <h1 className="mt-2 text-[44px] leading-[1.02] font-black tracking-[-0.035em]">{t.askName}</h1>
+          </div>
+          {/* Tu panda (el que tendrás en la sala), encima de la caja del nombre. Sin animación. */}
+          <div className="flex flex-col items-center gap-5">
+            {myColor ? (
+              <Avatar player={{ name: name.trim() || '?', color: myColor, emoji: myAvatar }} roomCode={code} size={160} ring />
+            ) : (
+              <span className="size-[160px] rounded-full bg-white/20 ring-[3px] ring-white" />
+            )}
             <TextInput
-              className="animate-rise"
-              style={{ animationDelay: '0.15s' }}
+              className={`animate-rise ${shake ? 'animate-nudge' : ''}`}
+              style={{ animationDelay: '0.1s' }}
               placeholder={t.namePlaceholderGuest}
               aria-label={t.yourName}
               maxLength={MAX_NAME_LENGTH}
@@ -450,7 +473,12 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
               )}
             </div>
           )}
-          <Button type="submit" variant="ink" disabled={!name.trim() || busy} className="flex items-center justify-center gap-3">
+          {nameTaken && (
+            <p className="animate-rise text-center text-[16px] font-bold" role="alert">
+              {t.nameTaken}
+            </p>
+          )}
+          <Button type="submit" variant="ink" disabled={!name.trim() || busy || nameTaken} className="flex items-center justify-center gap-3">
             {busy ? (
               <>
                 {t.joining} <TypingDots />

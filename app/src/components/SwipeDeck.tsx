@@ -36,7 +36,17 @@ export const GLYPHS = {
   ),
 }
 
-export default function SwipeDeck({ cards, intro, onAnswer }: { cards: SwipeCard[]; intro: string; onAnswer: (id: string, yes: boolean) => void }) {
+export default function SwipeDeck({
+  cards,
+  intro,
+  how,
+  onAnswer,
+}: {
+  cards: SwipeCard[]
+  intro: string
+  how: string // "Swipe": pequeño y centrado entre ← No y Sí → de la tarjeta
+  onAnswer: (id: string, yes: boolean) => void
+}) {
   const [index, setIndex] = useState(0)
   const [dx, setDx] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -172,10 +182,13 @@ export default function SwipeDeck({ cards, intro, onAnswer }: { cards: SwipeCard
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[17px] font-extrabold">
+                <div className="flex items-center justify-between gap-1 text-[17px] font-extrabold whitespace-nowrap">
                   <span className="flex items-center gap-1.5 transition-opacity" style={{ opacity: 1 - yes * 0.8 }}>
                     <span className="text-[22px] leading-none">←</span>
                     {card.no}
+                  </span>
+                  <span className="shrink-0 px-2 text-[13px] font-bold text-neutral-400 transition-opacity" style={{ opacity: 1 - Math.max(yes, no) }}>
+                    {how}
                   </span>
                   <span className="flex items-center gap-1.5 text-good transition-opacity" style={{ opacity: 1 - no * 0.8 }}>
                     {card.yes}

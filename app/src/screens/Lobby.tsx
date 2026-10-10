@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Avatar, Button, Eyebrow, Footer, Icon, LangToggle, Row, Screen } from '../components/ui'
+import { Avatar, Button, ConfirmDialog, Eyebrow, Footer, Icon, LangToggle, Row, Screen } from '../components/ui'
 import QR, { shareInvite } from '../components/QR'
 import { SettingsGear } from '../components/HostSettings'
 import { PendingRequests } from '../components/PendingRequests'
@@ -11,6 +11,8 @@ export default function Lobby() {
   const { room, me, game, error } = useGame()
   const t = useT()
   const [copied, setCopied] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [kickTarget, setKickTarget] = useState<{ id: string; name: string } | null>(null) // "¿Echar a X?" abierto
   if (!room || !me) return null
   const missing = MIN_PLAYERS - room.players.length
   const host = room.players.find((p) => p.isHost)
@@ -52,11 +54,34 @@ export default function Lobby() {
   )
 
   return (
-    <Screen>
+    <Screen className="relative">
+      {confirmLeave && (
+        <ConfirmDialog
+          title={t.leaveTitle}
+          body={t.leaveBody}
+          cancel={t.leaveStay}
+          confirm={t.leaveConfirm}
+          onCancel={() => setConfirmLeave(false)}
+          onConfirm={() => void game.leave()}
+        />
+      )}
+      {kickTarget && (
+        <ConfirmDialog
+          title={t.kickTitle(kickTarget.name)}
+          body={t.kickBody}
+          cancel={t.kickNo}
+          confirm={t.kickYes}
+          onCancel={() => setKickTarget(null)}
+          onConfirm={() => {
+            void game.kick(kickTarget.id)
+            setKickTarget(null)
+          }}
+        />
+      )}
       {/* Sin cabecera: atrás e idioma flotando arriba */}
       <div className="flex shrink-0 items-center justify-between px-4 pt-3">
         <button
-          onClick={() => void game.leave()}
+          onClick={() => setConfirmLeave(true)}
           aria-label={t.leaveRoom}
           className="flex size-[44px] items-center justify-center rounded-full bg-white/18 active:scale-90"
         >
@@ -123,6 +148,16 @@ export default function Lobby() {
                     {p.id === me.id && <span className="text-neutral-400"> ({t.youLower})</span>}
                   </span>
                   {p.isHost && <span className="text-[15px] text-neutral-400">{t.hostTag}</span>}
+                  {/* El host puede echar a alguien: la ✕ abre "¿Echar a X?" */}
+                  {me.isHost && p.id !== me.id && (
+                    <button
+                      onClick={() => setKickTarget({ id: p.id, name: p.name })}
+                      aria-label={t.kick(p.name)}
+                      className="-mr-1 flex size-[44px] shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand transition active:scale-90 active:bg-brand active:text-white"
+                    >
+                      <Icon name="x" size={18} />
+                    </button>
+                  )}
                 </Row>
               </li>
             ))}

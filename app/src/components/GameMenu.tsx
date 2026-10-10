@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '../i18n'
 import { useGame } from '../game/useGame'
+import { Avatar } from './ui'
 
 const TEXT = {
   en: {
@@ -86,7 +87,7 @@ function MenuSheet({ onClose }: { onClose: () => void }) {
             <ul className="mt-2 flex flex-col gap-1.5">
               {room.players.map((p) => (
                 <li key={p.id} className="flex min-h-[48px] items-center gap-3 rounded-[16px] bg-neutral-100 px-3">
-                  <span className="size-3 shrink-0 rounded-full" style={{ background: p.color }} />
+                  <Avatar player={p} size={34} />
                   <span className="min-w-0 flex-1 truncate text-[16px] font-bold">
                     {p.name}
                     {p.id === me.id && <span className="ml-1.5 text-[13px] text-neutral-400">({t.you})</span>}

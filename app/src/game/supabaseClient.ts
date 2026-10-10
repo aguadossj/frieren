@@ -9,11 +9,13 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { GameClient, GameState, GroupType, Pack, Room, RoomSettings, Setup, SetupQuestion } from './types'
+import { PLAYER_COLORS } from './types'
 import { getLang } from '../i18n'
 import type { Lang } from '../i18n'
 
 const ROOM_KEY = 'typing.roomId'
 const POLL_MS = 5000
+const PENDING_POLL_MS = 1500 // esperando a que el host te deje entrar
 
 const PACK_TO_VIBE: Record<Pack, string> = { uni: 'uni', spicy: 'spicy', dating: 'exes', moral: 'ethics' }
 const VIBE_TO_PACK: Record<string, Pack> = { uni: 'uni', spicy: 'spicy', exes: 'dating', ethics: 'moral' }
@@ -35,6 +37,7 @@ const ERRORS: Record<Lang, Record<string, string>> = {
     writer_cannot_vote: "It's your round. Just watch them guess.",
     not_writing_phase: 'Too late, time is up.',
     not_voting_phase: 'Voting is closed.',
+    name_taken: 'That name is already taken in this room.',
     unknown: 'Something went wrong. Try again.',
   },
   es: {
@@ -53,6 +56,7 @@ const ERRORS: Record<Lang, Record<string, string>> = {
     writer_cannot_vote: 'Es tu ronda. Mira cómo intentan adivinar.',
     not_writing_phase: 'Tarde, se acabó el tiempo.',
     not_voting_phase: 'La votación está cerrada.',
+    name_taken: 'Ese nombre ya está cogido en esta sala.',
     unknown: 'Algo ha fallado. Vuelve a intentarlo.',
   },
 }
@@ -102,6 +106,7 @@ export function createSupabaseClient(): GameClient {
   let roomId: string | null = readRoomId()
   let channel: RealtimeChannel | null = null
   let pollTimer: ReturnType<typeof setInterval> | null = null
+  let pendingTimer: ReturnType<typeof setTimeout> | null = null
   let phaseTimer: ReturnType<typeof setTimeout> | null = null
   let requestSeq = 0
   let lastVersion = -1
@@ -164,12 +169,12 @@ export function createSupabaseClient(): GameClient {
     }
   }
 
-  function leaveLocally(error: string | null = null) {
+  function leaveLocally(error: string | null = null, removed: GameState['removed'] = null) {
     stopSync()
     roomId = null
     lastVersion = -1
     writeRoomId(null)
-    state = { room: null, meId: null, error, pending: null }
+    state = { room: null, meId: null, error, pending: null, removed }
     emit()
   }
 
@@ -179,16 +184,25 @@ export function createSupabaseClient(): GameClient {
     try {
       const s = await rpc<ServerRoom>('get_room_state', { p_room_id: roomId })
       if (seq !== requestSeq) return // llegó una respuesta más nueva
-      if (s.kicked) return leaveLocally(ERRORS[getLang()].kicked)
-      if (s.rejected) return leaveLocally(ERRORS[getLang()].rejected)
+      if (s.kicked) return leaveLocally(ERRORS[getLang()].kicked, 'kicked')
+      if (s.rejected) return leaveLocally(ERRORS[getLang()].rejected, 'rejected')
       if (s.left) return leaveLocally()
       if (s.pending) {
-        // Sala con aprobación: esperando al host (sin ver nada de la sala)
+        // Sala con aprobación: esperando al host (sin ver nada de la sala). Mientras esperas no puedes escuchar el
+        // canal de la sala (es solo para jugadores dentro), así que se pregunta cada 1,5 s para entrar en cuanto te acepten.
         state = { ...state, room: null, meId: s.meId, pending: { code: s.code, hostName: s.hostName ?? null } }
+        if (pendingTimer) clearTimeout(pendingTimer)
+        pendingTimer = setTimeout(() => void refresh(), PENDING_POLL_MS)
         return emit()
       }
+      const wasPending = state.pending !== null
       lastVersion = s.version
       state = { ...state, room: toRoom(s), meId: s.meId, pending: null }
+      // Recién aceptado: conectarse ya al canal de la sala (mientras esperabas no se podía)
+      if (wasPending && roomId && channel?.state !== 'joined') {
+        const id = roomId
+        setTimeout(() => void startSync(id), 0)
+      }
       emit()
       schedulePhaseTimer()
     } catch (e) {
@@ -236,6 +250,8 @@ export function createSupabaseClient(): GameClient {
   }
 
   function stopSync() {
+    if (pendingTimer) clearTimeout(pendingTimer)
+    pendingTimer = null
     if (channel) void db.removeChannel(channel)
     channel = null
     if (pollTimer) clearInterval(pollTimer)
@@ -279,8 +295,14 @@ export function createSupabaseClient(): GameClient {
     },
     async checkRoom(code) {
       try {
-        const r = await rpc<{ ok: boolean; reason: string | null; color?: string | null }>('check_room', { p_code: code })
-        return r.ok ? { ok: true, color: r.color ?? undefined } : { ok: false, message: friendly(r.reason ?? 'room_not_found') }
+        const r = await rpc<{ ok: boolean; reason: string | null; players?: number; color?: string | null; taken_avatars?: string[]; taken_names?: string[] }>(
+          'check_room',
+          { p_code: code },
+        )
+        if (!r.ok) return { ok: false, message: friendly(r.reason ?? 'room_not_found') }
+        // `color` viene de la migración check_room_color; sin ella, el siguiente color en orden según cuántos hay
+        const guess = typeof r.players === 'number' ? PLAYER_COLORS[r.players % PLAYER_COLORS.length] : undefined
+        return { ok: true, color: r.color ?? guess, takenAvatars: r.taken_avatars ?? [], takenNames: r.taken_names ?? [] }
       } catch {
         // Si la función aún no está desplegada o falla la red, no bloqueamos: join_room vuelve a comprobarlo
         return { ok: true }

@@ -1,4 +1,4 @@
-// Idioma de la interfaz (EN/ES). Se guarda en el móvil y por defecto sigue al idioma del sistema.
+// Idioma de la interfaz (EN/ES). Se guarda en el móvil; por defecto, inglés.
 // Uso: `const t = useT()` → `t.createRoom`, `t.youreIn(name)`. Cambiar: `setLang('es')`.
 import { useSyncExternalStore } from 'react'
 
@@ -10,9 +10,10 @@ function initial(): Lang {
     const saved = localStorage.getItem(KEY)
     if (saved === 'en' || saved === 'es') return saved
   } catch {
-    /* sin almacenamiento: seguimos con el del sistema */
+    /* sin almacenamiento: inglés */
   }
-  return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('es') ? 'es' : 'en'
+  // Por defecto, inglés (también la explicación de la primera visita); quien cambie a ES lo tiene guardado
+  return 'en'
 }
 
 let current: Lang = initial()
@@ -75,15 +76,15 @@ const en = {
   howNext: 'Next',
   howPlay: 'Let’s play!',
   howSkip: 'Skip',
-  // ¿Qué es Mimic? (página con el mismo formato que "unirse")
+  // ¿Qué es Mimic? (una sola pantalla)
   mimicInfo: {
-    eyebrow: 'What’s Mimic?',
-    title: 'An AI plays with you',
-    body: 'It copies whoever answers and sneaks a fake reply into the vote.',
-    avoid: 'Vote for it and you lose 100 points.',
+    title: 'Mimic is an AI',
+    body: 'It pretends to be one of you and sneaks a fake answer into the vote.',
+    avoid: 'Avoid its answer: vote for it and you lose 100 points.',
     demoFake: 'lol nope',
     cta: 'Got it',
     more: 'More about the AI',
+    close: 'Close',
   },
   back: 'Back',
   next: 'Next',
@@ -94,12 +95,14 @@ const en = {
   yourName: 'Your name',
   namePlaceholderHost: 'e.g. Pol',
   namePlaceholderGuest: 'e.g. Laura',
-  situationLabel: 'What’s going on right now?',
-  situationPlaceholder: 'Friday drinks at Pol’s flat. Someone just spilled wine on the sofa…',
-  situationHint: 'Where you are, who’s there, what just happened.',
-  situationRequired: 'Tell us what’s going on to start.',
+  askName: 'What’s your name?',
+  situationLabel: 'What are you guys doing right now?',
+  situationPlaceholder: 'Having Friday drinks at Pol’s flat, about to head out…',
+  situationHint: 'What you’re doing, where, and who’s there.',
+  situationRequired: 'Tell us what you’re up to so we can start.',
   openingRoom: 'Opening your room…',
   quickOnes: '5 quick ones. Swipe.',
+  swipeHint: 'Swipe',
   lookingAround: 'Looking around you…',
   near: 'Near',
   cards: {
@@ -122,8 +125,22 @@ const en = {
   joinRoom: 'Join room',
   joining: 'Joining',
   changeCode: 'Change code',
+  nameTaken: 'That name is already taken. Pick another one.',
   // Sala
   leaveRoom: 'Leave room',
+  leaveTitle: 'Leave the room?',
+  leaveBody: 'To come back you’ll need the code again.',
+  leaveStay: 'Stay',
+  leaveConfirm: 'Leave',
+  kick: (name: string) => `Kick ${name}`,
+  kickTitle: (name: string) => `Kick ${name}?`,
+  kickBody: 'They’ll be removed from the room and can’t come back.',
+  kickYes: 'Kick',
+  kickNo: 'Cancel',
+  removedKicked: 'The host kicked you out',
+  removedRejected: 'The host didn’t let you in',
+  removedBody: 'Join another room or create your own.',
+  removedOk: 'Got it',
   checkingRoom: 'Checking room…',
   copyLink: 'Share invite',
   linkCopied: 'Invite copied',
@@ -157,6 +174,10 @@ const en = {
   locked: (done: number, total: number) => `Locked · ${done}/${total} voted`,
   lockVote: 'Lock vote',
   tapTheReal: 'Tap the real one',
+  voteTitle: (name: string) => `Only one is the real ${name}`,
+  voteSub: 'The rest are friends faking it',
+  voteSeparator: (name: string) => `${name} replied… only one is real`,
+  tapWhatSaid: (name: string) => `Tap what ${name} really said`,
   // Revelación
   theRealSaid: (name: string) => `The real ${name} said…`,
   round: (n: number) => `Round ${n}`,
@@ -232,13 +253,13 @@ const es: typeof en = {
   howPlay: '¡A jugar!',
   howSkip: 'Saltar',
   mimicInfo: {
-    eyebrow: '¿Qué es Mimic?',
-    title: 'Una IA juega con vosotros',
-    body: 'Imita a quien contesta y cuela una respuesta falsa en la votación.',
-    avoid: 'Si la votas, pierdes 100 puntos.',
+    title: 'Mimic es una IA',
+    body: 'Se hace pasar por uno de vosotros y cuela una respuesta falsa en la votación.',
+    avoid: 'Evítala: si la votas, pierdes 100 puntos.',
     demoFake: 'jajaja qué va',
     cta: 'Entendido',
     more: 'Más detalles sobre la IA',
+    close: 'Cerrar',
   },
   back: 'Atrás',
   next: 'Siguiente',
@@ -246,14 +267,16 @@ const es: typeof en = {
   setUpGame: 'Prepara tu partida',
   setUpSub: 'La IA escribe vuestros chats a partir de esto.',
   yourName: 'Tu nombre',
-  namePlaceholderHost: 'p. ej. Pol',
-  namePlaceholderGuest: 'p. ej. Laura',
-  situationLabel: '¿Qué está pasando ahora?',
-  situationPlaceholder: 'Cervezas del viernes en casa de Pol. Alguien acaba de tirar vino en el sofá…',
-  situationHint: 'Dónde estáis, quién hay, qué acaba de pasar.',
-  situationRequired: 'Cuéntanos qué está pasando para empezar.',
+  namePlaceholderHost: 'Ej: Pol',
+  namePlaceholderGuest: 'Ej: Laura',
+  askName: '¿Cómo te llamas?',
+  situationLabel: '¿Qué estáis haciendo ahora?',
+  situationPlaceholder: 'Tomando algo en casa de Pol antes de salir de fiesta…',
+  situationHint: 'Qué hacéis, dónde estáis y quién hay.',
+  situationRequired: 'Cuéntanos qué estáis haciendo para empezar.',
   openingRoom: 'Abriendo tu sala…',
   quickOnes: '5 preguntas rápidas. Desliza.',
+  swipeHint: 'Desliza',
   lookingAround: 'Mirando qué hay por la zona…',
   near: 'Cerca',
   cards: {
@@ -275,7 +298,21 @@ const es: typeof en = {
   joinRoom: 'Entrar',
   joining: 'Entrando',
   changeCode: 'Cambiar código',
+  nameTaken: 'Ese nombre ya está cogido. Elige otro.',
   leaveRoom: 'Salir de la sala',
+  leaveTitle: '¿Salir de la sala?',
+  leaveBody: 'Para volver necesitarás otra vez el código.',
+  leaveStay: 'Quedarme',
+  leaveConfirm: 'Salir',
+  kick: (name) => `Echar a ${name}`,
+  kickTitle: (name) => `¿Echar a ${name}?`,
+  kickBody: 'Saldrá de la sala y no podrá volver a entrar.',
+  kickYes: 'Echar',
+  kickNo: 'Cancelar',
+  removedKicked: 'El anfitrión te ha echado',
+  removedRejected: 'El anfitrión no te ha dejado entrar',
+  removedBody: 'Únete a otra sala o crea la tuya.',
+  removedOk: 'Entendido',
   checkingRoom: 'Comprobando sala…',
   copyLink: 'Compartir invitación',
   linkCopied: 'Invitación copiada',
@@ -307,6 +344,10 @@ const es: typeof en = {
   locked: (done, total) => `Votado · ${done}/${total}`,
   lockVote: 'Confirmar voto',
   tapTheReal: 'Toca la de verdad',
+  voteTitle: (name) => `Solo una la escribió ${name}`,
+  voteSub: 'Las demás son amigos haciéndose pasar',
+  voteSeparator: (name) => `${name} ha contestado… solo una es real`,
+  tapWhatSaid: (name) => `Toca lo que dijo ${name} de verdad`,
   theRealSaid: (name) => `Lo que dijo ${name} de verdad…`,
   round: (n) => `Ronda ${n}`,
   nobodyGotIt: 'Nadie acertó',

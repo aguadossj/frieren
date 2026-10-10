@@ -6,7 +6,7 @@ export type Phase = 'lobby' | 'generating' | 'writing' | 'voting' | 'reveal' | '
 export type Pack = 'uni' | 'spicy' | 'dating' | 'moral'
 export type GroupType = 'students' | 'friends' | 'coworkers' | 'family'
 
-export const PHASE_SECONDS = { writing: 45, voting: 25, reveal: 12, leaderboard: 4 } as const // valores por defecto del backend
+export const PHASE_SECONDS = { writing: 45, voting: 15, reveal: 8, leaderboard: 4 } as const // valores por defecto del backend
 export const MIN_PLAYERS = 3
 export const MAX_PLAYERS = 8
 export const MAX_ROUNDS = 5
@@ -132,6 +132,8 @@ export interface GameState {
   error: string | null
   /** Sala con aprobación: he pedido entrar y espero a que el host me acepte (room = null mientras tanto). */
   pending?: { code: string; hostName: string | null } | null
+  /** Te acaban de sacar de la sala: el host te ha echado o no te ha dejado entrar (para avisarte en la portada). */
+  removed?: 'kicked' | 'rejected' | null
 }
 
 /** Solicitud para entrar en una sala con aprobación (solo la ve el host). */
@@ -146,7 +148,7 @@ export interface GameClient {
   joinRoom(code: string, name: string, emoji?: string): Promise<void>
   /** Antes de pedir el nombre: ¿se puede entrar con este código? `message` ya traducido si no. */
   /** `color`: el que te tocará al entrar (o el tuyo si ya estás dentro) → para enseñar tu panda antes de unirte. */
-  checkRoom(code: string): Promise<{ ok: boolean; message?: string; color?: string }>
+  checkRoom(code: string): Promise<{ ok: boolean; message?: string; color?: string; takenAvatars?: string[]; takenNames?: string[] }>
   setOptions(options: { pack?: Pack; groupType?: GroupType }): Promise<void> // atajo: guarda en `setup` (who/vibes)
   // Host
   saveSetup(answers: Setup): Promise<void> // contexto para la IA; en lobby y en partida (aplica a la siguiente ronda)

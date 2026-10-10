@@ -41,7 +41,24 @@ function shuffled(n: number, seed: string): number[] {
 
 const cache = new Map<string, number[]>()
 
-export function avatarFor(roomCode: string, player: Pick<Player, 'color'> & { id?: string; name?: string }): PandaAvatar {
+/** Panda guardado en el jugador (`emoji` = "p01"…"p20", elegido al entrar). */
+export const avatarCode = (n: number) => `p${String(n + 1).padStart(2, '0')}`
+const fromCode = (emoji?: string | null) => {
+  const m = /^p(\d{2})$/.exec(emoji ?? '')
+  const i = m ? Number(m[1]) - 1 : -1
+  return i >= 0 && i < AVATARS.length ? AVATARS[i] : null
+}
+
+/** Un panda libre al azar (código "pNN") que no esté en `taken`. */
+export function randomFreeAvatar(taken: string[] = []): string {
+  const free = AVATARS.map((_, i) => avatarCode(i)).filter((c) => !taken.includes(c))
+  const pool = free.length ? free : AVATARS.map((_, i) => avatarCode(i))
+  return pool[Math.floor(Math.random() * pool.length)]
+}
+
+export function avatarFor(roomCode: string, player: Pick<Player, 'color'> & { id?: string; name?: string; emoji?: string | null }): PandaAvatar {
+  const chosen = fromCode(player.emoji)
+  if (chosen) return chosen
   if (!cache.has(roomCode)) cache.set(roomCode, shuffled(AVATARS.length, roomCode || 'typing'))
   const order = cache.get(roomCode)!
   const slot = PLAYER_COLORS.indexOf(player.color as (typeof PLAYER_COLORS)[number])

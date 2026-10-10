@@ -1,20 +1,14 @@
 import { useState } from 'react'
 import { Avatar, Button, Footer, Icon, Screen, TimeBar, TopBar } from '../components/ui'
-import { useCountdown, useGame } from '../game/useGame'
-import { PHASE_SECONDS, speedPoints } from '../game/types'
+import { useGame } from '../game/useGame'
+import { PHASE_SECONDS } from '../game/types'
 import { useT } from '../i18n'
-
-const LETTERS = 'ABCDEF'
 
 export default function Voting() {
   const { room, me, game } = useGame()
   const t = useT()
   const [picked, setPicked] = useState<string | null>(null)
-  useCountdown(room?.phaseEndsAt ?? null) // repinta 4 veces por segundo: los puntos del botón bajan con el tiempo
   if (!room?.chat || !me) return null
-  // Puntos si aciertas ahora mismo (estilo Kahoot: 200 al instante → 100 al final). Los da el servidor; esto es la estimación.
-  const votingMs = (room.settings?.voting_seconds ?? PHASE_SECONDS.voting) * 1000
-  const potential = room.phaseEndsAt ? speedPoints(votingMs - Math.max(0, room.phaseEndsAt - Date.now()), votingMs) : 0
 
   const writer = room.players.find((p) => p.id === room.chat!.writerId)!
   const isWriter = writer.id === me.id
@@ -26,8 +20,10 @@ export default function Voting() {
 
   return (
     <Screen>
+      {/* Título claro: solo una es de verdad; el resto son amigos haciéndose pasar */}
       <TopBar
-        title={t.whichIsReal(writer.name)}
+        title={t.voteTitle(writer.name)}
+        subtitle={t.voteSub}
         right={<TimeBar endsAt={room.phaseEndsAt} totalSeconds={room.settings?.voting_seconds ?? PHASE_SECONDS.voting} className="w-[30%] shrink-0" />}
       />
 
@@ -42,6 +38,12 @@ export default function Voting() {
             </div>
           </div>
         )}
+        {/* Separador que une la pregunta con las respuestas */}
+        <div className="flex shrink-0 items-center gap-3 px-1 text-[14px] font-extrabold text-white/85">
+          <span className="h-px flex-1 bg-white/35" />
+          <span className="text-center">{t.voteSeparator(writer.name)}</span>
+          <span className="h-px flex-1 bg-white/35" />
+        </div>
         {room.mimic && (
           <p className="shrink-0 self-center rounded-full bg-ink px-4 py-1 text-[13px] font-bold">{t.aiAmongThese}</p>
         )}
@@ -61,15 +63,21 @@ export default function Voting() {
                 disabled={isWriter || answer.mine || locked}
                 onClick={() => setPicked(answer.id)}
               >
-                <span
-                  className={`flex size-9 shrink-0 items-center justify-center rounded-full text-[16px] font-black ${
-                    selected ? 'bg-white text-ink' : 'bg-neutral-100 text-neutral-500'
-                  }`}
-                >
-                  {selected ? <Icon name="check" size={18} /> : LETTERS[i]}
-                </span>
+                {/* Todas las opciones llevan el panda de quien se imita: parecen mensajes suyos (el panda siempre entero) */}
+                <Avatar player={writer} size={44} />
                 <span className="line-clamp-2 min-w-0 flex-1 text-[17px] leading-snug font-semibold">{answer.text}</span>
-                {answer.mine && <span className="shrink-0 text-[13px] font-extrabold text-neutral-400">{t.yours}</span>}
+                {answer.mine ? (
+                  <span className="shrink-0 text-[13px] font-extrabold text-neutral-400">{t.yours}</span>
+                ) : (
+                  // Marca de selección a la derecha: círculo vacío → check
+                  <span
+                    className={`flex size-[30px] shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
+                      selected ? 'scale-110 bg-white text-good' : 'border-[2.5px] border-neutral-200'
+                    }`}
+                  >
+                    {selected && <Icon name="check" size={17} />}
+                  </span>
+                )}
               </button>
               </div>
             )
@@ -84,11 +92,9 @@ export default function Voting() {
           ) : locked ? (
             t.locked(room.votedIds.length, voters)
           ) : picked ? (
-            <>
-              {t.lockVote} · <span className={`tabular-nums ${potential >= 150 ? 'text-[#7CF29A]' : 'text-[#FFC24D]'}`}>+{potential}</span>
-            </>
+            t.lockVote
           ) : (
-            t.tapTheReal
+            t.tapWhatSaid(writer.name)
           )}
         </Button>
       </Footer>

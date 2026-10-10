@@ -56,6 +56,37 @@
   from { transform: translateX(-80px) scale(0.94); opacity: 0; }
   to { transform: translateX(0) scale(1); opacity: 1; }
 }
+/* ¿Qué es Mimic?: el robot mira a los lados, flota, mueve el bigote y parpadea la antena; su respuesta votada
+   tiembla y salta el −100 */
+@keyframes mimic-look {
+  0%, 30%, 100% { transform: translateX(0); }
+  40%, 55% { transform: translateX(-4px); }
+  65%, 80% { transform: translateX(4px); }
+}
+@keyframes mimic-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+@keyframes mimic-wiggle {
+  0%, 85%, 100% { transform: rotate(0); }
+  90% { transform: rotate(-6deg); }
+  95% { transform: rotate(6deg); }
+}
+@keyframes mimic-blink {
+  0%, 70%, 100% { opacity: 1; }
+  80% { opacity: 0.25; }
+}
+@keyframes mimic-shake {
+  0%, 100% { translate: 0; }
+  20%, 60% { translate: -5px; }
+  40%, 80% { translate: 5px; }
+}
+.mimic-eyes { animation: mimic-look 3.2s ease-in-out infinite; }
+.mimic-bob { animation: mimic-float 2.6s ease-in-out infinite; }
+.mimic-stache { transform-box: fill-box; transform-origin: center; animation: mimic-wiggle 2.4s ease-in-out infinite; }
+.mimic-blink { animation: mimic-blink 1.6s ease-in-out infinite; }
+.mimic-voted { animation-name: pop, mimic-shake; animation-duration: 0.35s, 0.4s; animation-delay: 0.5s, 1.25s; animation-fill-mode: both, none; }
+.mimic-minus { animation: pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) 1.2s both; }
 @keyframes swipe-hint {
   0%, 100% { transform: translateX(0) rotate(0); }
   25% { transform: translateX(-26px) rotate(-2deg); }

@@ -24,6 +24,7 @@ const ICONS = {
   share: 'M12 3v12M7 8l5-5 5 5M5 14v6h14v-6',
   replay: 'M4 4v6h6M4.6 15a8 8 0 1 0 1.8-8.3L4 10',
   code: 'M9 4L7 20M17 4l-2 16M4 9h16M3 15h16',
+  x: 'M6 6l12 12M18 6L6 18',
   pin: 'M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
 } as const
 
@@ -115,7 +116,7 @@ export function TopBar({ title, subtitle, right, avatar }: { title: ReactNode; s
       {avatar}
       <div className="min-w-0 flex-1">
         <div className="line-clamp-2 text-[20px] leading-tight font-extrabold">{title}</div>
-        {subtitle && <div className="truncate text-[15px] font-semibold text-brand">{subtitle}</div>}
+        {subtitle && <div className="line-clamp-2 text-[15px] leading-tight font-semibold text-brand">{subtitle}</div>}
       </div>
       {right}
       <GameMenu />
@@ -195,7 +196,7 @@ export function Avatar({
   ring = false,
   roomCode,
 }: {
-  player: Pick<Player, 'name' | 'color'> & { id?: string }
+  player: Pick<Player, 'name' | 'color'> & { id?: string; emoji?: string | null }
   size?: number
   ring?: boolean
   /** Código de sala cuando aún no estás dentro (pantalla de unirse); si no, el de la sala actual. */
@@ -333,6 +334,58 @@ export function LangToggle({ className = '' }: { className?: string }) {
           </button>
         </span>
       ))}
+    </div>
+  )
+}
+
+/** Ventana de confirmación (salir de la sala…): fondo oscurecido y tarjeta que sube desde abajo. */
+export function ConfirmDialog({
+  title,
+  body,
+  confirm,
+  cancel,
+  onConfirm,
+  onCancel,
+}: {
+  title: string
+  body?: string
+  confirm: string
+  cancel?: string // sin `cancel`: aviso con un solo botón
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel()
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+  return (
+    <div
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+      className="absolute inset-0 z-[70] flex animate-fade-in items-end bg-black/45 backdrop-blur-[2px] sm:items-center sm:justify-center"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full animate-rise rounded-t-[32px] bg-white px-6 pt-6 pb-[calc(env(safe-area-inset-bottom)+20px)] text-ink sm:mx-5 sm:rounded-[32px] sm:pb-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="confirm-title" className="text-[26px] leading-tight font-black tracking-[-0.02em]">
+          {title}
+        </h2>
+        {body && <p className="mt-1.5 text-[17px] leading-snug font-semibold text-neutral-500">{body}</p>}
+        <div className={`mt-5 grid gap-3 ${cancel ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {cancel && (
+            <button onClick={onCancel} className="h-[56px] rounded-full bg-neutral-100 text-[18px] font-extrabold transition active:scale-[0.97]">
+              {cancel}
+            </button>
+          )}
+          <button onClick={onConfirm} className="h-[56px] rounded-full bg-brand text-[18px] font-extrabold text-white transition active:scale-[0.97]">
+            {confirm}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
