@@ -3,7 +3,7 @@
 // Aprende del writer con lo que ya hay en la sala: sus respuestas reales, la memoria (estilo, datos) y qué
 // imitaciones de sus amigos engañaron a la gente. Sin nombres de otros jugadores en la salida ni pistas de que es una IA.
 
-import { AiError, callModel, copiedFrom, parseExamples, type AiConfig, type Memory } from './core.ts'
+import { AiError, LANGUAGES, callModel, copiedFrom, languageProblem, parseExamples, type AiConfig, type Memory } from './core.ts'
 
 export const MIMIC_PROMPT_VERSION = 'mimic-v1'
 
@@ -53,7 +53,8 @@ How to sound like the writer:
 - reply_examples are real replies from real group chats (anonymous, often Spanish). Copy their texting feel
   (short, casual, typos, "siii", "jajaja"), never their words. If the writer has no real answers yet, sound like them.
 
-Rules: one message, max 80 characters, written in DATA.language, answer the last message directly. No quotes around it, no names of
+Rules: one message, max 80 characters, written in DATA.language (follow DATA.language_notes, whatever the language
+of the examples), answer the last message directly. No quotes around it, no names of
 other players, never mention being an AI, a bot, a model or fake. Nothing offensive, nothing explicit.
 Return JSON: {"answer": "..."}`
 
@@ -77,8 +78,10 @@ function buildData(ctx: RoundContext, examples: { who: string; text: string }[][
     .filter((h) => h.writer_id === ctx.writer.id)
     .flatMap((h) => h.answers.filter((a) => !a.is_real && !a.is_bot && a.votes > 0 && a.text !== '…'))
     .map((a) => ({ text: clip(a.text, 80), votes_fooled: a.votes }))
+  const lang = ctx.setup?.lang === 'es' ? 'es' : 'en'
   return {
-    language: ctx.setup?.lang === 'es' ? 'Spanish from Spain, informal texting' : 'English',
+    language: LANGUAGES[lang].name,
+    language_notes: LANGUAGES[lang].notes,
     writer: {
       name: ctx.writer.name,
       real_answers: [...new Set([...(memory?.real_answers ?? []), ...real])].slice(-5),
@@ -128,6 +131,8 @@ export async function generateMimic(contextValue: unknown, examplesValue: unknow
     if (others.some((name) => name.length >= 2 && answer.toLowerCase().includes(name))) throw new AiError('invalid_output', 'names_player')
     if (copiedFrom([answer], examples)) throw new AiError('invalid_output', 'copied_example')
     if (copiedFrom([answer], earlier)) throw new AiError('invalid_output', 'repeats_writer')
+    const wrong = languageProblem([answer], ctx.setup?.lang === 'es' ? 'es' : 'en')
+    if (wrong) throw new AiError('invalid_output', wrong)
     return { answer, usage }
   }
 
