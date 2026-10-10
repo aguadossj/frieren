@@ -1,13 +1,13 @@
 /**
- * "Cómo se juega": pantalla completa con 4 páginas. Deslizar a la derecha avanza y a la izquierda vuelve (o botón / ← →).
+ * "Cómo se juega": 4 páginas a pantalla completa (formato en Explainer.tsx).
  * Cada página enseña una captura REAL del juego (app/public/howto/{es|en}-*.webp, sacadas de una partida de verdad)
  * dentro de un móvil, con un título y una frase.
  * Sale solo la primera vez que alguien entra en la web, por donde entre (portada o enlace/QR de una sala), y luego
  * desde el botón "Cómo jugar" de la portada. Se recuerda en localStorage y en una cookie.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect } from 'react'
 import { useLang, useT } from '../i18n'
-import { Icon } from './ui'
+import Explainer from './Explainer'
 
 const SEEN_KEY = 'typing.howto.seen'
 const SHOTS = ['chat', 'vote', 'reveal', 'standings'] as const
@@ -25,7 +25,6 @@ const FRAMES: Frame[] = [
   { mode: 'full', tilt: 3 }, // clasificación: barras y panda
 ]
 const PHONE_RATIO = 2.2 // alto / ancho del iPhone dibujado (marco + barra de estado + captura)
-const SWIPE = 50 // px de deslizamiento para cambiar de página
 
 const COOKIE = 'typing_seen=1'
 
@@ -69,141 +68,43 @@ function markSeen() {
 export default function HowToPlay({ onClose }: { onClose: () => void }) {
   const t = useT()
   const lang = useLang()
-  const pages = t.howPages
-  const [page, setPage] = useState(0)
-  const [leaving, setLeaving] = useState(false)
-  const [dir, setDir] = useState<1 | -1>(1)
-  const startX = useRef<number | null>(null)
-  const last = page === pages.length - 1
 
   useEffect(markSeen, [])
 
-  const close = () => {
-    if (leaving) return
-    setLeaving(true)
-    setTimeout(onClose, 250)
+  const visual = (i: number) => {
+    const frame = FRAMES[i]
+    const src = `/howto/${lang}-${SHOTS[i]}.webp`
+    return frame.mode === 'full' ? (
+      <div className="flex h-full items-center justify-center px-8 py-4">
+        <IPhone src={src} tilt={frame.tilt} className="h-full max-h-[540px]" />
+      </div>
+    ) : (
+      <>
+        {/* Zoom: el móvil más ancho que la pantalla, desplazado para que la zona clave quede en el centro */}
+        <div
+          className="absolute left-1/2 w-[min(108vw,430px)] -translate-x-1/2"
+          style={{ top: `calc(50% - ${frame.focus * PHONE_RATIO} * min(108vw, 430px))` }}
+        >
+          <IPhone src={src} tilt={frame.tilt} className="w-full" />
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-ink to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink via-ink/80 to-transparent" />
+      </>
+    )
   }
-  const go = (to: number) => {
-    if (to < 0 || to >= pages.length || to === page) return
-    setDir(to > page ? 1 : -1)
-    setPage(to)
-  }
-  const next = () => (last ? close() : go(page + 1))
-
-  // Teclado: ← → para pasar, Esc para cerrar
-  const keys = useRef({ next, prev: () => go(page - 1), close })
-  useEffect(() => {
-    keys.current = { next, prev: () => go(page - 1), close }
-  })
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') keys.current.next()
-      if (e.key === 'ArrowLeft') keys.current.prev()
-      if (e.key === 'Escape') keys.current.close()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="howto-title"
-      className={`absolute inset-x-0 top-0 z-[60] flex h-full flex-col overflow-hidden bg-ink text-white sm:top-6 sm:h-[calc(100%-3rem)] sm:max-h-[900px] sm:rounded-[44px] ${leaving ? 'animate-fade-out' : 'animate-fade-in'}`}
-      style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
-    >
-      {/* Progreso tipo "stories" (cada tramo lleva a su página) + Saltar */}
-      <div className="flex shrink-0 items-center gap-3 px-4 pt-2">
-        <div className="flex flex-1 gap-1.5">
-          {pages.map((p, i) => (
-            <button key={p.title} onClick={() => go(i)} aria-label={`${i + 1} / ${pages.length}`} className="flex h-[44px] flex-1 items-center">
-              <span className={`h-[5px] w-full rounded-full transition-colors duration-300 ${i <= page ? 'bg-white' : 'bg-white/20'}`} />
-            </button>
-          ))}
-        </div>
-        {!last && (
-          <button onClick={close} className="h-[44px] shrink-0 px-2 text-[15px] font-extrabold text-white/60">
-            {t.howSkip}
-          </button>
-        )}
-      </div>
-
-      {/* Una página cada vez. Deslizar el dedo a la DERECHA avanza y a la IZQUIERDA vuelve; la animación va como
-          siempre: la siguiente entra por la derecha y la anterior por la izquierda. */}
-      <div
-        className="flex min-h-0 flex-1 touch-pan-y flex-col select-none"
-        onPointerDown={(e) => {
-          startX.current = e.clientX
-        }}
-        onPointerUp={(e) => {
-          if (startX.current === null) return
-          const dx = e.clientX - startX.current
-          startX.current = null
-          if (dx > SWIPE) next()
-          else if (dx < -SWIPE) go(page - 1)
-        }}
-        onPointerCancel={() => {
-          startX.current = null
-        }}
-      >
-        <section
-          key={page}
-          className="flex min-h-0 flex-1 flex-col"
-          style={{ animation: `${dir === 1 ? 'howto-in-right' : 'howto-in-left'} 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.1) both` }}
-        >
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            {FRAMES[page].mode === 'full' ? (
-              <div className="flex h-full items-center justify-center px-8 py-4">
-                <IPhone src={`/howto/${lang}-${SHOTS[page]}.webp`} tilt={FRAMES[page].tilt} className="h-full max-h-[540px]" />
-              </div>
-            ) : (
-              <>
-                {/* Zoom: el móvil más ancho que la pantalla, desplazado para que la zona clave quede en el centro */}
-                <div
-                  className="absolute left-1/2 w-[min(108vw,430px)] -translate-x-1/2"
-                  style={{ top: `calc(50% - ${(FRAMES[page] as { focus: number }).focus * PHONE_RATIO} * min(108vw, 430px))` }}
-                >
-                  <IPhone src={`/howto/${lang}-${SHOTS[page]}.webp`} tilt={FRAMES[page].tilt} className="w-full" />
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-ink to-transparent" />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-ink via-ink/80 to-transparent" />
-              </>
-            )}
-          </div>
-          <div className="shrink-0 px-6 pt-2 text-center">
-            <div className="text-[13px] font-extrabold tracking-[0.16em] text-brand">
-              {page + 1} / {pages.length}
-            </div>
-            <h2 id="howto-title" className="mt-1 text-[32px] leading-[1.05] font-black tracking-[-0.03em] [@media(max-height:700px)]:text-[27px]">
-              {pages[page].title}
-            </h2>
-            <p className="mx-auto mt-2 min-h-[48px] max-w-[330px] text-[17px] leading-snug font-semibold text-white/75 [@media(max-height:700px)]:text-[15px]">
-              {pages[page].body}
-            </p>
-          </div>
-        </section>
-      </div>
-
-      {/* Las 4 capturas montadas y ya decodificadas (invisibles): al cambiar de página salen al instante */}
-      <div className="pointer-events-none absolute size-px overflow-hidden opacity-0" aria-hidden="true">
-        {SHOTS.map((shot) => (
-          <img key={shot} src={`/howto/${lang}-${shot}.webp`} alt="" decoding="sync" fetchPriority="high" />
-        ))}
-      </div>
-
-      <div className="shrink-0 px-5 pt-3 pb-6">
-        <button
-          onClick={next}
-          className={`flex h-[66px] w-full items-center justify-center gap-3 rounded-full text-[21px] font-extrabold transition active:scale-[0.97] ${
-            last ? 'bg-brand text-white' : 'bg-white text-ink'
-          }`}
-        >
-          {last ? t.howPlay : t.howNext}
-          <Icon name="arrowRight" size={22} />
-        </button>
-      </div>
-    </div>
+    <Explainer
+      pages={t.howPages.map((p, i) => ({ ...p, visual: visual(i) }))}
+      onClose={onClose}
+      next={t.howNext}
+      done={t.howPlay}
+      skip={t.howSkip}
+      // Las 4 capturas montadas y ya decodificadas: al cambiar de página salen al instante
+      preload={SHOTS.map((shot) => (
+        <img key={shot} src={`/howto/${lang}-${shot}.webp`} alt="" decoding="sync" fetchPriority="high" />
+      ))}
+    />
   )
 }
 

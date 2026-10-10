@@ -76,13 +76,15 @@ const en = {
   howNext: 'Next',
   howPlay: 'Let’s play!',
   howSkip: 'Skip',
-  // ¿Qué es Mimic? (página con el mismo formato que "unirse")
+  // ¿Qué es Mimic? (mismo formato que "Cómo se juega")
   mimicInfo: {
-    eyebrow: 'What’s Mimic?',
-    title: 'An AI plays with you',
-    body: 'It copies whoever answers and sneaks a fake reply into the vote.',
-    avoid: 'Vote for it and you lose 100 points.',
-    demoFake: 'lol nope',
+    pages: [
+      { title: 'An AI plays with you', body: 'Mimic studies how whoever is answering texts, and writes a fake reply just like theirs.' },
+      { title: 'Can you spot it?', body: 'Its reply is mixed in with yours in the vote. It looks like just another one.' },
+      { title: 'Vote for it: −100', body: 'Fall for Mimic and you lose 100 points. If it fools everyone, it takes the award.' },
+    ],
+    typing: 'Mimic is typing…',
+    demo: ['ok it was me 😅', 'lol nope', 'it was the cat 🐱'],
     cta: 'Got it',
     more: 'More about the AI',
   },
@@ -234,11 +236,13 @@ const es: typeof en = {
   howPlay: '¡A jugar!',
   howSkip: 'Saltar',
   mimicInfo: {
-    eyebrow: '¿Qué es Mimic?',
-    title: 'Una IA juega con vosotros',
-    body: 'Imita a quien contesta y cuela una respuesta falsa en la votación.',
-    avoid: 'Si la votas, pierdes 100 puntos.',
-    demoFake: 'jajaja qué va',
+    pages: [
+      { title: 'Una IA juega con vosotros', body: 'Mimic estudia cómo escribe quien contesta y se inventa una respuesta como la suya.' },
+      { title: '¿Sabrás cuál es?', body: 'Su respuesta sale mezclada con las vuestras en la votación. Parece una más.' },
+      { title: 'Si la votas: −100', body: 'Si te la cuela, pierdes 100 puntos. Si engaña a todos, se lleva el premio.' },
+    ],
+    typing: 'Mimic está escribiendo…',
+    demo: ['vale, fui yo 😅', 'jajaja qué va', 'fue el gato 🐱'],
     cta: 'Entendido',
     more: 'Más detalles sobre la IA',
   },
