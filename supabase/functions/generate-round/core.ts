@@ -20,6 +20,10 @@ export interface AiConfig {
   // Cómo pedir JSON al proveedor. 'json_schema' (Groq, vLLM, OpenAI) es lo más fiable; 'json_object' o 'none'
   // para modelos/proveedores sin salida estructurada (p. ej. Hermes 3 en algunos hosts): el esquema va en el prompt.
   jsonMode?: 'json_schema' | 'json_object' | 'none'
+  // Solo para probar prompts (prompt-lab.mjs): sustituye SYSTEM_PROMPT de las rondas. La partida nunca lo pone.
+  systemPrompt?: string
+  // Si el modelo principal (Hermes 405B) no contesta a tiempo, un intento con este (70B) en el tiempo que queda.
+  fallbackModel?: string
 }
 
 export interface Setup {
@@ -96,9 +100,12 @@ export interface GenerateRoundOutput {
   output_tokens: number | null
   latency_ms: number
   attempts: number
+  theme_id?: string // para métricas y el laboratorio de prompts
+  format_id?: string
+  device?: string
 }
 
-export const PROMPT_VERSION = 'round-v8'
+export const PROMPT_VERSION = 'round-v10'
 
 export class AiError extends Error {
   code: 'bad_input' | 'provider_status' | 'invalid_output' | 'timeout' | 'provider_failed'
@@ -123,8 +130,8 @@ export const LANGUAGES = {
   es: {
     name: 'Spanish (Spain)',
     notes:
-      'Castellano de España, como escriben universitarios de Barcelona o Madrid: vale, tío/tía, guay, flipar, quedada, ' +
-      'finde, birra, en plan, JAJAJA. Nunca español de Latinoamérica ni tópicos mexicanos: nada de güey, chido, platicar, ' +
+      'Castellano de España, como escriben universitarios de Barcelona o Madrid. Muletillas ("tío", "tía", "en plan") como ' +
+      'mucho una vez por chat, y nunca para empezar. Nunca español de Latinoamérica ni tópicos mexicanos: nada de güey, chido, platicar, ' +
       'ahorita, órale, neta, tacos o taquerías. Ninguna palabra en inglés salvo las que se usan de verdad (story, match, like).',
   },
 } as const
@@ -150,7 +157,7 @@ export const TEXTING = {
   },
 } as const
 
-const MAX_LINES = 6 // game.ai_complete_round acepta 2–6 mensajes
+const MAX_LINES = 5 // game.ai_complete_round acepta 2–6; más de 5 se hacía largo de leer en el móvil
 const words = (text: string) => text.trim().split(/\s+/).filter(Boolean).length
 
 // Medido en los fragmentos reales (game.style_examples). Las reacciones y emojis salen de los más frecuentes.
@@ -259,7 +266,20 @@ export const THEMES: Theme[] = [
   { id: 'talent', en: 'someone claims a hidden talent nobody believes', es: 'alguien dice tener un talento oculto que nadie se cree' },
   { id: 'screenshot', en: 'a screenshot or a message sent to the wrong chat', es: 'una captura o un mensaje enviado al chat equivocado' },
   { id: 'trip', en: 'a trip or a day out where everything went wrong', es: 'un viaje o una excursión en la que todo salió mal' },
+  { id: 'hobby', en: 'the writer has a suspicious new hobby or obsession', es: 'el writer tiene un hobby u obsesión nueva muy sospechosa' },
+  { id: 'purchase', en: 'the writer is hiding something they bought', es: 'el writer esconde algo que se ha comprado' },
+  { id: 'parents', en: "the writer's mum or dad found or sent something", es: 'la madre o el padre del writer ha encontrado o mandado algo' },
+  { id: 'exposed', en: "the writer's search history, screen time or playlist got exposed", es: 'se ha filtrado el historial, el tiempo de pantalla o la playlist del writer' },
+  { id: 'spotted', en: 'the writer was spotted somewhere they said they would not be', es: 'han visto al writer en un sitio donde dijo que no iba a estar' },
+  { id: 'excuse', en: "the writer's ridiculous excuse to skip a plan", es: 'la excusa ridícula del writer para no venir a un plan' },
+  { id: 'practice', en: 'the writer has been secretly practising something', es: 'el writer lleva tiempo practicando algo en secreto' },
+  { id: 'recognised', en: 'the writer got recognised somewhere unexpected', es: 'han reconocido al writer en un sitio inesperado' },
+  { id: 'pet', en: "the writer's pet, plant or car did something absurd", es: 'la mascota, la planta o el coche del writer ha hecho algo absurdo' },
+  { id: 'bet_losing', en: 'a group bet that the writer is clearly losing', es: 'una apuesta del grupo que el writer va perdiendo claramente' },
   { id: 'crush', en: 'someone has a suspicious new crush', es: 'alguien tiene un crush nuevo muy sospechoso', adult: true },
+  { id: 'drunk_text', en: 'a drunk text the writer sent last night', es: 'un mensaje que mandó el writer borracho anoche', adult: true },
+  { id: 'dating_app', en: "the writer's dating app profile was found", es: 'alguien ha encontrado el perfil del writer en una app de ligar', adult: true },
+  { id: 'woke_up', en: 'the writer woke up somewhere unexpected', es: 'el writer se ha despertado en un sitio inesperado', adult: true },
   { id: 'night_out', en: 'where someone disappeared to on the last night out', es: 'dónde desapareció alguien la última noche de fiesta', adult: true },
   { id: 'ex', en: 'an ex just showed up again (a like, a story, a text)', es: 'un ex ha vuelto a aparecer (un like, una story, un mensaje)', adult: true },
 ]
@@ -274,7 +294,71 @@ export function pickTheme(input: Pick<GenerateRoundInput, 'setup' | 'memory'>, e
   const allowed = THEMES.filter((t) => !(noSpicy(input.setup) && t.adult))
   const fresh = allowed.filter((t) => !used.has(t.id))
   const pool = fresh.length > 0 ? fresh : allowed
-  return pool[Math.floor(Math.random() * pool.length)]
+  // Si el host pidió picante, un tercio de las rondas van a un tema picante; el resto, cualquiera (con tono picante).
+  const adult = pool.filter((t) => t.adult)
+  if (input.setup.spicy === 'yes' && adult.length > 0 && Math.random() < 0.33) return pickOne(adult)
+  return pickOne(pool)
+}
+
+// Formato de cada ronda: QUÉ se comparte en el chat (una captura, un Bizum…). Lo elige el código para que los chats
+// no salgan todos iguales; el modelo lo usa si encaja con la situación.
+export interface Format {
+  id: string
+  en: string
+  es: string
+}
+export const FORMATS: Format[] = [
+  { id: 'plain', en: 'no special format: just the conversation', es: 'sin formato especial: solo la conversación' },
+  { id: 'screenshot', en: 'someone shares a screenshot of something the writer wrote or posted', es: 'alguien comparte una captura de algo que escribió o publicó el writer' },
+  { id: 'payment', en: 'a Venmo / bank transfer from or to the writer with a suspicious note', es: 'un Bizum del writer o al writer con un concepto sospechoso' },
+  { id: 'voice_note', en: 'a voice note the writer sent at a strange hour (describe what it says)', es: 'un audio que mandó el writer a una hora rara (contad qué dice)' },
+  { id: 'poll', en: 'someone creates a poll about the writer', es: 'alguien crea una encuesta sobre el writer' },
+  { id: 'location', en: "the writer's live location is somewhere it should not be", es: 'la ubicación en tiempo real del writer está donde no debería' },
+  { id: 'story', en: 'a story or post the writer just published', es: 'una story o un post que acaba de subir el writer' },
+  { id: 'wrong_chat', en: 'the writer sent a message to the wrong chat', es: 'el writer mandó un mensaje al chat equivocado' },
+  { id: 'order', en: 'something the writer ordered online just arrived', es: 'acaba de llegar algo que pidió el writer por internet' },
+  { id: 'listing', en: 'the writer is selling something weird second hand', es: 'el writer está vendiendo algo rarísimo en Wallapop' },
+  { id: 'photo', en: 'someone just sent a photo of the writer (describe it)', es: 'alguien acaba de mandar una foto del writer (describidla)' },
+  { id: 'seen', en: "the writer left someone on 'seen' or was online at a suspicious time", es: "el writer dejó a alguien en visto o estaba en línea a una hora sospechosa" },
+]
+export const pickFormat = (): Format => (Math.random() < 0.5 ? FORMATS[0] : pickOne(FORMATS.slice(1)))
+
+/** "un secreto… — happening during: <lo que dijo el host>" */
+export const hostAngle = (angle: string, setup: Setup): string => {
+  const host = SITUATIONS[setup.situation ?? ''] ?? setup.situation
+  return host ? `${angle} — happening during: "${host}"` : angle
+}
+
+// Cómo se cuenta (la estructura del chiste), también al azar: si no, todos los chats tienen la misma forma.
+export const DEVICES = [
+  'quick: only 2 or 3 messages, straight to the question',
+  'escalation: each message reveals a worse detail',
+  'fake calm: someone pretends everything is fine when it clearly is not',
+  'detectives: someone drops a clue and the others analyse it far too seriously',
+  'misunderstanding: the group has completely misread something the writer did',
+  'pattern: two people realise the writer has done this before, more than once',
+  'deadpan: one person states something absurd as if it were normal, one reaction, the question',
+]
+export const pickDevice = (): string => pickOne(DEVICES)
+
+/** Lo que eligió el host, en claro: el prompt lo pone por delante de todo lo demás. */
+export function roomBrief(setup: Setup, format: Format, device = DEVICES[1]) {
+  const lang = setup.lang === 'es' ? 'es' : 'en'
+  const clean = isClean(setup)
+  return {
+    host_says: SITUATIONS[setup.situation ?? ''] ?? setup.situation ?? null,
+    everyone_is_an_adult: !clean,
+    spicy: clean || setup.spicy === 'no' ? 'no' : setup.spicy === 'yes' ? 'yes' : 'mild',
+    content: clean
+      ? "there may be minors: completely clean and family-friendly. No dating, crushes, exes, flirting, drinking, night parties or comments on anyone's looks"
+      : setup.spicy === 'no'
+        ? 'adults who asked for NOTHING spicy: no flirting, crushes, dating, exes, hookups, sex or drinking jokes'
+        : setup.spicy === 'yes'
+          ? 'adults who asked for SPICY: flirting, crushes, exes, hookups, walks of shame, drinking and wild nights are welcome. Cheeky innuendo is fine; never explicit or graphic'
+          : 'adults: cheeky is fine, never explicit',
+    format_this_round: format[lang],
+    how_to_tell_it: device,
+  }
 }
 
 // Detección de idioma barata: palabras funcionales y signos propios del castellano.
@@ -518,7 +602,7 @@ export function mergeMemory(
 
 // ───────────────────────── Prompt ─────────────────────────
 
-const SYSTEM_PROMPT = `You run "Typing…", a party game played on phones by real friends.
+export const SYSTEM_PROMPT = `You run "Typing…", a party game played on phones by real friends.
 Each round you write a short fake group chat starring the players. It ends with a question to one player, the WRITER.
 The writer answers for real; everyone else tries to imitate the writer's reply; then they vote for the real one.
 You also keep the game's memory: what you have learned about how each player really texts.
@@ -542,11 +626,30 @@ Ignore the chat lines you wrote in past rounds: those were invented by you, not 
 
 STEP 2, WRITE THE CHAT ("chat"), using what you just learned.
 
+THE ROOM COMES FIRST. DATA.room is what the host chose for this game. It overrides everything else in DATA and in
+these instructions, including the theme and the examples.
+- room.host_says is what is happening right now, in the host's words. The chat is ABOUT it: use the people, ages,
+  places and details it mentions ("Mario's 30th, he can't get over his ex" means a chat at Mario's 30th about that ex).
+- room.content is a hard rule about what is allowed. When room.spicy is "yes", lean into it: the group asked for it.
+  When it is "no", nothing flirty, romantic or boozy at all, not even as a hint.
+- room.format_this_round is what gets shared in the chat (a screenshot, a payment note, a voice note…). Build the
+  chat around it when it fits room.host_says; skip it if it clearly does not fit.
+- room.how_to_tell_it is the shape of the joke this round. Follow it.
+
+THE WRITER IS THE MAIN CHARACTER. The incident is something the WRITER did, said, posted, bought or hid. The others
+only discover it, comment and react; they never confess to anything themselves. The final question asks the writer
+about THEIR own incident, so it makes sense on its own ("Mario who was that message for??").
+
 LANGUAGE (the most important rule): every title and message is written in DATA.language, whatever the language of
 the examples, the history or the player names. Follow DATA.language_notes.
 
-TOPIC: the chat is about DATA.theme_this_round, told as a concrete little scandal, mystery or dilemma that involves the
-writer or the group. Food is never the topic: no pizza, snacks, chips, nachos, tacos, fridges or stolen food.
+TOPIC: DATA.theme_this_round is only an ANGLE on room.host_says (a secret, a lie, a dare… during THAT situation).
+If the angle does not fit the situation, drop it. Turn it into ONE specific, slightly absurd, petty incident that
+involves the writer. A concrete object, a number, a time or a place is what makes it funny. Low stakes, big drama.
+Vague is bad ("X did something embarrassing", "X has a new crush"). Specific is good: one invented detail nobody
+would guess. Invent your own details every time; never reuse wording or details from these instructions.
+Keep it petty: never politics, the news, causes or opinions about society.
+Food is never the topic: no pizza, snacks, chips, nachos, tacos, fridges or stolen food.
 audience.where_they_are is only the backdrop (where they are right now), not the topic.
 If audience.right_now is set, they are physically together at that real spot at that local time: the theme happens
 during this exact night/day out. Read the plan from where_they_are + local_time + nearby (e.g. Saturday past midnight
@@ -554,26 +657,40 @@ next to clubs = going out clubbing around there; lunchtime next to restaurants =
 the street or neighbourhood, or ONE real nearby place by name when it makes the chat feel like theirs (where they go
 next, who will not get in, the queue). Never invent other venues, never give addresses or house numbers.
 
+HUMOUR: the group is teasing the writer the way close friends do: affectionate roasting, never mean.
+- Build it like a comedy bit. The first message drops the incident. Each next message escalates with ONE new detail
+  (proof, a screenshot, a witness, an even worse detail). Then the question.
+- Every message adds information. No filler: never "guys you won't believe this", "what happened?", "tell us", "omg".
+- Vary how chats start: never open with "guys", "tío", "tía", "ok so" or "bro". Start with the incident itself.
+- The joke lives in specific details and deadpan delivery, not in laughter. Only react ("JAJAJA", "💀", "nooo") right
+  after something that is actually funny. Never explain the joke.
+- The final question cannot be answered with yes or no, and has many plausible funny answers, so friends can fake it:
+  ask the writer to explain, justify, choose, or say exactly what they did or said.
+  Good shapes: "WRITER explain the …", "WRITER what did you write him", "WRITER which one was it", "WRITER why …".
+  Bad: "WRITER what do you think?", "is it true?", "WRITER??", "what happened?", "are you ok?".
+
 STRUCTURE: DATA.house_examples are the game's reference chats, written by the team (WRITER = the writer's name).
-Match their shape: 2 to 4 short messages that build a situation fast, then a direct, specific question to the writer
-that is fun to answer for real and fun to fake ("WRITER?? explain", "WRITER what did you do exactly").
-Never copy them; write a new situation with the same punch.
+Match their punch: a few short messages that build the situation fast, then the question to the writer.
+Never copy them; write a new situation that is funnier.
 
 STYLE: DATA.style_examples are real group chats from real people (A, B, C), in DATA.language.
-DATA.texting_targets were measured on hundreds of real messages: match them. Real people send bursts of very short
-messages instead of one long sentence: split every thought into its own message, almost never use commas, never use
-opening ¿ or ¡, and drop the final period. A pure reaction ("JAJAJA", "nooo", "wait what", "😭") counts as a message.
+DATA.texting_targets were measured on hundreds of real messages: match them. Real people send bursts of short
+messages instead of one long sentence: almost never use commas, never use opening ¿ or ¡, and drop the final period.
+Keep each punchline whole in one message. A pure reaction ("JAJAJA", "nooo", "wait what", "😭") counts as a message.
 The same person often sends two or three messages in a row. Small typos are fine.
 The same kinds of situations they talk about are welcome; never reuse their sentences or details.
 
 FIELDS:
-- "situation": a few words naming the situation. It must differ from everything in memory.used_situations.
+- "situation": write this FIRST: room.host_says in a few words + this round's incident ("Mario's 30th: Bizum to
+  his ex"). It must differ from everything in memory.used_situations. Then write the lines about exactly that.
 - "title": a real group chat name for these people (max 24 characters, may include one emoji), not a summary of the joke.
-- "lines": 3 to 6 short messages. "from" is the handle of the sender. The writer NEVER sends a message.
+- "lines": 2 to 5 short messages; most chats are 3 or 4. Shorter is funnier. "from" is the handle of the sender. The writer NEVER sends a message.
   Handles (P0, P1…) are only for "from": inside message text always use the player's name.
   "text" is only what they type: never start it with the sender's name or "name:". Max 60 characters each.
   Nobody ever says their own name: a message that mentions a player is sent by someone else.
 - The LAST message is addressed to the writer by name: a question or a direct demand ("Laura explain", "Laura what did you do").
+  It must invite a funny or revealing reply that friends could plausibly fake. Nothing comes after it: no reaction,
+  no extra comment. The chat ends on that question.
 - Follow the audience (group, know_each_other, content, vibes, topic, extra_context). From round 2 on, call back a
   running joke or something a player said when it fits, and follow the steer. If the writer has been easy to spot
   (stats.spotted_by), ask something more open-ended.
@@ -645,15 +762,17 @@ export function buildAudience(setup: Setup) {
   }
 }
 
-function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme) {
+function buildData(input: GenerateRoundInput, handleOf: (id: string) => string, theme: Theme, format: Format, device: string) {
   const memory = input.memory ?? {}
   const evidence = computeEvidence(input.players, input.history)
   const lang = input.setup.lang === 'es' ? 'es' : 'en'
   return {
+    room: roomBrief(input.setup, format, device),
     language: LANGUAGES[lang].name,
     language_notes: LANGUAGES[lang].notes,
     texting_targets: TEXTING[lang],
-    theme_this_round: theme[lang],
+    // El tema es un ángulo SOBRE lo que dijo el host: van juntos para que el modelo no se olvide de lo segundo.
+    theme_this_round: hostAngle(theme[lang], input.setup),
     round: input.round,
     total_rounds: input.total_rounds,
     house_examples: input.house_examples ?? [],
@@ -774,19 +893,57 @@ function repairChat(
       }
     }
   })
+  endOnQuestion(lines, writerName)
   const last = lines[lines.length - 1]
-  if (typeof last?.text === 'string' && !mentions(last.text, writerName)) {
-    // Si la pregunta va a otro jugador (p. ej. al writer de la ronda anterior), se cambia ese nombre por el del writer.
-    const other = Object.values(nameOf).find((name) => name !== writerName && mentions(last.text, name))
-    const word =
-      other &&
-      (last.text.toLowerCase().includes(other.toLowerCase())
-        ? other
-        : other.split(/\s+/).find((w) => w.length >= 2 && mentions(last.text, w)))
-    last.text = word
-      ? last.text.replace(new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), writerName)
-      : `${writerName} ${last.text.replace(/^[^\p{L}\p{N}]*/u, '')}`
+  // Solo se arregla una PREGUNTA que no nombra al writer. Una línea final que no es pregunta ni le nombra
+  // ("Oh noooo") no se convierte en "Nico Oh noooo": falla la validación y se reintenta.
+  // Si la pregunta va a OTRO jugador ("Nico to who??" cuando quien la lió fue Nico) NO se cambia el nombre por el del
+  // writer: la historia era de otro y la pregunta dejaría de tener sentido ("mario to who??"). Falla y se reintenta.
+  const toOther = Object.values(nameOf).some((name) => name !== writerName && namesPerson(last?.text ?? '', name))
+  if (typeof last?.text === 'string' && !mentions(last.text, writerName) && isQuestion(last.text) && !toOther) {
+    // "Qué ha pasado aquí?" -> "Nico qué ha pasado aquí?" (sin la mayúscula a mitad de frase de "Nico Qué…").
+    const rest = last.text.replace(/^[^\p{L}\p{N}]*/u, '')
+    last.text = `${writerName} ${startsWithCapsWord(rest) ? rest : rest.charAt(0).toLowerCase() + rest.slice(1)}`
   }
+}
+
+/**
+ * Muletillas al empezar un mensaje ("Tío, acaba de…", "Guys look…"): el prompt las prohíbe y 70B las sigue poniendo
+ * en casi todos los chats. Se quitan si detrás queda texto.
+ */
+const FILLER_OPENER = /^(?:(?:ok(?:ay)?(?:\s+so)?|vale|eh|oye|bueno|buah|wait|so)[\s,]+)?(?:t[íi]os?|t[íi]as?|guys|bro|dude|chicos|peña)(?![\p{L}])[\s,!.:]*(?=\S)/iu
+export function stripFillerOpeners<T extends { text: string }>(lines: T[]): T[] {
+  for (const line of lines) {
+    const stripped = line.text.replace(FILLER_OPENER, '')
+    if (stripped !== line.text && stripped.trim().length >= 3) line.text = stripped
+  }
+  return lines
+}
+
+/** Como mucho `max` mensajes: sobran primero las reacciones sueltas ("😂", "nooo") y luego el segundo mensaje. */
+export function capLines<T extends { text: string }>(lines: T[], max: number): T[] {
+  const out = [...lines]
+  while (out.length > max) {
+    const reaction = out.findIndex((l, i) => i > 0 && i < out.length - 1 && words(l.text) <= 2)
+    out.splice(reaction > 0 ? reaction : 1, 1)
+  }
+  return out
+}
+
+// Pregunta: acaba en "?" (aunque detrás vaya algún emoji o "!").
+const isQuestion = (text: string) => /\?[\s!\p{Extended_Pictographic}\u{FE0F}]*$/u.test(text.trim())
+
+/**
+ * El chat acaba en la pregunta al writer. El modelo a veces sigue después ("Ana tía qué haces?" + "Oh noooo"):
+ * se corta tras la última pregunta que nombra al writer o, si no hay, tras la última pregunta. Siempre quedan 2+ líneas.
+ */
+function endOnQuestion(lines: { from: string; text: string }[], writerName: string): void {
+  const lastIndex = (test: (text: string) => boolean) =>
+    lines.findLastIndex((line) => typeof line?.text === 'string' && test(line.text))
+  const toWriter = lastIndex((text) => isQuestion(text) && mentions(text, writerName))
+  const anyQuestion = lastIndex(isQuestion)
+  const cut = toWriter >= 1 ? toWriter : mentions(lines[lines.length - 1]?.text ?? '', writerName) ? -1 : anyQuestion
+  if (cut >= 1 && cut < lines.length - 1) lines.splice(cut + 1)
 }
 
 function validateChat(output: ModelOutput, writerName: string, otherHandles: Set<string>): string | null {
@@ -833,8 +990,17 @@ export async function callModel<T>(
     }
   }
   if (!response.ok) throw new AiError('provider_status', `${response.status} ${await response.text().catch(() => '')}`)
+  // OpenRouter responde 200 al momento y genera mientras mantiene la conexión abierta: si se acaba el tiempo, se corta
+  // la LECTURA del cuerpo. Eso es un timeout, no un JSON malo (antes salía como not_json y no se veía en las métricas).
+  let data: { choices?: { message?: { content?: unknown } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } }
   try {
-    const data = await response.json()
+    data = await response.json()
+  } catch (error) {
+    const name = error instanceof Error ? error.name : ''
+    if (name === 'TimeoutError' || name === 'AbortError') throw new AiError('timeout', 'body_read_timeout')
+    throw new AiError('invalid_output', 'not_json')
+  }
+  try {
     return { json: parseJsonReply(data.choices?.[0]?.message?.content) as T, usage: data.usage ?? {} }
   } catch {
     throw new AiError('invalid_output', 'not_json')
@@ -845,14 +1011,33 @@ export async function callModel<T>(
 export function parseJsonReply(content: unknown): unknown {
   const text = typeof content === 'string' ? content.trim() : ''
   try {
-    return JSON.parse(text)
+    return cleanStrings(JSON.parse(text))
   } catch {
     const start = text.indexOf('{')
     const end = text.lastIndexOf('}')
     if (start === -1 || end <= start) throw new Error('no_json')
-    return JSON.parse(text.slice(start, end + 1))
+    return cleanStrings(JSON.parse(text.slice(start, end + 1)))
   }
 }
+
+/**
+ * Hermes a veces rompe los caracteres en json_object: "Andr\u0000e9s" (é partida en un NUL + "e9") o códigos de
+ * color de terminal ("\u001b[36;1m"). Se rehace la letra y se quita el resto, en todas las cadenas de la respuesta.
+ */
+export function cleanText(text: string): string {
+  return text
+    .replace(/\u0000([0-9a-fA-F]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\u001b?\[[0-9;]*m/g, '')
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '')
+}
+const cleanStrings = (value: unknown): unknown =>
+  typeof value === 'string'
+    ? cleanText(value)
+    : Array.isArray(value)
+      ? value.map(cleanStrings)
+      : value && typeof value === 'object'
+        ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, cleanStrings(v)]))
+        : value
 
 async function send(config: AiConfig, system: string, user: string, schemaName: string, schema: unknown, timeoutMs: number) {
   const mode = config.jsonMode ?? 'json_schema'
@@ -868,8 +1053,8 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
       body: JSON.stringify({
         model: config.model,
         ...(config.model.includes('gpt-oss') ? { reasoning_effort: 'low' } : {}),
-        // Los modelos pequeños (p. ej. Hermes 3 8B) se desordenan con temperatura 1.
-        temperature: config.model.includes('gpt-oss') ? 1 : 0.8,
+        // Los modelos pequeños (p. ej. Hermes 3 8B) se desordenan con temperatura 1; 0.95 da más variedad a Hermes 70B.
+        temperature: config.model.includes('gpt-oss') ? 1 : 0.95,
         // max_tokens lo entiende cualquier servidor compatible (vLLM, OpenRouter…); Groq acepta ambos.
         ...(mode === 'json_schema' ? { max_completion_tokens: 4000 } : { max_tokens: 1500 }),
         ...(mode === 'json_schema'
@@ -893,29 +1078,51 @@ async function send(config: AiConfig, system: string, user: string, schemaName: 
 export async function generateRound(input: GenerateRoundInput, config: AiConfig): Promise<GenerateRoundOutput> {
   const started = Date.now()
   const deadline = started + (config.timeoutMs ?? 8000)
-  const done = (output: Attempt, attempts: number): GenerateRoundOutput => ({
+  const done = (output: Attempt, attempts: number, model = config.model): GenerateRoundOutput => ({
     ...output,
-    model: config.model,
+    model,
     prompt_version: PROMPT_VERSION,
     latency_ms: Date.now() - started,
     attempts,
+    theme_id: theme.id,
+    format_id: format.id,
+    device: device.split(':')[0],
   })
   const theme = pickTheme(input)
+  const format = pickFormat()
+  const device = pickDevice()
+  const budget = config.timeoutMs ?? 8000
+  const fallback = config.fallbackModel && config.fallbackModel !== config.model ? config.fallbackModel : null
+  // Con modelo de respaldo y tiempo suficiente, se le guardan ~16 s (70B con carga tarda 12–16 s): el principal (405B) se corta antes.
+  const reserve = fallback && budget >= 30000 ? 16000 : 0
   try {
-    return done(await generateOnce(input, config, theme), 1)
+    // Primer intento estricto (el writer tiene que ser el protagonista) solo si hay tiempo para un segundo.
+    const first = { ...config, timeoutMs: budget - reserve }
+    return done(await generateOnce(input, first, theme, format, device, reserve > 0 || budget >= 24000), 1)
   } catch (error) {
+    const timedOut = error instanceof AiError && error.code === 'timeout'
     const retryable =
       error instanceof AiError &&
-      (error.code === 'invalid_output' || (error.code === 'provider_status' && error.message.startsWith('400')))
+      (error.code === 'invalid_output' ||
+        (error.code === 'provider_status' && error.message.startsWith('400')) ||
+        (timedOut && reserve > 0))
     const left = deadline - Date.now()
     if (!retryable || left < 2500) throw error
-    return done(await generateOnce(input, { ...config, timeoutMs: left }, theme), 2)
+    const model = fallback ?? config.model
+    return done(await generateOnce(input, { ...config, model, timeoutMs: left }, theme, format, device), 2, model)
   }
 }
 
 type Attempt = Pick<GenerateRoundOutput, 'chat' | 'memory' | 'input_tokens' | 'output_tokens'>
 
-async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: Theme): Promise<Attempt> {
+async function generateOnce(
+  input: GenerateRoundInput,
+  config: AiConfig,
+  theme: Theme,
+  format: Format,
+  device: string,
+  strictStory = false,
+): Promise<Attempt> {
   const handles = new Map(input.players.map((p, i) => [p.id, `P${i}`]))
   const handleToId = Object.fromEntries([...handles].map(([id, handle]) => [handle, id]))
   const handleOf = (id: string) => handles.get(id) ?? 'gone' // jugadores que ya se fueron
@@ -925,8 +1132,8 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
 
   const { json, usage } = await callModel<ModelOutput>(
     config,
-    SYSTEM_PROMPT,
-    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme))}`,
+    config.systemPrompt ?? SYSTEM_PROMPT,
+    `DATA:\n${JSON.stringify(buildData(input, handleOf, theme, format, device))}`,
     'round',
     buildSchema([...handles.values()]),
   )
@@ -936,14 +1143,19 @@ async function generateOnce(input: GenerateRoundInput, config: AiConfig, theme: 
     const nameOf = Object.fromEntries(input.players.map((p) => [handleOf(p.id), p.name]))
     output.chat.lines = naturalize(output.chat.lines.filter((l) => typeof l?.text === 'string' && l.text.trim()), lang)
     if (!fixSelfReferences(output.chat.lines, nameOf, otherHandles)) throw new AiError('invalid_output', 'self_reference')
+    output.chat.lines = capLines(stripFillerOpeners(output.chat.lines), MAX_LINES)
     output.chat.title = String(output.chat.title ?? '')
       .replace(/[¿¡]/g, '')
       .replace(/\bP\d\b/g, (handle) => nameOf[handle] ?? handle)
       .trim()
   }
   const texts = output?.chat?.lines?.map((l) => l.text) ?? []
+  // El writer es el protagonista: sale nombrado antes de la pregunta final. Solo se exige si queda tiempo para
+  // reintentar (rondas 2+); en la ronda 1 en directo vale el chat antes que el respaldo.
+  const writerInStory = texts.slice(0, -1).some((text) => namesPerson(text, writer.name))
   const problem =
     validateChat(output, writer.name, new Set(otherHandles)) ??
+    (strictStory && texts.length > 2 && !writerInStory ? 'writer_not_main' : null) ??
     languageProblem([output.chat.title, ...texts], lang) ??
     copiedFrom(texts, [...(input.style_examples ?? []), ...(input.house_examples ?? []).map((ex) => ex.lines)])
   if (problem) throw new AiError('invalid_output', problem)

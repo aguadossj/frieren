@@ -38,3 +38,8 @@ supabase/.temp/
 
 # Project instructions
 CLAUDE.md
+
+# Prompt lab: generated outputs
+supabase/functions/generate-round/prompt-lab-report.md
+supabase/functions/generate-round/prompt-sim-chats.json
+supabase/functions/generate-round/prompt-sim-batch*.json

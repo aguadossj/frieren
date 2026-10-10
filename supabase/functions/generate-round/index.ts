@@ -69,6 +69,8 @@ Deno.serve(async (request: Request) => {
     timeoutMs: 18000,
     // json_object (por defecto, Hermes 3) | json_schema | none: el esquema va en el prompt salvo con json_schema
     jsonMode: (Deno.env.get('AI_JSON_MODE') ?? 'json_object') as 'json_schema' | 'json_object' | 'none',
+    // Hermes 405B escribe mejor pero con mucha gente a la vez a veces no llega: entonces, un intento con 70B.
+    fallbackModel: Deno.env.get('AI_FALLBACK_MODEL') ?? 'nousresearch/hermes-3-llama-3.1-70b:nitro',
   }
 
   const body = await request.json().catch(() => null)
@@ -79,7 +81,8 @@ Deno.serve(async (request: Request) => {
     const roomId = typeof body?.room_id === 'string' ? body.room_id : null
     try {
       if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
-      const output = await generateDrafts(body.input, { ...config, timeoutMs: 30000 }, Number(body.count) || 3)
+      // pg_net espera 45 s a los borradores: 42 s dejan sitio al respaldo y a guardarlos.
+      const output = await generateDrafts(body.input, { ...config, timeoutMs: 42000 }, Number(body.count) || 3)
       if (!roomId) return json(200, output)
       const saved = output.drafts.length
         ? await rpc('ai_save_drafts', { p_room_id: roomId, p_setup_hash: String(body.setup_hash ?? ''), p_drafts: output.drafts })
@@ -133,7 +136,8 @@ Deno.serve(async (request: Request) => {
     try {
       if (!apiKey) throw new AiError('provider_failed', 'no AI_API_KEY')
       const input = parseInput(body.input)
-      const output = await generateRound(input, { ...config, timeoutMs: input.round === 1 ? 18000 : 28000 })
+      // Rondas 2+: pg_net espera 35 s; 33 s = ~17 s para 405B + ~16 s para el respaldo. Ronda 1 en directo: 18 s (sala esperando).
+      const output = await generateRound(input, { ...config, timeoutMs: input.round === 1 ? 18000 : 33000 })
       const outcome = await rpc('ai_complete_round', { p_round_id: roundId, p_result: output })
       return json(200, { outcome })
     } catch (error) {
