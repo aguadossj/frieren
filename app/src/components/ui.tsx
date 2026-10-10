@@ -193,12 +193,16 @@ export function Avatar({
   player,
   size = 36,
   ring = false,
+  roomCode,
 }: {
   player: Pick<Player, 'name' | 'color'> & { id?: string }
   size?: number
   ring?: boolean
+  /** Código de sala cuando aún no estás dentro (pantalla de unirse); si no, el de la sala actual. */
+  roomCode?: string
 }) {
-  const code = useGame().room?.code ?? ''
+  const roomNow = useGame().room?.code
+  const code = roomCode ?? roomNow ?? ''
   const avatar = avatarFor(code, player)
   const [broken, setBroken] = useState(false)
   return (

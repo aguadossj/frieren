@@ -356,7 +356,8 @@ export function createMockClient(): GameClient {
     },
     // Mock: cualquier código de 4 letras es una sala con bots (útil para probar sin backend)
     async checkRoom(roomCode) {
-      return /^[A-Za-z]{4}$/.test(roomCode.trim()) ? { ok: true } : { ok: false, message: 'Room not found' }
+      // joinRoom del mock mete primero al host (bot) y luego a ti: te toca el segundo color
+      return /^[A-Za-z]{4}$/.test(roomCode.trim()) ? { ok: true, color: PLAYER_COLORS[1] } : { ok: false, message: 'Room not found' }
     },
     async joinRoom(roomCode, name) {
       reset()

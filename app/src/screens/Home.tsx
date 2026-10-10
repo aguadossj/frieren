@@ -4,7 +4,8 @@ import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import HowToPlay, { seenHowTo } from '../components/HowToPlay'
 import MimicInfo from '../components/MimicInfo'
 import type { SwipeCard } from '../components/SwipeDeck'
-import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
+import { AppHeader, Avatar, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
+import { PandaFace } from '../components/Panda'
 import { getLang, useLang, useT } from '../i18n'
 import { LEGAL, LEGAL_PAGES, LEGAL_PATHS } from '../content/legal'
 import { describePlace, knownPosition } from '../lib/place'
@@ -319,13 +320,18 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
   // Comprobación del código ANTES de pedir el nombre (check_room): existe, no ha empezado, no está llena
   const [checking, setChecking] = useState(false)
   const [codeError, setCodeError] = useState<string | null>(null)
+  // Color (→ panda) que te tocará al entrar, según check_room
+  const [myColor, setMyColor] = useState<string | null>(null)
 
   const checkCode = async (v: string) => {
     setChecking(true)
     setCodeError(null)
     const res = await game.checkRoom(v)
     setChecking(false)
-    if (res.ok) return setStep('name')
+    if (res.ok) {
+      setMyColor(res.color ?? null)
+      return setStep('name')
+    }
     setStep('code')
     setCodeError(res.message ?? null)
     setShake(true)
@@ -393,7 +399,6 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
     )
   }
 
-  const initial = name.trim().slice(0, 1).toUpperCase()
   return (
     <Screen>
       <AppHeader left={back} />
@@ -404,52 +409,34 @@ function JoinPage({ initialCode, onBack }: { initialCode: string; onBack: () => 
           void join()
         }}
       >
-        <Body className="gap-6 pt-4">
-          {/* Invitación tipo entrada, con muescas y línea perforada */}
-          <div className={`relative animate-pop rounded-[30px] bg-white text-ink ${shake ? 'animate-nudge' : ''}`}>
-            <div className="px-6 pt-6 pb-5 text-center">
-              <Eyebrow className="text-neutral-400">{t.invitedTo}</Eyebrow>
-              <div className="mt-3 flex justify-center gap-2">
-                {code.split('').map((l, i) => (
-                  <span
-                    key={i}
-                    className="flex h-[58px] w-[50px] animate-pop items-center justify-center rounded-[16px] bg-brand text-[32px] font-black text-white"
-                    style={{ animationDelay: `${0.15 + i * 0.07}s` }}
-                  >
-                    {l}
-                  </span>
-                ))}
-              </div>
+        <Body className="pt-4">
+          {/* Solo tu panda (el que tendrás en la sala) y tu nombre */}
+          <div className="my-auto flex flex-col items-center gap-8 py-4">
+            <div className={`animate-pop ${shake ? 'animate-nudge' : ''}`}>
+              {myColor ? (
+                <Avatar player={{ name: name.trim() || '?', color: myColor }} roomCode={code} size={176} ring />
+              ) : checking ? (
+                <span className="flex size-[176px] items-center justify-center rounded-full bg-white/20 ring-[3px] ring-white">
+                  <TypingDots />
+                </span>
+              ) : (
+                // Sin dato de color (servidor sin actualizar): un panda genérico
+                <span className="flex size-[176px] items-center justify-center overflow-hidden rounded-full bg-white ring-[3px] ring-white">
+                  <PandaFace size={150} />
+                </span>
+              )}
             </div>
-            <div className="relative h-0 border-t-[3px] border-dashed border-neutral-200">
-              <span className="absolute -top-[14px] -left-[14px] size-[26px] rounded-full bg-brand" />
-              <span className="absolute -top-[14px] -right-[14px] size-[26px] rounded-full bg-brand" />
-            </div>
-            {/* Vista previa en vivo: así te verán en el chat */}
-            <div className="flex items-center gap-3 px-6 pt-5 pb-6">
-              <span
-                className="flex size-[52px] shrink-0 items-center justify-center rounded-full text-[22px] font-black text-white transition-colors duration-300"
-                style={{ background: name.trim() ? '#111111' : '#E5E5E5' }}
-              >
-                {initial || <TypingDots />}
-              </span>
-              <div className="min-w-0">
-                <div className="truncate text-[19px] leading-tight font-extrabold">{name.trim() || t.you}</div>
-                <div className="text-[15px] font-semibold text-neutral-400">{name.trim() ? t.joiningChat : t.typeYourName}</div>
-              </div>
-            </div>
-          </div>
-
-          <label className="flex animate-rise flex-col gap-2" style={{ animationDelay: '0.15s' }}>
-            <Eyebrow>{t.yourName}</Eyebrow>
             <TextInput
+              className="animate-rise"
+              style={{ animationDelay: '0.15s' }}
               placeholder={t.namePlaceholderGuest}
+              aria-label={t.yourName}
               maxLength={MAX_NAME_LENGTH}
               value={name}
               onChange={(e) => setName(e.target.value)}
               enterKeyHint="go"
             />
-          </label>
+          </div>
         </Body>
 
         <Footer>
