@@ -142,6 +142,28 @@ input { font-size: 16px; }
   from { opacity: 1; }
   to { opacity: 0; }
 }
+/* Final: los bloques del podio crecen desde el suelo */
+@keyframes podium-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+/* Corona que cae y rebota sobre el ganador */
+@keyframes crown-drop {
+  0% { transform: translate(-50%, -40px) rotate(-20deg); opacity: 0; }
+  60% { transform: translate(-50%, 4px) rotate(6deg); opacity: 1; }
+  80% { transform: translate(-50%, -3px) rotate(-3deg); }
+  100% { transform: translate(-50%, 0) rotate(0); opacity: 1; }
+}
+/* Confeti del final: cae una vez, con deriva lateral y giro propios (--dx, --rot) */
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0); opacity: 0; }
+  8% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate3d(var(--dx), 820px, 0) rotate(var(--rot)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .confetti { display: none; }
+}
 @keyframes nudge {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-8px); }

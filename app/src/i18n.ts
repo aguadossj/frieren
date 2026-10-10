@@ -47,6 +47,12 @@ export function useT() {
   return STRINGS[useLang()]
 }
 
+const fmt = (n: number) => n.toLocaleString('en')
+const MEDALS = ['🥇', '🥈', '🥉']
+const ordinalEn = (n: number) => {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'
+  return `${n}${s}`
+}
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 const en = {
@@ -169,11 +175,26 @@ const en = {
   // Final
   gameOver: 'Game over',
   rounds: (n: number) => plural(n, 'round', 'rounds'),
-  wins: (name: string, isMe: boolean) => (isMe ? 'You win! 👑' : `${name} wins! 👑`),
+  wins: (name: string, isMe: boolean) => (isMe ? 'You win!' : `${name} wins!`),
+  /** Línea bajo el titular del final: tu resultado. */
+  myResult: (place: number, score: number) =>
+    place === 1 ? `${fmt(score)} points. Untouchable.` : `You finished ${ordinalEn(place)} with ${fmt(score)} points.`,
+  winnerScore: (score: number) => `${fmt(score)} points`,
+  pts: 'pts',
   playAgain: 'Play again',
   menu: 'Menu',
-  shareResult: 'Share the result',
-  shareText: (name: string, score: number) => `${name} won Typing… with ${score} points. Think you can fake your friends?`,
+  shareResult: 'Share',
+  copied: 'Copied!',
+  /** Mensaje para WhatsApp & co.: podio con medallas + enlace en su propia línea. */
+  shareText: (top: { name: string; score: number }[], iWon: boolean, url: string) =>
+    [
+      iWon ? '🏆 I won Typing…!' : `🏆 ${top[0].name} won Typing…!`,
+      '',
+      ...top.slice(0, 3).map((p, i) => `${MEDALS[i]} ${p.name} · ${fmt(p.score)} pts`),
+      '',
+      'Think you can fake your friends? 👇',
+      url,
+    ].join('\n'),
 }
 
 const es: typeof en = {
@@ -287,11 +308,24 @@ const es: typeof en = {
   },
   gameOver: 'Fin de la partida',
   rounds: (n) => plural(n, 'ronda', 'rondas'),
-  wins: (name, isMe) => (isMe ? '¡Has ganado! 👑' : `¡Gana ${name}! 👑`),
+  wins: (name, isMe) => (isMe ? '¡Has ganado!' : `¡Gana ${name}!`),
+  myResult: (place, score) =>
+    place === 1 ? `${fmt(score)} puntos. Intocable.` : `Has quedado ${place}º con ${fmt(score)} puntos.`,
+  winnerScore: (score) => `${fmt(score)} puntos`,
+  pts: 'pts',
   playAgain: 'Otra partida',
   menu: 'Menú',
-  shareResult: 'Compartir resultado',
-  shareText: (name, score) => `${name} ha ganado en Typing… con ${score} puntos. ¿Sabrías imitar a tus amigos?`,
+  shareResult: 'Compartir',
+  copied: '¡Copiado!',
+  shareText: (top, iWon, url) =>
+    [
+      iWon ? '🏆 ¡He ganado en Typing…!' : `🏆 ¡${top[0].name} gana en Typing…!`,
+      '',
+      ...top.slice(0, 3).map((p, i) => `${MEDALS[i]} ${p.name} · ${fmt(p.score)} pts`),
+      '',
+      '¿Sabrías imitar a tus amigos? 👇',
+      url,
+    ].join('\n'),
 }
 
 const STRINGS = { en, es }

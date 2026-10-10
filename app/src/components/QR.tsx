@@ -4,22 +4,26 @@ import QRCode from 'qrcode'
 
 export const joinUrl = (code: string) => `${location.origin}/?room=${code}`
 
+/** Enlace público del juego (lo que se comparte al acabar). En local seguiría siendo la web pública, no tu IP. */
+export const PUBLIC_URL = ((import.meta.env.VITE_PUBLIC_URL as string | undefined) ?? 'https://frieren-bfq.pages.dev').replace(/\/$/, '')
+
 /**
- * Compartir la invitación: abre el menú nativo de compartir (WhatsApp, Mensajes…) con el texto y el enlace.
- * Si el navegador no puede compartir, copia "texto + enlace" al portapapeles.
- * Devuelve 'shared' | 'copied' | 'cancelled' para que la UI muestre (o no) "copiado".
+ * Comparte un texto ya completo (con el enlace dentro): menú nativo → portapapeles → copia a la antigua.
+ * El enlace va dentro del texto (y no en `url`) para que WhatsApp/Mensajes respeten los saltos de línea.
  */
-export async function shareInvite(code: string, text: string): Promise<'shared' | 'copied' | 'cancelled'> {
-  const url = joinUrl(code)
+export async function shareText(text: string): Promise<'shared' | 'copied' | 'cancelled'> {
   if (navigator.share) {
     try {
-      await navigator.share({ title: 'Typing…', text, url })
+      await navigator.share({ text })
       return 'shared'
     } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled' // el usuario cerró el menú
+      if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled'
     }
   }
-  const full = `${text}\n${url}`
+  return copyText(text)
+}
+
+async function copyText(full: string): Promise<'copied' | 'cancelled'> {
   try {
     await navigator.clipboard.writeText(full)
     return 'copied'
@@ -35,6 +39,24 @@ export async function shareInvite(code: string, text: string): Promise<'shared' 
     ta.remove()
     return ok ? 'copied' : 'cancelled'
   }
+}
+
+/**
+ * Compartir la invitación: abre el menú nativo de compartir (WhatsApp, Mensajes…) con el texto y el enlace.
+ * Si el navegador no puede compartir, copia "texto + enlace" al portapapeles.
+ * Devuelve 'shared' | 'copied' | 'cancelled' para que la UI muestre (o no) "copiado".
+ */
+export async function shareInvite(code: string, text: string): Promise<'shared' | 'copied' | 'cancelled'> {
+  const url = joinUrl(code)
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Typing…', text, url })
+      return 'shared'
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return 'cancelled' // el usuario cerró el menú
+    }
+  }
+  return copyText(`${text}\n${url}`)
 }
 
 export default function QR({ code, size = 168 }: { code: string; size?: number }) {
