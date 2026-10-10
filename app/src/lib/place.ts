@@ -28,6 +28,19 @@ export function getPosition(timeoutMs = 10000): Promise<{ lat: number; lon: numb
   })
 }
 
+/**
+ * Pedir la ubicación nada más entrar en la web (aviso del navegador al abrirla, no a mitad de crear la sala).
+ * Se pide UNA vez y se guarda en memoria; la posición no se envía a ningún sitio hasta que el host dice
+ * "estáis juntos" al crear la sala (entonces se traduce a nombres con OpenStreetMap, ver describePlace).
+ */
+let earlyPosition: Promise<{ lat: number; lon: number } | null> | null = null
+export function requestPositionEarly() {
+  earlyPosition ??= getPosition()
+  return earlyPosition
+}
+/** La posición pedida al entrar (o la pide ahora si no se pidió). */
+export const knownPosition = () => requestPositionEarly()
+
 async function fetchJson(url: string, init: RequestInit = {}, timeoutMs = 7000) {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), timeoutMs)

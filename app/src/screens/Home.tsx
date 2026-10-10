@@ -4,7 +4,7 @@ import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
 import { getLang, useT } from '../i18n'
-import { describePlace, getPosition } from '../lib/place'
+import { describePlace, knownPosition } from '../lib/place'
 import type { PlaceContext } from '../lib/place'
 import { useGame } from '../game/useGame'
 import { MAX_NAME_LENGTH } from '../game/types'
@@ -125,12 +125,12 @@ function NamePage({ onBack }: { onBack: () => void }) {
   const [busy, setBusy] = useState(false)
   const answers = useRef<Record<string, boolean>>({})
 
-  // Ubicación: se pide al deslizar "sí" en la tarjeta de "estáis juntos" (ahí sale el aviso del navegador)
-  // y se traduce a calle, barrio y sitios cercanos mientras el host contesta el resto de tarjetas.
+  // Ubicación: el permiso se pide al ENTRAR en la web (main.tsx). Aquí, si el host desliza "sí" en "estáis juntos",
+  // se usa esa posición y se traduce a calle, barrio y sitios cercanos mientras contesta el resto de tarjetas.
   const placeLookup = useRef<Promise<PlaceContext | null> | null>(null)
   const [lookingAround, setLookingAround] = useState(false)
   const locate = () => {
-    placeLookup.current = getPosition().then((pos) => (pos ? describePlace(pos.lat, pos.lon, getLang()) : null))
+    placeLookup.current = knownPosition().then((pos) => (pos ? describePlace(pos.lat, pos.lon, getLang()) : null))
   }
 
   const create = async () => {
