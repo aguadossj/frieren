@@ -164,6 +164,32 @@ input { font-size: 16px; }
 @media (prefers-reduced-motion: reduce) {
   .confetti { display: none; }
 }
+/* ¿Qué es Mimic?: el robot disfrazado mira a los lados, flota, parpadea la antena y mueve el bigote */
+@keyframes mimic-look {
+  0%, 30%, 100% { transform: translateX(0); }
+  40%, 55% { transform: translateX(-4px); }
+  65%, 80% { transform: translateX(4px); }
+}
+@keyframes mimic-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes mimic-wiggle {
+  0%, 85%, 100% { transform: rotate(0); }
+  90% { transform: rotate(-6deg); }
+  95% { transform: rotate(6deg); }
+}
+@keyframes mimic-blink {
+  0%, 70%, 100% { opacity: 1; }
+  80% { opacity: 0.25; }
+}
+.mimic-eyes { animation: mimic-look 3.2s ease-in-out infinite; }
+.mimic-bob { animation: mimic-float 2.6s ease-in-out infinite; }
+.mimic-stache { transform-box: fill-box; transform-origin: center; animation: mimic-wiggle 2.4s ease-in-out infinite; }
+.mimic-blink { animation: mimic-blink 1.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .mimic-eyes, .mimic-bob, .mimic-stache, .mimic-blink { animation: none; }
+}
 @keyframes nudge {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-8px); }

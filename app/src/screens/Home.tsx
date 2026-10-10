@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { retintSafariBars } from '../lib/viewport'
 import SwipeDeck, { GLYPHS } from '../components/SwipeDeck'
 import HowToPlay, { seenHowTo } from '../components/HowToPlay'
+import MimicInfo from '../components/MimicInfo'
 import type { SwipeCard } from '../components/SwipeDeck'
 import { AppHeader, Body, Button, Eyebrow, Footer, Icon, LangToggle, Screen, TextInput, TypingDots } from '../components/ui'
 import { getLang, useLang, useT } from '../i18n'
@@ -126,11 +127,13 @@ function NamePage({ onBack }: { onBack: () => void }) {
   const { game, error } = useGame()
   const t = useT()
   const lang = useLang()
+  // "¿Qué es Mimic?": pop-up con ilustraciones dentro de la app (antes abría la página legal en otra pestaña)
+  const [mimicInfo, setMimicInfo] = useState(false)
   const cards: SwipeCard[] = CARD_IDS.map((id) => ({
     id,
     icon: CARD_ICONS[id],
     ...t.cards[id],
-    ...(id === 'mimic' && { link: { label: LEGAL[lang].ui.mimicLink, href: `${LEGAL_PATHS.ai}#mimic` } }),
+    ...(id === 'mimic' && { link: { label: LEGAL[lang].ui.mimicLink, onClick: () => setMimicInfo(true) } }),
   }))
   const [name, setName] = useState('')
   const [situation, setSituation] = useState('')
@@ -231,6 +234,7 @@ function NamePage({ onBack }: { onBack: () => void }) {
           )}
           {error && <p className="pt-3 text-center text-[16px] font-bold">{error}</p>}
         </div>
+        {mimicInfo && <MimicInfo onClose={() => setMimicInfo(false)} moreHref={`${LEGAL_PATHS.ai}#mimic`} />}
       </Screen>
     )
   }
