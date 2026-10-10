@@ -6,7 +6,7 @@ export type Phase = 'lobby' | 'generating' | 'writing' | 'voting' | 'reveal' | '
 export type Pack = 'uni' | 'spicy' | 'dating' | 'moral'
 export type GroupType = 'students' | 'friends' | 'coworkers' | 'family'
 
-export const PHASE_SECONDS = { writing: 45, voting: 25, reveal: 12, leaderboard: 4 } as const // valores por defecto del backend
+export const PHASE_SECONDS = { writing: 45, voting: 15, reveal: 8, leaderboard: 4 } as const // valores por defecto del backend
 export const MIN_PLAYERS = 3
 export const MAX_PLAYERS = 8
 export const MAX_ROUNDS = 5
