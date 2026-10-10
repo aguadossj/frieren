@@ -15,8 +15,11 @@ const PODIUM = [
   { place: 1, k: 1, avatar: 80, block: 'bg-ink text-white', delay: 0.5 },
   { place: 3, k: 0.52, avatar: 58, block: 'bg-white text-ink', delay: 0 },
 ] as const
-// 667 px (iPhone SE) → 140 px · 760 → 182 · 844 → 220 (lo que queda tras título, avatares y botones)
-const FIRST_HEIGHT = 'clamp(110px, calc(var(--vv-h, 100dvh) * 0.45 - 160px), 260px)'
+// 667 px (iPhone SE) → 122 px · 760 → 164 · 844 → 202 (lo que queda tras título, avatares y botones).
+// Con 4+ jugadores el podio baja un poco para que quepan sus filas debajo.
+// Cada bloque tiene además un alto mínimo para que el puesto y los puntos quepan siempre (el 3º se cortaba).
+const MIN_BLOCK = { 1: 104, 2: 84, 3: 72 } as const
+const FIRST_HEIGHT = 'clamp(104px, calc(var(--vv-h, 100dvh) * 0.45 - 178px), 260px)'
 const GROW_S = 0.55
 
 export default function Final() {
@@ -29,6 +32,7 @@ export default function Final() {
   const winner = ranking[0]
   const myPlace = ranking.findIndex((p) => p.id === me?.id) + 1
   const iWon = myPlace === 1
+  const extra = Math.min(Math.max(ranking.length - 3, 0), 2) * 30 // px que cede el podio por cada fila de debajo
   const label = (p: Player) => (p.id === me?.id ? t.you : p.name)
 
   const share = async () => {
@@ -81,10 +85,10 @@ export default function Final() {
                 </span>
                 <div
                   className={`flex w-full origin-bottom flex-col items-center justify-start rounded-t-[22px] pt-3 ${block}`}
-                  style={{ height: `calc(${FIRST_HEIGHT} * ${k})`, animation: `podium-grow ${GROW_S}s ${delay}s cubic-bezier(0.2, 0.9, 0.3, 1.1) both` }}
+                  style={{ height: `max(calc((${FIRST_HEIGHT} - ${extra}px) * ${k}), ${MIN_BLOCK[place]}px)`, animation: `podium-grow ${GROW_S}s ${delay}s cubic-bezier(0.2, 0.9, 0.3, 1.1) both` }}
                 >
                   <span className={`leading-none font-black ${place === 1 ? 'text-[44px]' : 'text-[34px]'}`}>{place}</span>
-                  <span className={`mt-1 text-[14px] font-extrabold tabular-nums ${place === 1 ? 'text-white/70' : 'text-neutral-400'}`}>
+                  <span className={`mt-1 text-[15px] font-extrabold tabular-nums ${place === 1 ? 'text-white/80' : 'text-neutral-500'}`}>
                     {fmt(p.score)} {t.pts}
                   </span>
                 </div>
@@ -107,12 +111,12 @@ export default function Final() {
           <Icon name="replay" size={22} />
           {t.playAgain}
         </Button>
-        <div className="grid grid-cols-2 gap-3">
-          <Button variant="ink" onClick={() => void share()} className="flex items-center justify-center gap-2.5 text-[19px]">
-            <Icon name={copied ? 'check' : 'share'} size={20} className={copied ? 'text-good' : ''} />
+        <div className="grid grid-cols-2 gap-2.5">
+          <Button variant="ink" onClick={() => void share()} className="flex h-[50px]! items-center justify-center gap-2 text-[17px]!">
+            <Icon name={copied ? 'check' : 'share'} size={18} className={copied ? 'text-good' : ''} />
             {copied ? t.copied : t.shareResult}
           </Button>
-          <Button variant="ink" onClick={() => void game.leave()} className="text-[19px]">
+          <Button variant="ink" onClick={() => void game.leave()} className="h-[50px]! text-[17px]!">
             {t.menu}
           </Button>
         </div>
